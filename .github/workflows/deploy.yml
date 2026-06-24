@@ -1,0 +1,47 @@
+# Deploys the PWA to Firebase Hosting on every push to main.
+#
+# Required GitHub secret:
+#   FIREBASE_SERVICE_ACCOUNT_DEV  — JSON key for a service account on the
+#     bourbonbuddy-dev project with the "Firebase Hosting Admin" role
+#     (and "Cloud Datastore Index Admin" / "Firebase Rules Admin" if you
+#     extend this to deploy rules). Create it in the GCP console:
+#       IAM & Admin → Service Accounts → Keys → Add key (JSON).
+#
+# NOTE: This targets the DEV project. Point FIREBASE_PROJECT at
+# bourbon-buddy-prod (and add a prod service-account secret) once that
+# project exists.
+
+name: Deploy to Firebase Hosting
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  FIREBASE_PROJECT: bourbonbuddy-dev
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (production)
+        run: npm run build:prod
+
+      - name: Deploy to Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_DEV }}
+          projectId: ${{ env.FIREBASE_PROJECT }}
+          channelId: live

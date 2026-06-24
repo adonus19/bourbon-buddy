@@ -1,0 +1,52 @@
+# Manually deploys Firestore Security Rules, indexes, Storage rules, and
+# Cloud Functions. Run from the GitHub Actions tab (workflow_dispatch) so
+# backend changes are deliberate, not triggered by every push.
+#
+# Required GitHub secret:
+#   FIREBASE_SERVICE_ACCOUNT_DEV — same JSON key described in deploy.yml,
+#   but the service account also needs:
+#     - Firebase Rules Admin
+#     - Cloud Datastore Index Admin
+#     - Cloud Functions Admin
+#     - Service Account User
+
+name: Deploy Backend (rules, indexes, functions)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "What to deploy"
+        required: true
+        default: "firestore:rules,firestore:indexes,storage"
+        type: choice
+        options:
+          - "firestore:rules,firestore:indexes,storage"
+          - "functions"
+          - "firestore:rules,firestore:indexes,storage,functions"
+
+env:
+  FIREBASE_PROJECT: bourbonbuddy-dev
+
+jobs:
+  deploy-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install functions dependencies
+        run: npm ci
+        working-directory: functions
+
+      - name: Write service account key
+        run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_DEV }}' > "$RUNNER_TEMP/sa.json"
+
+      - name: Deploy
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
+        run: npx firebase-tools deploy --only "${{ inputs.target }}" --project "$FIREBASE_PROJECT" --non-interactive

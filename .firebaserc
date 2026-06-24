@@ -1,0 +1,7 @@
+{
+  "projects": {
+    "default": "bourbonbuddy-dev",
+    "dev": "bourbonbuddy-dev",
+    "prod": "bourbon-buddy-prod"
+  }
+}
