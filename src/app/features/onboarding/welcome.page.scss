@@ -1,0 +1,50 @@
+.welcome-content {
+  --background: var(--color-bg-primary);
+
+  &::part(scroll) {
+    background:
+      radial-gradient(
+        90% 50% at 50% 38%,
+        rgba(200, 135, 58, 0.1),
+        transparent 65%
+      ),
+      var(--color-bg-primary);
+  }
+}
+
+.welcome {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding: 24px;
+  padding-top: max(24px, env(safe-area-inset-top));
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
+
+  &__center {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  &__tagline {
+    font-family: var(--font-body);
+    font-size: 16px;
+    font-style: italic;
+    font-weight: 300;
+    color: var(--color-text-secondary);
+    margin-top: 14px;
+  }
+
+  &__cta {
+    --background: var(--color-amber);
+    --background-activated: var(--color-amber-dim);
+    --color: var(--color-bg-primary);
+    --border-radius: var(--radius-button);
+    font-weight: 600;
+    font-size: 15px;
+    height: 52px;
+  }
+}

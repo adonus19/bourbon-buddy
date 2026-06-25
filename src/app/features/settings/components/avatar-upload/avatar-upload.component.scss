@@ -1,0 +1,68 @@
+.avatar-upload {
+  display: flex;
+  justify-content: center;
+
+  &__ring {
+    position: relative;
+    width: 104px;
+    height: 104px;
+    border-radius: 50%;
+    background: var(--color-bg-elevated);
+    border: 2px solid var(--color-border-bright);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  &__img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  &__initials {
+    font-family: var(--font-display);
+    font-size: 36px;
+    font-weight: 600;
+    color: var(--color-amber);
+  }
+
+  &__overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(20, 18, 16, 0.6);
+
+    ion-spinner {
+      color: var(--color-amber-light);
+    }
+  }
+
+  &__btn {
+    position: absolute;
+    right: -2px;
+    bottom: -2px;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--color-amber);
+    border: 2px solid var(--color-bg-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+
+    ion-icon {
+      font-size: 17px;
+      color: var(--color-bg-primary);
+    }
+
+    &.is-disabled {
+      opacity: 0.6;
+      pointer-events: none;
+    }
+  }
+}
