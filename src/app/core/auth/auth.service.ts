@@ -95,25 +95,29 @@ export class AuthService {
   /**
    * Starts Google sign-in via full-page redirect (reliable on mobile / PWA,
    * where popups are often blocked). The page navigates away; the result is
-   * finished by completeRedirectSignIn() when the app reloads.
+   * finished by init() (APP_INITIALIZER) when the app reloads.
    */
   async signInWithGoogle(): Promise<void> {
     await signInWithRedirect(this.auth, new GoogleAuthProvider());
   }
 
   /**
-   * Completes a pending redirect sign-in. Call once on app init: returns the
-   * signed-in user only on the load immediately following a redirect (else
-   * null), so ensureProfile runs for redirect sign-ups without an extra read
-   * on every normal load.
+   * App-bootstrap hook (wired via APP_INITIALIZER). Processes a pending Google
+   * redirect result BEFORE the router and route guards run, so the guards never
+   * observe a transient signed-out state on the load returning from a redirect
+   * (which otherwise bounces the user back to /login). Also awaits the first
+   * settled auth state so guard reads resolve immediately afterwards.
    */
-  async completeRedirectSignIn(): Promise<User | null> {
-    const result = await getRedirectResult(this.auth);
-    if (result?.user) {
-      await this.userService.ensureProfile(result.user);
-      return result.user;
+  async init(): Promise<void> {
+    try {
+      const result = await getRedirectResult(this.auth);
+      if (result?.user) {
+        await this.userService.ensureProfile(result.user);
+      }
+    } catch {
+      // A failed/again redirect can simply be retried from the login screen.
     }
-    return null;
+    await firstValueFrom(this.currentUser$);
   }
 
   async resetPassword(email: string): Promise<void> {

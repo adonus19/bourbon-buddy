@@ -3,6 +3,7 @@ import { CanActivateFn, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
 import { AuthService } from '../auth/auth.service';
+import { OnboardingService } from '../services/onboarding.service';
 
 /**
  * Blocks unauthenticated access. Waits for the first auth-state emission so a
@@ -22,8 +23,11 @@ export const authGuard: CanActivateFn = async () => {
  */
 export const publicOnlyGuard: CanActivateFn = async () => {
   const auth = inject(AuthService);
+  const onboarding = inject(OnboardingService);
   const router = inject(Router);
 
   const user = await firstValueFrom(auth.currentUser$);
-  return user ? router.createUrlTree(['/tabs']) : true;
+  // Authed users (incl. those returning from a Google redirect) skip the auth
+  // pages and land on welcome (first time) or the app, per OnboardingService.
+  return user ? router.createUrlTree([onboarding.postAuthRoute()]) : true;
 };

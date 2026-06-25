@@ -1,8 +1,10 @@
-import { NgModule } from '@angular/core';
+import { NgModule, inject, provideAppInitializer } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { RouteReuseStrategy } from '@angular/router';
 
 import { IonicModule, IonicRouteStrategy } from '@ionic/angular';
+
+import { AuthService } from './core/auth/auth.service';
 
 import {
   initializeApp,
@@ -38,6 +40,8 @@ import { AppRoutingModule } from './app-routing.module';
   imports: [BrowserModule, IonicModule.forRoot(), AppRoutingModule],
   providers: [
     { provide: RouteReuseStrategy, useClass: IonicRouteStrategy },
+    // Finish any pending Google redirect sign-in before the router/guards run.
+    provideAppInitializer(() => inject(AuthService).init()),
     provideFirebaseApp(() => initializeApp(environment.firebase)),
     provideAuth(() => {
       const auth = getAuth();
