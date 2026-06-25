@@ -5,6 +5,7 @@ import { RouterModule } from '@angular/router';
 
 import { SharedModule } from '../../shared/shared.module';
 import { CellarPage } from './cellar.page';
+import { LogFilterModalComponent } from './filter-modal/log-filter-modal.component';
 
 @NgModule({
   imports: [
@@ -13,6 +14,6 @@ import { CellarPage } from './cellar.page';
     SharedModule,
     RouterModule.forChild([{ path: '', component: CellarPage }]),
   ],
-  declarations: [CellarPage],
+  declarations: [CellarPage, LogFilterModalComponent],
 })
 export class CellarPageModule {}

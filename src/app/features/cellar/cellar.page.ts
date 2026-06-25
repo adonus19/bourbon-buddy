@@ -5,10 +5,23 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { ActionSheetController, ViewWillEnter } from '@ionic/angular';
+import {
+  ActionSheetController,
+  ModalController,
+  ViewWillEnter,
+} from '@ionic/angular';
 
 import { LogEntry } from '../../models';
 import { LogEntryService } from '../../core/services/log-entry.service';
+import {
+  EMPTY_LOG_FILTER,
+  LogFilter,
+  activeChips,
+  isFilterActive,
+  matchesFilter,
+  matchesSearch,
+} from './log-filter';
+import { LogFilterModalComponent } from './filter-modal/log-filter-modal.component';
 
 type SortKey = 'date' | 'rating' | 'name' | 'distillery' | 'proof';
 
@@ -29,11 +42,26 @@ const SORT_LABELS: Record<SortKey, string> = {
 export class CellarPage implements ViewWillEnter {
   private readonly logService = inject(LogEntryService);
   private readonly actionSheet = inject(ActionSheetController);
+  private readonly modalCtrl = inject(ModalController);
   private readonly cdr = inject(ChangeDetectorRef);
 
   readonly entries = this.logService.entries;
   readonly sort = signal<SortKey>('date');
   readonly sortLabel = computed(() => SORT_LABELS[this.sort()]);
+
+  readonly search = signal('');
+  readonly filter = signal<LogFilter>(EMPTY_LOG_FILTER);
+  readonly filterActive = computed(() => isFilterActive(this.filter()));
+  readonly chips = computed(() => activeChips(this.filter()));
+
+  /** Search + filter applied on top of the current sort. */
+  readonly visibleEntries = computed<LogEntry[]>(() => {
+    const term = this.search();
+    const f = this.filter();
+    return this.sortedEntries().filter(
+      (e) => matchesSearch(e, term) && matchesFilter(e, f)
+    );
+  });
 
   readonly sortedEntries = computed<LogEntry[]>(() => {
     const list = [...this.entries()];
@@ -76,5 +104,25 @@ export class CellarPage implements ViewWillEnter {
       ],
     });
     await sheet.present();
+  }
+
+  onSearchInput(value: string): void {
+    this.search.set(value);
+  }
+
+  applyFilter(next: LogFilter): void {
+    this.filter.set(next);
+  }
+
+  async openFilter(): Promise<void> {
+    const modal = await this.modalCtrl.create({
+      component: LogFilterModalComponent,
+      componentProps: { filter: this.filter() },
+    });
+    await modal.present();
+    const { data, role } = await modal.onWillDismiss<LogFilter>();
+    if (role === 'apply' && data) {
+      this.filter.set(data);
+    }
   }
 }

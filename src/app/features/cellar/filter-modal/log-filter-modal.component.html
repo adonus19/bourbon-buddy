@@ -1,0 +1,110 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button (click)="cancel()">Cancel</ion-button>
+    </ion-buttons>
+    <ion-title>Filters</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="clearAll()">Clear</ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="filter">
+  <p class="eyebrow filter__label">Category</p>
+  <div class="chips">
+    @for (c of categories; track c.value) {
+      <button
+        type="button"
+        class="chip"
+        [class.chip--selected]="isCategorySelected(c.value)"
+        (click)="toggleCategory(c.value)"
+      >
+        {{ c.label }}
+      </button>
+    }
+  </div>
+
+  <p class="eyebrow filter__label">Entry type</p>
+  <div class="chips">
+    @for (t of entryTypes; track t.value) {
+      <button
+        type="button"
+        class="chip"
+        [class.chip--selected]="isEntryTypeSelected(t.value)"
+        (click)="toggleEntryType(t.value)"
+      >
+        {{ t.label }}
+      </button>
+    }
+  </div>
+
+  <p class="eyebrow filter__label">
+    Rating
+    <span class="filter__range-val">
+      {{ ratingRange().lower }}–{{ ratingRange().upper }}★
+    </span>
+  </p>
+  <ion-range
+    [dualKnobs]="true"
+    [min]="ratingBounds.min"
+    [max]="ratingBounds.max"
+    [step]="0.5"
+    [pin]="true"
+    [value]="ratingRange()"
+    (ionChange)="onRatingChange($any($event.detail.value))"
+  ></ion-range>
+
+  <p class="eyebrow filter__label">
+    Proof
+    <span class="filter__range-val">
+      {{ proofRange().lower }}–{{ proofRange().upper }}
+    </span>
+  </p>
+  <ion-range
+    [dualKnobs]="true"
+    [min]="proofBounds.min"
+    [max]="proofBounds.max"
+    [step]="1"
+    [pin]="true"
+    [value]="proofRange()"
+    (ionChange)="onProofChange($any($event.detail.value))"
+  ></ion-range>
+
+  <p class="eyebrow filter__label">Date range</p>
+  <div class="filter__dates">
+    <ion-input
+      class="filter__date"
+      fill="solid"
+      type="date"
+      label="From"
+      labelPlacement="stacked"
+      [value]="draft().dateFrom"
+      (ionInput)="setDateFrom($any($event.detail.value) || '')"
+    ></ion-input>
+    <ion-input
+      class="filter__date"
+      fill="solid"
+      type="date"
+      label="To"
+      labelPlacement="stacked"
+      [value]="draft().dateTo"
+      (ionInput)="setDateTo($any($event.detail.value) || '')"
+    ></ion-input>
+  </div>
+
+  <p class="eyebrow filter__label">Flavor tags</p>
+  <app-flavor-tag-selector
+    label="Tags"
+    [selected]="draft().flavorTags"
+    (selectedChange)="setFlavorTags($event)"
+  ></app-flavor-tag-selector>
+</ion-content>
+
+<ion-footer>
+  <ion-toolbar>
+    <ion-button class="filter__apply" expand="block" (click)="apply()">
+      Show results
+    </ion-button>
+  </ion-toolbar>
+</ion-footer>
