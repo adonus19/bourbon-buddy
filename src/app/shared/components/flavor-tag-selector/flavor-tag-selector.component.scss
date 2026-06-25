@@ -1,0 +1,89 @@
+.flavor {
+  border-bottom: 1px solid var(--color-border);
+  padding: 4px 0 12px;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 10px 2px;
+    cursor: pointer;
+  }
+
+  &__label {
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+  }
+
+  &__count {
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: var(--color-amber-dim);
+    color: var(--color-amber-light);
+    font-size: 11px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  &__chevron {
+    margin-left: auto;
+    color: var(--color-text-secondary);
+    font-size: 16px;
+  }
+
+  &__group {
+    margin-bottom: 12px;
+  }
+
+  &__group-name {
+    display: block;
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin: 0 0 6px 2px;
+  }
+
+  // Horizontally scrollable chip row per group (per the brief).
+  &__chips {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+}
+
+.chip {
+  flex-shrink: 0;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+
+  &--selected {
+    background: var(--color-amber-dim);
+    border-color: var(--color-amber);
+    color: var(--color-amber-light);
+  }
+}

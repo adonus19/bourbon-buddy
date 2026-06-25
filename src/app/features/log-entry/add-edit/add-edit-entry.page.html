@@ -1,0 +1,351 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/tabs/cellar" text=""></ion-back-button>
+    </ion-buttons>
+    <ion-title>Add to Cellar</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true" class="entry-content">
+  <form [formGroup]="form" class="entry">
+    <!-- THE BOTTLE -->
+    <p class="eyebrow entry__section">The bottle</p>
+
+    <app-bourbon-autocomplete
+      [value]="form.controls.bourbonName.value ?? ''"
+      (valueChange)="onNameInput($event)"
+      (selected)="onBottleSelected($event)"
+    ></app-bourbon-autocomplete>
+    @if (form.controls.bourbonName.touched && form.controls.bourbonName.invalid) {
+      <div class="entry__error">A name is required.</div>
+    }
+
+    <ion-input
+      class="entry__field"
+      fill="solid"
+      label="Distillery"
+      labelPlacement="stacked"
+      formControlName="distillery"
+    ></ion-input>
+
+    <ion-input
+      class="entry__field"
+      fill="solid"
+      label="Bottler (if sourced)"
+      labelPlacement="stacked"
+      formControlName="bottler"
+    ></ion-input>
+
+    <ion-select
+      class="entry__field"
+      fill="solid"
+      label="Category"
+      labelPlacement="stacked"
+      interface="action-sheet"
+      formControlName="category"
+    >
+      @for (c of categories; track c.value) {
+        <ion-select-option [value]="c.value">{{ c.label }}</ion-select-option>
+      }
+    </ion-select>
+
+    <ion-select
+      class="entry__field"
+      fill="solid"
+      label="Sub-type"
+      labelPlacement="stacked"
+      interface="action-sheet"
+      placeholder="None"
+      formControlName="subType"
+    >
+      @for (s of subTypes; track s.value) {
+        <ion-select-option [value]="s.value">{{ s.label }}</ion-select-option>
+      }
+    </ion-select>
+
+    <!-- BOTTLE DETAILS -->
+    <p class="eyebrow entry__section">Bottle details</p>
+
+    <ion-item class="entry__toggle" lines="none">
+      <ion-toggle
+        formControlName="isNas"
+        (ionChange)="onNasToggle($event.detail.checked)"
+        >No age statement (NAS)</ion-toggle
+      >
+    </ion-item>
+
+    <ion-input
+      class="entry__field"
+      fill="solid"
+      label="Age statement (years)"
+      labelPlacement="stacked"
+      type="number"
+      inputmode="numeric"
+      formControlName="ageStatement"
+      (ionInput)="onAgeInput()"
+    ></ion-input>
+
+    <ion-input
+      class="entry__field"
+      fill="solid"
+      label="Proof"
+      labelPlacement="stacked"
+      type="number"
+      inputmode="decimal"
+      formControlName="proof"
+    ></ion-input>
+
+    <p class="entry__hint">Mash bill (%)</p>
+    <div class="entry__row">
+      <ion-input
+        class="entry__field"
+        fill="solid"
+        label="Corn"
+        labelPlacement="stacked"
+        type="number"
+        formControlName="mashBillCorn"
+      ></ion-input>
+      <ion-input
+        class="entry__field"
+        fill="solid"
+        label="Rye"
+        labelPlacement="stacked"
+        type="number"
+        formControlName="mashBillRye"
+      ></ion-input>
+    </div>
+    <div class="entry__row">
+      <ion-input
+        class="entry__field"
+        fill="solid"
+        label="Wheat"
+        labelPlacement="stacked"
+        type="number"
+        formControlName="mashBillWheat"
+      ></ion-input>
+      <ion-input
+        class="entry__field"
+        fill="solid"
+        label="Malt"
+        labelPlacement="stacked"
+        type="number"
+        formControlName="mashBillMalt"
+      ></ion-input>
+    </div>
+
+    <div class="entry__row">
+      <ion-input
+        class="entry__field"
+        fill="solid"
+        label="Batch #"
+        labelPlacement="stacked"
+        formControlName="batchNumber"
+      ></ion-input>
+      <ion-input
+        class="entry__field"
+        fill="solid"
+        label="Barrel #"
+        labelPlacement="stacked"
+        formControlName="barrelNumber"
+      ></ion-input>
+    </div>
+
+    <ion-input
+      class="entry__field"
+      fill="solid"
+      label="Series / collection"
+      labelPlacement="stacked"
+      formControlName="series"
+    ></ion-input>
+
+    <!-- HOW YOU GOT IT -->
+    <p class="eyebrow entry__section">How you got it</p>
+
+    <ion-select
+      class="entry__field"
+      fill="solid"
+      label="Entry type"
+      labelPlacement="stacked"
+      interface="action-sheet"
+      formControlName="entryType"
+    >
+      @for (e of entryTypes; track e.value) {
+        <ion-select-option [value]="e.value">{{ e.label }}</ion-select-option>
+      }
+    </ion-select>
+
+    <ion-item class="entry__toggle" lines="none">
+      <ion-toggle
+        formControlName="didNotPurchase"
+        (ionChange)="onDidNotPurchaseToggle($event.detail.checked)"
+        >Didn't purchase it</ion-toggle
+      >
+    </ion-item>
+
+    <div class="entry__row">
+      <ion-input
+        class="entry__field"
+        fill="solid"
+        label="Price"
+        labelPlacement="stacked"
+        type="number"
+        inputmode="decimal"
+        formControlName="purchasePrice"
+      ></ion-input>
+      <ion-select
+        class="entry__field"
+        fill="solid"
+        label="Bottle size"
+        labelPlacement="stacked"
+        interface="action-sheet"
+        placeholder="—"
+        formControlName="bottleSizeMl"
+      >
+        @for (size of bottleSizes; track size) {
+          <ion-select-option [value]="size">{{ size }} mL</ion-select-option>
+        }
+      </ion-select>
+    </div>
+
+    <ion-input
+      class="entry__field"
+      fill="solid"
+      label="Where"
+      labelPlacement="stacked"
+      formControlName="purchaseLocation"
+    ></ion-input>
+
+    <ion-input
+      class="entry__field"
+      fill="solid"
+      label="Purchase date"
+      labelPlacement="stacked"
+      type="date"
+      formControlName="purchaseDate"
+    ></ion-input>
+
+    @if (isPurchasedBottle()) {
+      <ion-select
+        class="entry__field"
+        fill="solid"
+        label="Bottle remaining"
+        labelPlacement="stacked"
+        interface="action-sheet"
+        formControlName="bottleRemainingPct"
+      >
+        @for (r of remainingOptions; track r.value) {
+          <ion-select-option [value]="r.value">{{ r.label }}</ion-select-option>
+        }
+      </ion-select>
+    }
+
+    <!-- WHAT YOU THOUGHT -->
+    <p class="eyebrow entry__section entry__section--rating">What you thought</p>
+
+    <div class="entry__rating">
+      <app-rating-widget
+        [rating]="form.controls.rating.value"
+        [interactive]="true"
+        [size]="34"
+        (ratingChange)="setRating($event)"
+      ></app-rating-widget>
+    </div>
+
+    <app-flavor-tag-selector
+      label="Nose"
+      [selected]="form.controls.noseTags.value || []"
+      (selectedChange)="setTags('noseTags', $event)"
+    ></app-flavor-tag-selector>
+    <ion-textarea
+      class="entry__field"
+      fill="solid"
+      label="Nose notes"
+      labelPlacement="stacked"
+      [autoGrow]="true"
+      formControlName="noseNotes"
+    ></ion-textarea>
+
+    <app-flavor-tag-selector
+      label="Palate"
+      [selected]="form.controls.palateTags.value || []"
+      (selectedChange)="setTags('palateTags', $event)"
+    ></app-flavor-tag-selector>
+    <ion-textarea
+      class="entry__field"
+      fill="solid"
+      label="Palate notes"
+      labelPlacement="stacked"
+      [autoGrow]="true"
+      formControlName="palateNotes"
+    ></ion-textarea>
+
+    <app-flavor-tag-selector
+      label="Finish"
+      [selected]="form.controls.finishTags.value || []"
+      (selectedChange)="setTags('finishTags', $event)"
+    ></app-flavor-tag-selector>
+    <ion-textarea
+      class="entry__field"
+      fill="solid"
+      label="Finish notes"
+      labelPlacement="stacked"
+      [autoGrow]="true"
+      formControlName="finishNotes"
+    ></ion-textarea>
+
+    <ion-segment class="entry__segment" formControlName="finishLength">
+      <ion-segment-button value="short"><ion-label>Short</ion-label></ion-segment-button>
+      <ion-segment-button value="medium"><ion-label>Medium</ion-label></ion-segment-button>
+      <ion-segment-button value="long"><ion-label>Long</ion-label></ion-segment-button>
+    </ion-segment>
+
+    <p class="entry__hint">Would buy again?</p>
+    <ion-segment class="entry__segment" formControlName="wouldBuyAgain">
+      <ion-segment-button value="yes"><ion-label>Yes</ion-label></ion-segment-button>
+      <ion-segment-button value="maybe"><ion-label>Maybe</ion-label></ion-segment-button>
+      <ion-segment-button value="no"><ion-label>No</ion-label></ion-segment-button>
+    </ion-segment>
+
+    <!-- NOTES -->
+    <p class="eyebrow entry__section">Notes</p>
+
+    <ion-textarea
+      class="entry__field"
+      fill="solid"
+      label="Personal notes / story"
+      labelPlacement="stacked"
+      [autoGrow]="true"
+      placeholder="Where you were, who you were with, why it mattered…"
+      formControlName="personalNotes"
+    ></ion-textarea>
+
+    <ion-input
+      class="entry__field"
+      fill="solid"
+      label="Entry date"
+      labelPlacement="stacked"
+      type="date"
+      formControlName="entryDate"
+    ></ion-input>
+
+    <p class="entry__note">Label photo support arrives in the next iteration.</p>
+  </form>
+</ion-content>
+
+<ion-footer class="entry-footer">
+  <ion-toolbar>
+    <ion-button
+      class="entry__save"
+      expand="block"
+      (click)="save()"
+      [disabled]="saving"
+    >
+      @if (saving) {
+        <ion-spinner name="crescent"></ion-spinner>
+      } @else {
+        <span>Save to Cellar</span>
+      }
+    </ion-button>
+  </ion-toolbar>
+</ion-footer>

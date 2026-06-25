@@ -1,0 +1,37 @@
+<div
+  class="rating"
+  [class.rating--interactive]="interactive()"
+  role="img"
+  [attr.aria-label]="(rating() ?? 0) + ' out of 5'"
+>
+  @for (i of glasses; track i) {
+    <svg
+      class="rating__glass"
+      viewBox="0 0 24 24"
+      [style.width.px]="size()"
+      [style.height.px]="size()"
+      (click)="onGlassClick(i)"
+    >
+      <defs>
+        <clipPath [attr.id]="clipId(i)">
+          <rect
+            x="0"
+            [attr.y]="24 * (1 - fillFractions()[i])"
+            width="24"
+            [attr.height]="24 * fillFractions()[i]"
+          />
+        </clipPath>
+      </defs>
+      <!-- Glencairn silhouette: bulb bowl with a tapered rim. -->
+      <path
+        class="rating__outline"
+        d="M9 3 H15 L14.2 8.2 A5.2 5.2 0 1 1 9.8 8.2 Z"
+      />
+      <path
+        class="rating__fill"
+        d="M9 3 H15 L14.2 8.2 A5.2 5.2 0 1 1 9.8 8.2 Z"
+        [attr.clip-path]="'url(#' + clipId(i) + ')'"
+      />
+    </svg>
+  }
+</div>

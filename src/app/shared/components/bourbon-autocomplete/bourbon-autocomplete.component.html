@@ -1,0 +1,31 @@
+<div class="autocomplete">
+  <ion-input
+    class="autocomplete__input"
+    fill="solid"
+    [label]="label()"
+    labelPlacement="stacked"
+    type="text"
+    autocapitalize="words"
+    [value]="value()"
+    [placeholder]="placeholder()"
+    (ionInput)="onInput($event)"
+    (ionBlur)="hideResultsSoon()"
+  >
+    @if (searching()) {
+      <ion-spinner slot="end" name="dots"></ion-spinner>
+    }
+  </ion-input>
+
+  @if (showResults() && results().length) {
+    <ul class="autocomplete__results">
+      @for (b of results(); track b.id) {
+        <li class="autocomplete__result" (click)="pick(b)">
+          <span class="autocomplete__name">{{ b.name }}</span>
+          @if (b.distillery) {
+            <span class="autocomplete__meta">{{ b.distillery }}</span>
+          }
+        </li>
+      }
+    </ul>
+  }
+</div>

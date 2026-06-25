@@ -13,6 +13,12 @@
   <app-coming-soon
     icon="wine-outline"
     title="Your glass is empty."
-    subtitle="The Cellar — your bourbon log — arrives in Iteration 2."
+    subtitle="Tap + to log your first bourbon. (The full list view lands next.)"
   ></app-coming-soon>
+
+  <ion-fab slot="fixed" vertical="bottom" horizontal="end">
+    <ion-fab-button routerLink="/entry/new" aria-label="Add a bourbon">
+      <ion-icon name="add"></ion-icon>
+    </ion-fab-button>
+  </ion-fab>
 </ion-content>

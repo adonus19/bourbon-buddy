@@ -1,0 +1,31 @@
+.rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  &--interactive .rating__glass {
+    cursor: pointer;
+  }
+}
+
+.rating__glass {
+  display: block;
+  flex-shrink: 0;
+}
+
+.rating__outline {
+  fill: none;
+  stroke: var(--color-border-bright);
+  stroke-width: 1.4;
+}
+
+.rating__fill {
+  fill: var(--color-amber);
+  stroke: none;
+}
+
+// Brief: ~200ms liquid-pour fill. The clip rect animates; reduced-motion is
+// handled globally in global.scss.
+.rating__glass rect {
+  transition: y 0.2s ease-out, height 0.2s ease-out;
+}

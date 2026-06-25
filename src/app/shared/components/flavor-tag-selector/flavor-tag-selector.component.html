@@ -1,0 +1,39 @@
+<div class="flavor">
+  <button
+    type="button"
+    class="flavor__header"
+    (click)="toggleExpanded()"
+    [attr.aria-expanded]="expanded()"
+  >
+    <span class="flavor__label">{{ label() }}</span>
+    @if (selected().length) {
+      <span class="flavor__count">{{ selected().length }}</span>
+    }
+    <ion-icon
+      class="flavor__chevron"
+      [name]="expanded() ? 'chevron-up-outline' : 'chevron-down-outline'"
+    ></ion-icon>
+  </button>
+
+  @if (expanded()) {
+    <div class="flavor__groups">
+      @for (group of groups; track group.category) {
+        <div class="flavor__group">
+          <span class="flavor__group-name">{{ group.category }}</span>
+          <div class="flavor__chips">
+            @for (tag of group.tags; track tag) {
+              <button
+                type="button"
+                class="chip"
+                [class.chip--selected]="isSelected(tag)"
+                (click)="toggle(tag)"
+              >
+                {{ tag }}
+              </button>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  }
+</div>
