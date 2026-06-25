@@ -32,19 +32,27 @@ const routes: Routes = [
       ),
   },
   {
-    path: 'welcome',
-    canActivate: [authGuard],
-    loadChildren: () =>
-      import('./features/onboarding/onboarding.module').then(
-        (m) => m.OnboardingPageModule
-      ),
-  },
-  {
     path: 'settings',
     canActivate: [authGuard],
     loadChildren: () =>
       import('./features/settings/settings.module').then(
         (m) => m.SettingsPageModule
+      ),
+  },
+  {
+    path: 'entry/new',
+    canActivate: [authGuard],
+    loadChildren: () =>
+      import('./features/log-entry/add-edit/add-edit-entry.module').then(
+        (m) => m.AddEditEntryPageModule
+      ),
+  },
+  {
+    path: 'entry/:id',
+    canActivate: [authGuard],
+    loadChildren: () =>
+      import('./features/log-entry/detail/log-entry-detail.module').then(
+        (m) => m.LogEntryDetailPageModule
       ),
   },
   {

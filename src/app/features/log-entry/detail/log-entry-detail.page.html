@@ -1,0 +1,148 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/tabs/cellar" text=""></ion-back-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  @if (entry(); as e) {
+    <div class="hero" [style.--cat-accent]="accent()">
+      @if (e.labelPhotoUrl; as photo) {
+        <img class="hero__photo" [src]="photo" [alt]="e.bourbonName" />
+      } @else {
+        <div class="hero__placeholder">
+          <ion-icon name="wine-outline" aria-hidden="true"></ion-icon>
+        </div>
+      }
+    </div>
+
+    <div class="detail">
+      <h1 class="detail__name">{{ e.bourbonName }}</h1>
+      <p class="detail__sub">
+        @if (e.distillery) {<span>{{ e.distillery }}</span>}
+        @if (e.distillery && categoryLabel()) {<span class="detail__dot">·</span>}
+        <span>{{ categoryLabel() }}</span>
+      </p>
+
+      @if (e.rating != null || e.valueScore != null) {
+        <div class="detail__toprow">
+          @if (e.rating != null) {
+            <app-rating-widget [rating]="e.rating" [size]="26"></app-rating-widget>
+          }
+          @if (e.valueScore != null) {
+            <div class="vscore">
+              <p class="eyebrow">Value score</p>
+              <p class="vscore__num">{{ e.valueScore }}</p>
+              <p class="vscore__label">{{ scoreLabel() }}</p>
+            </div>
+          }
+        </div>
+      }
+
+      @if (hasTastingNotes()) {
+        <div class="section">
+          <p class="eyebrow">Tasting notes</p>
+
+          @if (e.noseTags.length || e.noseNotes) {
+            <div class="stage">
+              <span class="stage__label">Nose</span>
+              @if (e.noseTags.length) {
+                <div class="chips">
+                  @for (t of e.noseTags; track t) {<span class="chip">{{ t }}</span>}
+                </div>
+              }
+              @if (e.noseNotes) {<p class="stage__notes">{{ e.noseNotes }}</p>}
+            </div>
+          }
+
+          @if (e.palateTags.length || e.palateNotes) {
+            <div class="stage">
+              <span class="stage__label">Palate</span>
+              @if (e.palateTags.length) {
+                <div class="chips">
+                  @for (t of e.palateTags; track t) {<span class="chip">{{ t }}</span>}
+                </div>
+              }
+              @if (e.palateNotes) {<p class="stage__notes">{{ e.palateNotes }}</p>}
+            </div>
+          }
+
+          @if (e.finishTags.length || e.finishNotes) {
+            <div class="stage">
+              <span class="stage__label">Finish</span>
+              @if (e.finishTags.length) {
+                <div class="chips">
+                  @for (t of e.finishTags; track t) {<span class="chip">{{ t }}</span>}
+                </div>
+              }
+              @if (e.finishNotes) {<p class="stage__notes">{{ e.finishNotes }}</p>}
+            </div>
+          }
+
+          @if (e.finishLength) {
+            <p class="detail__meta">Finish length: {{ e.finishLength }}</p>
+          }
+          @if (e.wouldBuyAgain) {
+            <p class="detail__meta">Would buy again: {{ e.wouldBuyAgain }}</p>
+          }
+        </div>
+      }
+
+      <div class="section">
+        <p class="eyebrow">How I got it</p>
+        <div class="kv">
+          <span class="kv__row">{{ entryTypeLabel() }}</span>
+          @if (!e.didNotPurchase && e.purchasePrice != null) {
+            <span class="kv__row">${{ e.purchasePrice }}</span>
+          }
+          @if (!e.didNotPurchase && e.purchaseLocation) {
+            <span class="kv__row">{{ e.purchaseLocation }}</span>
+          }
+          @if (e.bottleSizeMl) {
+            <span class="kv__row">{{ e.bottleSizeMl }} mL</span>
+          }
+          @if (e.bottleRemainingPct != null) {
+            <span class="kv__row">{{ e.bottleRemainingPct }}% left</span>
+          }
+        </div>
+        <p class="detail__meta">
+          @if (e.purchaseDate) {
+            {{ e.purchaseDate.toDate() | date: 'mediumDate' }}
+          } @else {
+            Logged {{ e.entryDate.toDate() | date: 'mediumDate' }}
+          }
+        </p>
+      </div>
+
+      @if (hasBottleDetails()) {
+        <div class="section">
+          <p class="eyebrow">Bottle details</p>
+          <div class="kv">
+            @if (ageLabel(e)) {<span class="kv__row">{{ ageLabel(e) }}</span>}
+            @if (e.proof != null) {<span class="kv__row">{{ e.proof }} proof</span>}
+            @if (e.series) {<span class="kv__row">{{ e.series }}</span>}
+            @if (e.batchNumber) {<span class="kv__row">Batch {{ e.batchNumber }}</span>}
+            @if (e.barrelNumber) {<span class="kv__row">Barrel {{ e.barrelNumber }}</span>}
+          </div>
+          @if (mashBill(e).length) {
+            <p class="detail__meta">Mash bill: {{ mashBill(e).join(' · ') }}</p>
+          }
+        </div>
+      }
+
+      @if (e.personalNotes) {
+        <div class="section">
+          <p class="eyebrow">Notes</p>
+          <p class="detail__notes">{{ e.personalNotes }}</p>
+        </div>
+      }
+    </div>
+  } @else {
+    <div class="detail-missing">
+      <p>That bottle isn't in your Cellar.</p>
+      <ion-button routerLink="/tabs/cellar" fill="clear">Back to Cellar</ion-button>
+    </div>
+  }
+</ion-content>

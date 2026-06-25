@@ -4,15 +4,28 @@ import { IonicModule } from '@ionic/angular';
 
 import { ComingSoonComponent } from './components/coming-soon/coming-soon.component';
 import { WordmarkComponent } from './components/wordmark/wordmark.component';
+import { RatingWidgetComponent } from './components/rating-widget/rating-widget.component';
+import { FlavorTagSelectorComponent } from './components/flavor-tag-selector/flavor-tag-selector.component';
+import { BourbonAutocompleteComponent } from './components/bourbon-autocomplete/bourbon-autocomplete.component';
+import { LogEntryCardComponent } from './components/log-entry-card/log-entry-card.component';
 
 /**
  * Shared declarations reused across feature modules (presentational
  * components, pipes, directives). Import into any feature module that needs
  * them. Keep singletons/services out of here — those belong in core.
  */
+const COMPONENTS = [
+  ComingSoonComponent,
+  WordmarkComponent,
+  RatingWidgetComponent,
+  FlavorTagSelectorComponent,
+  BourbonAutocompleteComponent,
+  LogEntryCardComponent,
+];
+
 @NgModule({
-  declarations: [ComingSoonComponent, WordmarkComponent],
+  declarations: COMPONENTS,
   imports: [CommonModule, IonicModule],
-  exports: [ComingSoonComponent, WordmarkComponent],
+  exports: COMPONENTS,
 })
 export class SharedModule {}

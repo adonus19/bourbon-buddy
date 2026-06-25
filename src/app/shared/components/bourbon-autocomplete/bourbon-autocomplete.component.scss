@@ -1,0 +1,53 @@
+.autocomplete {
+  position: relative;
+
+  &__input {
+    --background: var(--color-bg-elevated);
+    --color: var(--color-text-primary);
+    --placeholder-color: var(--color-text-disabled);
+    --highlight-color-focused: var(--color-amber);
+    border-radius: var(--radius-input);
+    border: 1px solid var(--color-border);
+  }
+
+  &__results {
+    position: absolute;
+    z-index: 20;
+    left: 0;
+    right: 0;
+    top: calc(100% + 4px);
+    margin: 0;
+    padding: 4px;
+    list-style: none;
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border-bright);
+    border-radius: var(--radius-input);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    max-height: 260px;
+    overflow-y: auto;
+  }
+
+  &__result {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+
+    &:active {
+      background: var(--color-bg-surface);
+    }
+  }
+
+  &__name {
+    font-family: var(--font-display);
+    font-size: 16px;
+    color: var(--color-text-primary);
+  }
+
+  &__meta {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+  }
+}

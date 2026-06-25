@@ -11,6 +11,7 @@
     "test": "ng test",
     "lint": "ng lint",
     "build:prod": "ng build --configuration production",
+    "build:staging": "ng build --configuration staging",
     "emulators": "firebase emulators:start",
     "emulators:export": "firebase emulators:start --import=./emulator-data --export-on-exit",
     "deploy:hosting": "npm run build:prod && firebase deploy --only hosting",

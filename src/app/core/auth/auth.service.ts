@@ -91,9 +91,15 @@ export class AuthService {
     return cred.user;
   }
 
+  /**
+   * Google sign-in via popup. We use popup (not signInWithRedirect) on purpose:
+   * the redirect flow relies on cross-domain third-party storage to return the
+   * credential from the firebaseapp.com auth handler to the app's domain, which
+   * modern browsers (and incognito) block — leaving the user signed out. Popup
+   * uses postMessage instead and is Firebase's current recommendation.
+   */
   async signInWithGoogle(): Promise<User> {
-    const provider = new GoogleAuthProvider();
-    const cred = await signInWithPopup(this.auth, provider);
+    const cred = await signInWithPopup(this.auth, new GoogleAuthProvider());
     await this.userService.ensureProfile(cred.user);
     return cred.user;
   }

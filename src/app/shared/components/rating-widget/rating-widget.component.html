@@ -1,0 +1,39 @@
+<div
+  class="rating"
+  [class.rating--interactive]="interactive()"
+  role="img"
+  [attr.aria-label]="(rating() ?? 0) + ' out of 5'"
+>
+  @for (i of glasses; track i) {
+    <svg
+      class="rating__glass"
+      [attr.viewBox]="viewBox"
+      [style.height.px]="size()"
+      [style.width.px]="glassWidth()"
+      (click)="onGlassClick(i)"
+    >
+      <defs>
+        <clipPath [attr.id]="clipId(i)">
+          <rect
+            [attr.x]="vb.x"
+            [attr.y]="fillY(i)"
+            [attr.width]="vb.w"
+            [attr.height]="fillHeight(i)"
+          />
+        </clipPath>
+      </defs>
+
+      <!-- Amber liquid: solid glass body clipped to the bottom fraction. -->
+      <path
+        class="rating__liquid"
+        [attr.d]="bodyPath"
+        [attr.clip-path]="'url(#' + clipId(i) + ')'"
+      />
+
+      <!-- Glass linework drawn on top. -->
+      @for (d of outlinePaths; track $index) {
+        <path class="rating__outline" [attr.d]="d" />
+      }
+    </svg>
+  }
+</div>
