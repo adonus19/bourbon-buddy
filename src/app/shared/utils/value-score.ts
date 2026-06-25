@@ -30,3 +30,17 @@ export function computeValueScore(
   const clamped = Math.min(100, Math.max(0, raw));
   return Math.round(clamped * 10) / 10; // one decimal, matches the display
 }
+
+/** Contextual descriptor for a value score (see bands in the doc comment). */
+export function valueScoreLabel(score: number): string {
+  if (score >= 80) {
+    return 'Punches above its weight.';
+  }
+  if (score >= 60) {
+    return 'Pays its way.';
+  }
+  if (score >= 40) {
+    return 'Fair trade.';
+  }
+  return 'Love costs what it costs.';
+}

@@ -260,9 +260,9 @@ export class AddEditEntryPage {
         entryDate: this.toTimestamp(v.entryDate) ?? Timestamp.now(),
       };
 
-      await this.logService.add(input);
+      const newId = await this.logService.add(input);
       await this.presentToast('Added to your Cellar.');
-      await this.router.navigateByUrl('/tabs/cellar', { replaceUrl: true });
+      await this.router.navigateByUrl(`/entry/${newId}`, { replaceUrl: true });
     } catch {
       await this.presentToast(
         "Couldn't save. Check your connection and try again."

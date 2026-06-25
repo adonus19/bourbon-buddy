@@ -48,6 +48,14 @@ const routes: Routes = [
       ),
   },
   {
+    path: 'entry/:id',
+    canActivate: [authGuard],
+    loadChildren: () =>
+      import('./features/log-entry/detail/log-entry-detail.module').then(
+        (m) => m.LogEntryDetailPageModule
+      ),
+  },
+  {
     path: 'tabs',
     canActivate: [authGuard],
     loadChildren: () =>

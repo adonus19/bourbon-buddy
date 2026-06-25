@@ -1,4 +1,4 @@
-import { BourbonCategory } from '../../models';
+import { BourbonCategory, EntryType } from '../../models';
 
 // Human-readable labels + the category accent CSS variable for each category.
 // Accent values live in src/theme/variables.scss (--color-cat-*).
@@ -16,3 +16,12 @@ export const CATEGORY_DISPLAY: Record<
   japanese: { label: 'Japanese', accentVar: 'var(--color-cat-japanese)' },
   world_other: { label: 'World Other', accentVar: 'var(--color-cat-other)' },
 };
+
+export const ENTRY_TYPE_LABELS: Record<EntryType, string> = {
+  drink: 'Drink',
+  bottle_purchased: 'Bottle',
+  gift_received: 'Gift',
+  sample_split: 'Sample',
+  virtual_tasting: 'Virtual',
+};
+

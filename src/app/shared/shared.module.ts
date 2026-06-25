@@ -7,6 +7,7 @@ import { WordmarkComponent } from './components/wordmark/wordmark.component';
 import { RatingWidgetComponent } from './components/rating-widget/rating-widget.component';
 import { FlavorTagSelectorComponent } from './components/flavor-tag-selector/flavor-tag-selector.component';
 import { BourbonAutocompleteComponent } from './components/bourbon-autocomplete/bourbon-autocomplete.component';
+import { LogEntryCardComponent } from './components/log-entry-card/log-entry-card.component';
 
 /**
  * Shared declarations reused across feature modules (presentational
@@ -19,6 +20,7 @@ const COMPONENTS = [
   RatingWidgetComponent,
   FlavorTagSelectorComponent,
   BourbonAutocompleteComponent,
+  LogEntryCardComponent,
 ];
 
 @NgModule({

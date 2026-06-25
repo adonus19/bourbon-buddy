@@ -2,6 +2,11 @@
   <ion-toolbar>
     <ion-title>Cellar</ion-title>
     <ion-buttons slot="end">
+      @if (entries().length) {
+        <ion-button (click)="openSort()" aria-label="Sort">
+          <ion-icon slot="icon-only" name="swap-vertical-outline"></ion-icon>
+        </ion-button>
+      }
       <ion-button routerLink="/settings" aria-label="Settings">
         <ion-icon slot="icon-only" name="person-circle-outline"></ion-icon>
       </ion-button>
@@ -10,11 +15,32 @@
 </ion-header>
 
 <ion-content [fullscreen]="true">
-  <app-coming-soon
-    icon="wine-outline"
-    title="Your glass is empty."
-    subtitle="Tap + to log your first bourbon. (The full list view lands next.)"
-  ></app-coming-soon>
+  @if (entries().length === 0) {
+    <div class="cellar-empty">
+      <ion-icon name="wine-outline" aria-hidden="true"></ion-icon>
+      <h2 class="cellar-empty__title">Your glass is empty.</h2>
+      <p class="cellar-empty__sub">Log the first bourbon you've tried.</p>
+      <ion-button class="cellar-empty__cta" routerLink="/entry/new">
+        Log your first bourbon
+      </ion-button>
+    </div>
+  } @else {
+    <div class="cellar-sortbar">
+      <span>Sorted by {{ sortLabel() }}</span>
+      <span class="cellar-sortbar__count">
+        {{ entries().length }} {{ entries().length === 1 ? 'pour' : 'pours' }}
+      </span>
+    </div>
+
+    <div class="cellar-list">
+      @for (e of sortedEntries(); track e.id) {
+        <app-log-entry-card
+          [entry]="e"
+          [routerLink]="['/entry', e.id]"
+        ></app-log-entry-card>
+      }
+    </div>
+  }
 
   <ion-fab slot="fixed" vertical="bottom" horizontal="end">
     <ion-fab-button routerLink="/entry/new" aria-label="Add a bourbon">
