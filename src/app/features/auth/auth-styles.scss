@@ -29,6 +29,13 @@
   text-align: center;
   margin-bottom: 36px;
 
+  &__badge {
+    width: 84px;
+    height: 84px;
+    object-fit: contain;
+    margin-bottom: 14px;
+  }
+
   &__tagline {
     font-family: var(--font-body);
     font-size: 14px;
