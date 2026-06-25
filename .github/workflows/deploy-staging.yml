@@ -1,0 +1,53 @@
+# Deploys to a single, stable "staging" preview channel.
+#
+# Every PR (and manual run) builds the app with the DEV Firebase config and
+# deploys to ONE fixed channel named "staging", so the preview URL is constant
+# across PRs — you authorize that one host in Firebase Auth → Authorized
+# domains a single time, and Google sign-in works there forever.
+#
+# Important: builds use the `staging` Angular configuration (optimized but with
+# the real dev environment.ts), NOT `production` — the production config swaps
+# in environment.prod.ts (the not-yet-created prod project) and would break auth.
+#
+# Reuses the FIREBASE_SERVICE_ACCOUNT_DEV secret. Channel expiry is refreshed
+# (30d) on each deploy.
+
+name: Deploy Staging
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  FIREBASE_PROJECT: bourbonbuddy-dev
+
+jobs:
+  staging:
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (staging — dev Firebase config)
+        run: npm run build:staging
+
+      - name: Deploy to the fixed staging channel
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_DEV }}
+          projectId: ${{ env.FIREBASE_PROJECT }}
+          channelId: staging
+          expires: 30d

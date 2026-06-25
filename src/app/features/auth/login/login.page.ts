@@ -59,13 +59,10 @@ export class LoginPage {
     this.submitting = true;
     this.errorMessage = '';
     try {
+      // Redirects away; the result is handled by AppComponent on the return load.
       await this.auth.signInWithGoogle();
-      await this.router.navigateByUrl(this.onboarding.postAuthRoute(), {
-        replaceUrl: true,
-      });
     } catch (err) {
       this.errorMessage = authErrorMessage(err);
-    } finally {
       this.submitting = false;
     }
   }

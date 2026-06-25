@@ -6,9 +6,10 @@ import {
   User,
   authState,
   createUserWithEmailAndPassword,
+  getRedirectResult,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
-  signInWithPopup,
+  signInWithRedirect,
   signOut,
   updateProfile,
 } from '@angular/fire/auth';
@@ -91,11 +92,28 @@ export class AuthService {
     return cred.user;
   }
 
-  async signInWithGoogle(): Promise<User> {
-    const provider = new GoogleAuthProvider();
-    const cred = await signInWithPopup(this.auth, provider);
-    await this.userService.ensureProfile(cred.user);
-    return cred.user;
+  /**
+   * Starts Google sign-in via full-page redirect (reliable on mobile / PWA,
+   * where popups are often blocked). The page navigates away; the result is
+   * finished by completeRedirectSignIn() when the app reloads.
+   */
+  async signInWithGoogle(): Promise<void> {
+    await signInWithRedirect(this.auth, new GoogleAuthProvider());
+  }
+
+  /**
+   * Completes a pending redirect sign-in. Call once on app init: returns the
+   * signed-in user only on the load immediately following a redirect (else
+   * null), so ensureProfile runs for redirect sign-ups without an extra read
+   * on every normal load.
+   */
+  async completeRedirectSignIn(): Promise<User | null> {
+    const result = await getRedirectResult(this.auth);
+    if (result?.user) {
+      await this.userService.ensureProfile(result.user);
+      return result.user;
+    }
+    return null;
   }
 
   async resetPassword(email: string): Promise<void> {
