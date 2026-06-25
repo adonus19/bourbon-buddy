@@ -7,31 +7,33 @@
   @for (i of glasses; track i) {
     <svg
       class="rating__glass"
-      viewBox="0 0 24 24"
-      [style.width.px]="size()"
+      [attr.viewBox]="viewBox"
       [style.height.px]="size()"
+      [style.width.px]="glassWidth()"
       (click)="onGlassClick(i)"
     >
       <defs>
         <clipPath [attr.id]="clipId(i)">
           <rect
-            x="0"
-            [attr.y]="24 * (1 - fillFractions()[i])"
-            width="24"
-            [attr.height]="24 * fillFractions()[i]"
+            [attr.x]="vb.x"
+            [attr.y]="fillY(i)"
+            [attr.width]="vb.w"
+            [attr.height]="fillHeight(i)"
           />
         </clipPath>
       </defs>
-      <!-- Glencairn silhouette: bulb bowl with a tapered rim. -->
+
+      <!-- Amber liquid: solid glass body clipped to the bottom fraction. -->
       <path
-        class="rating__outline"
-        d="M9 3 H15 L14.2 8.2 A5.2 5.2 0 1 1 9.8 8.2 Z"
-      />
-      <path
-        class="rating__fill"
-        d="M9 3 H15 L14.2 8.2 A5.2 5.2 0 1 1 9.8 8.2 Z"
+        class="rating__liquid"
+        [attr.d]="bodyPath"
         [attr.clip-path]="'url(#' + clipId(i) + ')'"
       />
+
+      <!-- Glass linework drawn on top. -->
+      @for (d of outlinePaths; track $index) {
+        <path class="rating__outline" [attr.d]="d" />
+      }
     </svg>
   }
 </div>

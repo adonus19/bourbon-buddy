@@ -11,21 +11,21 @@
 .rating__glass {
   display: block;
   flex-shrink: 0;
+  overflow: visible;
 }
 
-.rating__outline {
-  fill: none;
-  stroke: var(--color-border-bright);
-  stroke-width: 1.4;
-}
-
-.rating__fill {
+// The amber liquid filling the glass body from the bottom.
+.rating__liquid {
   fill: var(--color-amber);
-  stroke: none;
 }
 
-// Brief: ~200ms liquid-pour fill. The clip rect animates; reduced-motion is
-// handled globally in global.scss.
+// The glass linework on top (dim when empty, always visible).
+.rating__outline {
+  fill: var(--color-border-bright);
+}
+
+// Brief: ~200ms liquid-pour fill. The clip rect animates as the rating changes;
+// reduced-motion is handled globally in global.scss.
 .rating__glass rect {
   transition: y 0.2s ease-out, height 0.2s ease-out;
 }
