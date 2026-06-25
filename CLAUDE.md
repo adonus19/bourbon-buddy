@@ -13,10 +13,19 @@ Full specs live in [docs/](docs/). Read these before non-trivial work:
 
 ## Architecture
 - **NgModules with lazy-loaded feature modules** (not standalone) — deliberate choice.
+- **Templates use Angular built-in control flow** (`@if` / `@for` / `@switch`), not
+  `*ngIf` / `*ngFor`. Angular 20 idiom; keep new templates consistent.
 - `src/app/core/` — singleton services, guards, auth. `src/app/shared/` — reusable
-  components, pipes, constants. `src/app/features/` — lazy feature modules
-  (log, wishlist, news, stats, search). `src/app/models/` — TS interfaces matching
-  Firestore (import from `models` barrel).
+  components (SharedModule), pipes, constants. `src/app/features/` — lazy feature
+  modules. `src/app/models/` — TS interfaces matching Firestore (import from the
+  `models` barrel).
+- **Feature dirs/routes use the product vocabulary from the UI/UX brief**, not the
+  data-model nouns: `cellar` (log), `hunt-list` (wishlist), `dispatch` (news),
+  `numbers` (stats), `search`. Firestore collections keep their original names
+  (`logEntries`, `wishlistEntries`, `newsArticles`). Auth pages live under
+  `features/auth/{login,register,forgot-password}`.
+- Routing: `/login`, `/register`, `/forgot-password` (publicOnlyGuard) and `/tabs`
+  (authGuard) with the 5 tab children. See [app-routing.module.ts](src/app/app-routing.module.ts).
 - AngularFire is wired in [src/app/app.module.ts](src/app/app.module.ts) via
   `provideFirebaseApp/provideAuth/provideFirestore/provideStorage/provideFunctions`.
   Toggle `useEmulators` in [src/environments/environment.ts](src/environments/environment.ts).
@@ -29,6 +38,15 @@ Full specs live in [docs/](docs/). Read these before non-trivial work:
   computed on read, never stored.
 - **Bourbon catalog** (`/bourbons`) is shared; created on first use of a new name.
 - Timestamps use Firestore `Timestamp`, never JS Date/string.
+- **Design system** lives in [src/theme/variables.scss](src/theme/variables.scss)
+  (tokens + Ionic var mapping) and global utilities in
+  [src/global.scss](src/global.scss) (`.glass-surface`, `.glass-modal`, `.eyebrow`).
+  App is always dark — no OS dark-mode palette. Full spec:
+  [docs/bourbon-buddy-ui-ux-brief.md](docs/bourbon-buddy-ui-ux-brief.md).
+- **Category accent overrides** (deviates from the brief, intentionally): Rye is
+  green (`--color-cat-rye`, real-world green-label convention) and Irish is burgundy
+  (`--color-cat-irish`, Redbreast) to avoid a green-on-green clash. See
+  [category-display.ts](src/app/shared/constants/category-display.ts).
 
 ## Commands
 - `npm start` — dev server (`ng serve`)

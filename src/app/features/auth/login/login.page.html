@@ -1,0 +1,99 @@
+<ion-content class="auth-content" [fullscreen]="true">
+  <div class="auth-shell">
+    <div class="auth-header">
+      <app-wordmark [size]="34"></app-wordmark>
+      <p class="auth-header__tagline">Every dram, remembered.</p>
+    </div>
+
+    <h1 class="auth-title">Welcome back.</h1>
+    <p class="auth-subtitle">Sign in to get to your Cellar.</p>
+
+    <form [formGroup]="form" (ngSubmit)="signIn()">
+      <ion-input
+        class="auth-field"
+        fill="solid"
+        label="Email"
+        labelPlacement="stacked"
+        type="email"
+        inputmode="email"
+        autocomplete="email"
+        formControlName="email"
+        placeholder="you@example.com"
+      ></ion-input>
+
+      <ion-input
+        class="auth-field"
+        fill="solid"
+        label="Password"
+        labelPlacement="stacked"
+        type="password"
+        autocomplete="current-password"
+        formControlName="password"
+        placeholder="Your password"
+      >
+        <ion-input-password-toggle slot="end"></ion-input-password-toggle>
+      </ion-input>
+
+      <div class="login-forgot">
+        <a class="auth-link" routerLink="/forgot-password">Forgot password?</a>
+      </div>
+
+      @if (errorMessage) {
+        <div class="auth-error">
+          <ion-icon name="alert-circle-outline"></ion-icon>
+          <span>{{ errorMessage }}</span>
+        </div>
+      }
+
+      <ion-button
+        class="auth-primary-btn"
+        expand="block"
+        type="submit"
+        [disabled]="submitting"
+      >
+        @if (submitting) {
+          <ion-spinner name="crescent"></ion-spinner>
+        } @else {
+          <span>Sign in</span>
+        }
+      </ion-button>
+    </form>
+
+    <div class="auth-divider">or</div>
+
+    <ion-button
+      class="auth-social-btn"
+      expand="block"
+      fill="outline"
+      (click)="signInWithGoogle()"
+      [disabled]="submitting"
+    >
+      <ion-icon name="logo-google" slot="start"></ion-icon>
+      Continue with Google
+    </ion-button>
+
+    <ion-button
+      class="auth-social-btn"
+      expand="block"
+      fill="outline"
+      (click)="providerNotReady('Apple')"
+    >
+      <ion-icon name="logo-apple" slot="start"></ion-icon>
+      Continue with Apple
+    </ion-button>
+
+    <ion-button
+      class="auth-social-btn"
+      expand="block"
+      fill="outline"
+      (click)="providerNotReady('Facebook')"
+    >
+      <ion-icon name="logo-facebook" slot="start"></ion-icon>
+      Continue with Facebook
+    </ion-button>
+
+    <div class="auth-footer">
+      New here? <a routerLink="/register">Create an account</a>
+    </div>
+  </div>
+</ion-content>

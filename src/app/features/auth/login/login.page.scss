@@ -1,0 +1,12 @@
+@use '../auth-styles' as *;
+
+.login-forgot {
+  display: flex;
+  justify-content: flex-end;
+  margin: -4px 2px 16px;
+}
+
+ion-spinner {
+  width: 22px;
+  height: 22px;
+}

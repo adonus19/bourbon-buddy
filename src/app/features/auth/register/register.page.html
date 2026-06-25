@@ -1,0 +1,83 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/login" text=""></ion-back-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="auth-content" [fullscreen]="true">
+  <div class="auth-shell">
+    <h1 class="auth-title">Create your account.</h1>
+    <p class="auth-subtitle">Start your Cellar. It takes a minute.</p>
+
+    <form [formGroup]="form" (ngSubmit)="register()">
+      <ion-input
+        class="auth-field"
+        fill="solid"
+        label="Display name"
+        labelPlacement="stacked"
+        type="text"
+        autocomplete="name"
+        formControlName="displayName"
+        placeholder="What should we call you?"
+      ></ion-input>
+
+      <ion-input
+        class="auth-field"
+        fill="solid"
+        label="Email"
+        labelPlacement="stacked"
+        type="email"
+        inputmode="email"
+        autocomplete="email"
+        formControlName="email"
+        placeholder="you@example.com"
+      ></ion-input>
+
+      <ion-input
+        class="auth-field"
+        fill="solid"
+        label="Password"
+        labelPlacement="stacked"
+        type="password"
+        autocomplete="new-password"
+        formControlName="password"
+        placeholder="At least 8 characters"
+      >
+        <ion-input-password-toggle slot="end"></ion-input-password-toggle>
+      </ion-input>
+
+      @if (passwordTooShort && !errorMessage) {
+        <div class="auth-error">
+          <ion-icon name="alert-circle-outline"></ion-icon>
+          <span>Password needs to be at least 8 characters.</span>
+        </div>
+      }
+
+      @if (errorMessage) {
+        <div class="auth-error">
+          <ion-icon name="alert-circle-outline"></ion-icon>
+          <span>{{ errorMessage }}</span>
+        </div>
+      }
+
+      <ion-button
+        class="auth-primary-btn"
+        expand="block"
+        type="submit"
+        [disabled]="submitting"
+      >
+        @if (submitting) {
+          <ion-spinner name="crescent"></ion-spinner>
+        } @else {
+          <span>Create account</span>
+        }
+      </ion-button>
+    </form>
+
+    <div class="auth-footer">
+      Already have an account? <a routerLink="/login">Sign in</a>
+    </div>
+  </div>
+</ion-content>
