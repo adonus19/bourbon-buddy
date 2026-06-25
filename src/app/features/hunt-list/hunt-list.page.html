@@ -1,13 +1,99 @@
 <ion-header [translucent]="true">
   <ion-toolbar>
     <ion-title>Hunt List</ion-title>
+    <ion-buttons slot="end">
+      @if (entries().length) {
+        <ion-button (click)="openFilter()" aria-label="Filter">
+          <ion-icon
+            slot="icon-only"
+            [name]="filterActive() ? 'funnel' : 'funnel-outline'"
+          ></ion-icon>
+        </ion-button>
+        <ion-button (click)="openSort()" aria-label="Sort">
+          <ion-icon slot="icon-only" name="swap-vertical-outline"></ion-icon>
+        </ion-button>
+      }
+    </ion-buttons>
   </ion-toolbar>
+
+  @if (entries().length) {
+    <ion-toolbar>
+      <ion-segment
+        [value]="archived() ? 'archived' : 'active'"
+        (ionChange)="setArchived($any($event.detail.value) === 'archived')"
+      >
+        <ion-segment-button value="active">
+          <ion-label>Hunting ({{ activeCount() }})</ion-label>
+        </ion-segment-button>
+        <ion-segment-button value="archived">
+          <ion-label>Got Away ({{ archivedCount() }})</ion-label>
+        </ion-segment-button>
+      </ion-segment>
+
+      @if (chips().length) {
+        <div class="hunt-chips">
+          @for (chip of chips(); track chip.label) {
+            <button
+              type="button"
+              class="hunt-chip"
+              (click)="applyFilter(chip.next)"
+            >
+              {{ chip.label }}
+              <ion-icon name="close"></ion-icon>
+            </button>
+          }
+        </div>
+      }
+    </ion-toolbar>
+  }
 </ion-header>
 
 <ion-content [fullscreen]="true">
-  <app-coming-soon
-    icon="compass-outline"
-    title="Nothing on the radar yet."
-    subtitle="The Hunt List — your wishlist — arrives in Iteration 3."
-  ></app-coming-soon>
+  @if (entries().length === 0) {
+    <div class="hunt-empty">
+      <ion-icon name="compass-outline" aria-hidden="true"></ion-icon>
+      <h2 class="hunt-empty__title">Nothing on the radar yet.</h2>
+      <p class="hunt-empty__sub">Add a bottle you want to hunt down.</p>
+      <ion-button class="hunt-empty__cta" routerLink="/wishlist/new">
+        Add a bottle to hunt
+      </ion-button>
+    </div>
+  } @else if (visibleEntries().length === 0) {
+    <div class="hunt-empty">
+      <ion-icon
+        [name]="archived() ? 'archive-outline' : 'search-outline'"
+        aria-hidden="true"
+      ></ion-icon>
+      <h2 class="hunt-empty__title">
+        {{ archived() ? 'Nothing logged yet.' : 'Nothing matches.' }}
+      </h2>
+      <p class="hunt-empty__sub">
+        {{
+          archived()
+            ? 'Bottles you find and log will land here.'
+            : 'Try loosening your filters.'
+        }}
+      </p>
+    </div>
+  } @else {
+    <div class="hunt-sortbar">
+      <span>Sorted by {{ sortLabel() }}</span>
+      <span class="hunt-sortbar__count">{{ visibleEntries().length }}</span>
+    </div>
+
+    <div class="hunt-list">
+      @for (e of visibleEntries(); track e.id) {
+        <app-wishlist-card
+          [entry]="e"
+          [routerLink]="['/wishlist', e.id]"
+        ></app-wishlist-card>
+      }
+    </div>
+  }
+
+  <ion-fab slot="fixed" vertical="bottom" horizontal="end">
+    <ion-fab-button routerLink="/wishlist/new" aria-label="Add to hunt list">
+      <ion-icon name="add"></ion-icon>
+    </ion-fab-button>
+  </ion-fab>
 </ion-content>

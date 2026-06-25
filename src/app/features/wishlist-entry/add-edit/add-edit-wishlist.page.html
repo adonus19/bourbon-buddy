@@ -1,0 +1,200 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button
+        [defaultHref]="isEditMode ? '/wishlist/' + editId : '/tabs/hunt-list'"
+        text=""
+      ></ion-back-button>
+    </ion-buttons>
+    <ion-title>{{ isEditMode ? 'Edit bottle' : 'Add to Hunt List' }}</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <form [formGroup]="form" class="wform">
+    <p class="eyebrow wform__section">The bottle</p>
+
+    <app-bourbon-autocomplete
+      [value]="form.controls.bourbonName.value ?? ''"
+      (valueChange)="onNameInput($event)"
+      (selected)="onBottleSelected($event)"
+    ></app-bourbon-autocomplete>
+    @if (form.controls.bourbonName.touched && form.controls.bourbonName.invalid) {
+      <div class="wform__error">A name is required.</div>
+    }
+
+    <ion-input
+      class="wform__field"
+      fill="solid"
+      label="Distillery"
+      labelPlacement="stacked"
+      formControlName="distillery"
+    ></ion-input>
+
+    <ion-select
+      class="wform__field"
+      fill="solid"
+      label="Category"
+      labelPlacement="stacked"
+      interface="action-sheet"
+      placeholder="—"
+      formControlName="category"
+    >
+      @for (c of categories; track c.value) {
+        <ion-select-option [value]="c.value">{{ c.label }}</ion-select-option>
+      }
+    </ion-select>
+
+    <ion-select
+      class="wform__field"
+      fill="solid"
+      label="Sub-type"
+      labelPlacement="stacked"
+      interface="action-sheet"
+      placeholder="None"
+      formControlName="subType"
+    >
+      @for (s of subTypes; track s.value) {
+        <ion-select-option [value]="s.value">{{ s.label }}</ion-select-option>
+      }
+    </ion-select>
+
+    <ion-input
+      class="wform__field"
+      fill="solid"
+      label="MSRP"
+      labelPlacement="stacked"
+      type="number"
+      inputmode="decimal"
+      formControlName="msrp"
+    ></ion-input>
+
+    <p class="eyebrow wform__section">Priority &amp; status</p>
+
+    <ion-select
+      class="wform__field"
+      fill="solid"
+      label="Priority"
+      labelPlacement="stacked"
+      interface="action-sheet"
+      formControlName="priority"
+    >
+      @for (p of priorities; track p.value) {
+        <ion-select-option [value]="p.value">{{ p.label }}</ion-select-option>
+      }
+    </ion-select>
+
+    <ion-select
+      class="wform__field"
+      fill="solid"
+      label="Status"
+      labelPlacement="stacked"
+      interface="action-sheet"
+      formControlName="status"
+    >
+      @for (s of statuses; track s.value) {
+        <ion-select-option [value]="s.value">{{ s.label }}</ion-select-option>
+      }
+    </ion-select>
+
+    <p class="eyebrow wform__section">Research</p>
+
+    <ion-textarea
+      class="wform__field"
+      fill="solid"
+      label="External tasting notes"
+      labelPlacement="stacked"
+      [autoGrow]="true"
+      placeholder="From reviews, articles, podcasts…"
+      formControlName="externalTastingNotes"
+    ></ion-textarea>
+
+    <ion-input
+      class="wform__field"
+      fill="solid"
+      label="Discovery source"
+      labelPlacement="stacked"
+      placeholder="e.g. Whisky Advocate, a friend"
+      formControlName="discoverySource"
+    ></ion-input>
+
+    <ion-input
+      class="wform__field"
+      fill="solid"
+      label="Discovery URL"
+      labelPlacement="stacked"
+      type="url"
+      inputmode="url"
+      formControlName="discoveryUrl"
+    ></ion-input>
+
+    <p class="wform__hint">Review links</p>
+    <div formArrayName="reviewLinks">
+      @for (link of reviewLinks.controls; track $index; let i = $index) {
+        <div class="wform__link" [formGroupName]="i">
+          <ion-input
+            class="wform__field"
+            fill="solid"
+            label="URL"
+            labelPlacement="stacked"
+            type="url"
+            inputmode="url"
+            formControlName="url"
+          ></ion-input>
+          <ion-input
+            class="wform__field"
+            fill="solid"
+            label="Label (optional)"
+            labelPlacement="stacked"
+            formControlName="label"
+          ></ion-input>
+          <ion-button
+            class="wform__link-remove"
+            fill="clear"
+            color="danger"
+            (click)="removeReviewLink(i)"
+          >
+            Remove link
+          </ion-button>
+        </div>
+      }
+    </div>
+    <ion-button
+      class="wform__add-link"
+      fill="outline"
+      size="small"
+      (click)="addReviewLink()"
+    >
+      <ion-icon name="add" slot="start"></ion-icon>
+      Add a review link
+    </ion-button>
+
+    <p class="eyebrow wform__section">Notes</p>
+
+    <ion-textarea
+      class="wform__field"
+      fill="solid"
+      label="Why you want it"
+      labelPlacement="stacked"
+      [autoGrow]="true"
+      formControlName="personalNotes"
+    ></ion-textarea>
+  </form>
+</ion-content>
+
+<ion-footer class="wform-footer">
+  <ion-toolbar>
+    <ion-button
+      class="wform__save"
+      expand="block"
+      (click)="save()"
+      [disabled]="saving"
+    >
+      @if (saving) {
+        <ion-spinner name="crescent"></ion-spinner>
+      } @else {
+        <span>{{ isEditMode ? 'Save changes' : 'Save' }}</span>
+      }
+    </ion-button>
+  </ion-toolbar>
+</ion-footer>

@@ -1,0 +1,116 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/tabs/hunt-list" text=""></ion-back-button>
+    </ion-buttons>
+    @if (entry()) {
+      <ion-buttons slot="end">
+        <ion-button [routerLink]="['/wishlist', entryId, 'edit']" aria-label="Edit">
+          <ion-icon slot="icon-only" name="create-outline"></ion-icon>
+        </ion-button>
+        <ion-button (click)="confirmDelete()" color="danger" aria-label="Remove">
+          <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+        </ion-button>
+      </ion-buttons>
+    }
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  @if (entry(); as e) {
+    <div class="wdetail">
+      <div class="wdetail__head">
+        <h1 class="wdetail__name">{{ e.bourbonName }}</h1>
+        @if (priority()?.isGrail) {
+          <span class="wdetail__unicorn" aria-label="Unicorn">🦄</span>
+        }
+      </div>
+      <p class="wdetail__sub">
+        @if (e.distillery) {<span>{{ e.distillery }}</span>}
+        @if (e.distillery && categoryLabel()) {<span class="wdetail__dot">·</span>}
+        <span>{{ categoryLabel() }}</span>
+      </p>
+
+      <div class="wdetail__badges">
+        @if (priority(); as p) {
+          <span
+            class="wdetail__badge"
+            [style.background]="p.badgeBg"
+            [style.color]="p.badgeText"
+            >{{ p.label }}</span
+          >
+        }
+        <span class="wdetail__status">{{ statusLabel() }}</span>
+      </div>
+
+      <div class="wdetail__pricing">
+        @if (e.msrp != null) {
+          <span>MSRP ${{ e.msrp }}</span>
+        }
+        @if (e.bestSightingPrice != null) {
+          <span class="wdetail__dot">·</span>
+          <span>Best ${{ e.bestSightingPrice }}</span>
+          @if (delta(); as d) {
+            <span [class.is-below]="d.below" [class.is-above]="!d.below">
+              ({{ d.text }})
+            </span>
+          }
+        }
+      </div>
+
+      <!-- Sightings arrive in Iteration 4 -->
+      <div class="section">
+        <p class="eyebrow">Sightings</p>
+        <p class="wdetail__empty">No sightings yet. Keep your eyes open.</p>
+      </div>
+
+      @if (e.externalTastingNotes) {
+        <div class="section">
+          <p class="eyebrow">Tasting notes (from the wild)</p>
+          <p class="wdetail__text">{{ e.externalTastingNotes }}</p>
+        </div>
+      }
+
+      @if (e.reviewLinks.length || e.discoverySource || e.discoveryUrl) {
+        <div class="section">
+          <p class="eyebrow">Research</p>
+          @if (e.discoverySource) {
+            <p class="wdetail__meta">Discovered via {{ e.discoverySource }}</p>
+          }
+          @if (e.discoveryUrl) {
+            <a class="wdetail__link" [href]="e.discoveryUrl" target="_blank" rel="noopener">
+              {{ e.discoveryUrl }}
+            </a>
+          }
+          @for (link of e.reviewLinks; track link.url) {
+            <a class="wdetail__link" [href]="link.url" target="_blank" rel="noopener">
+              {{ link.label || link.url }}
+            </a>
+          }
+        </div>
+      }
+
+      @if (e.personalNotes) {
+        <div class="section">
+          <p class="eyebrow">Why I want it</p>
+          <p class="wdetail__text">{{ e.personalNotes }}</p>
+        </div>
+      }
+    </div>
+  } @else {
+    <div class="wdetail-missing">
+      <p>That bottle isn't on your Hunt List.</p>
+      <ion-button routerLink="/tabs/hunt-list" fill="clear">Back to Hunt List</ion-button>
+    </div>
+  }
+</ion-content>
+
+@if (entry()) {
+  <ion-footer class="wdetail-footer">
+    <ion-toolbar>
+      <ion-button class="wdetail__found" expand="block" (click)="foundItLogIt()">
+        Found It — Log It
+      </ion-button>
+    </ion-toolbar>
+  </ion-footer>
+}

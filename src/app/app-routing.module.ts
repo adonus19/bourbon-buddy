@@ -64,6 +64,30 @@ const routes: Routes = [
       ),
   },
   {
+    path: 'wishlist/new',
+    canActivate: [authGuard],
+    loadChildren: () =>
+      import('./features/wishlist-entry/add-edit/add-edit-wishlist.module').then(
+        (m) => m.AddEditWishlistPageModule
+      ),
+  },
+  {
+    path: 'wishlist/:id/edit',
+    canActivate: [authGuard],
+    loadChildren: () =>
+      import('./features/wishlist-entry/add-edit/add-edit-wishlist.module').then(
+        (m) => m.AddEditWishlistPageModule
+      ),
+  },
+  {
+    path: 'wishlist/:id',
+    canActivate: [authGuard],
+    loadChildren: () =>
+      import('./features/wishlist-entry/detail/wishlist-detail.module').then(
+        (m) => m.WishlistDetailPageModule
+      ),
+  },
+  {
     path: 'tabs',
     canActivate: [authGuard],
     loadChildren: () =>

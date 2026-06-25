@@ -1,0 +1,41 @@
+<div class="wcard glass-surface">
+  <div class="wcard__head">
+    <h3 class="wcard__name">{{ entry().bourbonName }}</h3>
+    @if (priority().isGrail) {
+      <span class="wcard__unicorn" aria-label="Unicorn">🦄</span>
+    }
+  </div>
+
+  @if (entry().distillery) {
+    <p class="wcard__distillery">{{ entry().distillery }}</p>
+  }
+
+  <p class="wcard__pricing">
+    @if (entry().msrp != null) {
+      <span class="wcard__msrp">MSRP ${{ entry().msrp }}</span>
+    }
+    @if (entry().bestSightingPrice != null) {
+      <span class="wcard__dot">·</span>
+      <span class="wcard__best">Best ${{ entry().bestSightingPrice }}</span>
+      @if (delta(); as d) {
+        <span [class.is-below]="d.below" [class.is-above]="!d.below" class="wcard__delta">
+          ({{ d.text }})
+        </span>
+      }
+    } @else {
+      <span class="wcard__dot">·</span>
+      <span class="wcard__nosighting">No sightings yet</span>
+    }
+  </p>
+
+  <div class="wcard__badges">
+    <span
+      class="wcard__badge"
+      [style.background]="priority().badgeBg"
+      [style.color]="priority().badgeText"
+    >
+      {{ priority().label }}
+    </span>
+    <span class="wcard__status">{{ statusLabel() }}</span>
+  </div>
+</div>

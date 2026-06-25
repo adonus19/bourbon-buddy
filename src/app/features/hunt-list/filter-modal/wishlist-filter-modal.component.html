@@ -1,0 +1,73 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button (click)="cancel()">Cancel</ion-button>
+    </ion-buttons>
+    <ion-title>Filters</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="clearAll()">Clear</ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="wfilter">
+  <p class="eyebrow wfilter__label">Priority</p>
+  <div class="chips">
+    @for (p of priorities; track p.value) {
+      <button
+        type="button"
+        class="chip"
+        [class.chip--selected]="isPrioritySelected(p.value)"
+        (click)="togglePriority(p.value)"
+      >
+        {{ p.label }}
+      </button>
+    }
+  </div>
+
+  <p class="eyebrow wfilter__label">Category</p>
+  <div class="chips">
+    @for (c of categories; track c.value) {
+      <button
+        type="button"
+        class="chip"
+        [class.chip--selected]="isCategorySelected(c.value)"
+        (click)="toggleCategory(c.value)"
+      >
+        {{ c.label }}
+      </button>
+    }
+  </div>
+
+  <p class="eyebrow wfilter__label">MSRP range</p>
+  <div class="wfilter__prices">
+    <ion-input
+      class="wfilter__price"
+      fill="solid"
+      type="number"
+      inputmode="numeric"
+      label="Min $"
+      labelPlacement="stacked"
+      [value]="draft().priceMin"
+      (ionInput)="setPriceMin($any($event.detail.value) ?? '')"
+    ></ion-input>
+    <ion-input
+      class="wfilter__price"
+      fill="solid"
+      type="number"
+      inputmode="numeric"
+      label="Max $"
+      labelPlacement="stacked"
+      [value]="draft().priceMax"
+      (ionInput)="setPriceMax($any($event.detail.value) ?? '')"
+    ></ion-input>
+  </div>
+</ion-content>
+
+<ion-footer>
+  <ion-toolbar>
+    <ion-button class="wfilter__apply" expand="block" (click)="apply()">
+      Show results
+    </ion-button>
+  </ion-toolbar>
+</ion-footer>

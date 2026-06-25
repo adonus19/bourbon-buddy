@@ -1,0 +1,55 @@
+.wfilter {
+  --padding-start: 16px;
+  --padding-end: 16px;
+  --padding-top: 8px;
+}
+
+.wfilter__label {
+  display: block;
+  margin: 22px 2px 10px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+
+  &--selected {
+    background: var(--color-amber-dim);
+    border-color: var(--color-amber);
+    color: var(--color-amber-light);
+  }
+}
+
+.wfilter__prices {
+  display: flex;
+  gap: 12px;
+}
+
+.wfilter__price {
+  flex: 1;
+  --background: var(--color-bg-elevated);
+  --color: var(--color-text-primary);
+  border-radius: var(--radius-input);
+  border: 1px solid var(--color-border);
+}
+
+.wfilter__apply {
+  --background: var(--color-amber);
+  --color: var(--color-bg-primary);
+  --border-radius: var(--radius-button);
+  font-weight: 600;
+  margin: 4px 12px calc(4px + env(safe-area-inset-bottom));
+}
