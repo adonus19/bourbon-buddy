@@ -1,0 +1,26 @@
+<div class="avatar-upload">
+  <div class="avatar-upload__ring">
+    @if (avatarUrl()) {
+      <img class="avatar-upload__img" [src]="avatarUrl()" alt="Your avatar" />
+    } @else {
+      <span class="avatar-upload__initials">{{ initials() }}</span>
+    }
+
+    @if (uploading()) {
+      <div class="avatar-upload__overlay">
+        <ion-spinner name="crescent"></ion-spinner>
+      </div>
+    }
+
+    <label class="avatar-upload__btn" [class.is-disabled]="uploading()">
+      <ion-icon name="camera-outline" aria-hidden="true"></ion-icon>
+      <input
+        type="file"
+        accept="image/*"
+        (change)="onFileSelected($event)"
+        [disabled]="uploading()"
+        hidden
+      />
+    </label>
+  </div>
+</div>

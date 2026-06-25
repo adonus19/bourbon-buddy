@@ -1,0 +1,148 @@
+import { Component, computed, effect, inject } from '@angular/core';
+import { FormBuilder, Validators } from '@angular/forms';
+import { Router } from '@angular/router';
+import { AlertController, ToastController } from '@ionic/angular';
+import { Auth, updateProfile } from '@angular/fire/auth';
+
+import { AuthService } from '../../core/auth/auth.service';
+import { UserService } from '../../core/services/user.service';
+
+@Component({
+  selector: 'app-profile',
+  templateUrl: './profile.page.html',
+  styleUrls: ['./profile.page.scss'],
+  standalone: false,
+})
+export class ProfilePage {
+  private readonly fb = inject(FormBuilder);
+  private readonly auth = inject(AuthService);
+  private readonly firebaseAuth = inject(Auth);
+  private readonly userService = inject(UserService);
+  private readonly router = inject(Router);
+  private readonly toast = inject(ToastController);
+  private readonly alertCtrl = inject(AlertController);
+
+  // Already-loaded signals from the session state holder — no new Firebase reads.
+  readonly user = this.auth.currentUser;
+  readonly profile = this.auth.profile;
+
+  /** Only email/password users can change a password. */
+  readonly hasPasswordProvider = computed(
+    () =>
+      this.user()?.providerData.some((p) => p.providerId === 'password') ?? false
+  );
+
+  readonly form = this.fb.group({
+    displayName: ['', [Validators.required, Validators.maxLength(60)]],
+    bio: ['', [Validators.maxLength(280)]],
+    homeRegion: ['', [Validators.maxLength(80)]],
+  });
+
+  saving = false;
+
+  constructor() {
+    // Sync the loaded profile into the form, but never clobber in-progress edits.
+    // (Valid effect use: syncing signal state into the imperative Forms API.)
+    effect(() => {
+      const p = this.profile();
+      if (p && this.form.pristine) {
+        this.form.patchValue(
+          {
+            displayName: p.displayName ?? '',
+            bio: p.bio ?? '',
+            homeRegion: p.homeRegion ?? '',
+          },
+          { emitEvent: false }
+        );
+      }
+    });
+  }
+
+  async save(): Promise<void> {
+    const uid = this.user()?.uid;
+    if (!uid || this.form.invalid || this.saving) {
+      this.form.markAllAsTouched();
+      return;
+    }
+    this.saving = true;
+    try {
+      const displayName = this.form.value.displayName!.trim();
+      await this.userService.updateProfile(uid, {
+        displayName,
+        bio: this.form.value.bio?.trim() || null,
+        homeRegion: this.form.value.homeRegion?.trim() || null,
+      });
+      // Keep the Firebase Auth display name in sync with the profile doc.
+      const authUser = this.firebaseAuth.currentUser;
+      if (authUser && authUser.displayName !== displayName) {
+        await updateProfile(authUser, { displayName });
+      }
+      this.form.markAsPristine();
+      await this.presentToast('Saved.');
+    } catch {
+      await this.presentToast(
+        "Couldn't save. Check your connection and try again."
+      );
+    } finally {
+      this.saving = false;
+    }
+  }
+
+  async onAvatarUploaded(url: string): Promise<void> {
+    const uid = this.user()?.uid;
+    if (!uid) {
+      return;
+    }
+    await this.userService.updateProfile(uid, { avatarUrl: url });
+    const authUser = this.firebaseAuth.currentUser;
+    if (authUser) {
+      await updateProfile(authUser, { photoURL: url });
+    }
+    await this.presentToast('Avatar updated.');
+  }
+
+  async changePassword(): Promise<void> {
+    const email = this.user()?.email;
+    if (!email) {
+      return;
+    }
+    try {
+      await this.auth.resetPassword(email);
+      await this.presentToast('Password reset email sent.');
+    } catch {
+      await this.presentToast('Something went wrong. Try again.');
+    }
+  }
+
+  async confirmSignOut(): Promise<void> {
+    const alert = await this.alertCtrl.create({
+      header: 'Sign out?',
+      buttons: [
+        { text: 'Cancel', role: 'cancel' },
+        {
+          text: 'Sign out',
+          role: 'destructive',
+          handler: () => {
+            void this.signOut();
+          },
+        },
+      ],
+    });
+    await alert.present();
+  }
+
+  private async signOut(): Promise<void> {
+    await this.auth.signOut();
+    await this.presentToast('See you next pour.');
+    await this.router.navigateByUrl('/login', { replaceUrl: true });
+  }
+
+  private async presentToast(message: string): Promise<void> {
+    const t = await this.toast.create({
+      message,
+      duration: 2000,
+      position: 'top',
+    });
+    await t.present();
+  }
+}

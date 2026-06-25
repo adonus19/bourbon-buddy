@@ -1,0 +1,96 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/tabs/cellar" text=""></ion-back-button>
+    </ion-buttons>
+    <ion-title>Settings</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true" class="profile-content">
+  <div class="profile">
+    <app-avatar-upload
+      [uid]="user()?.uid ?? ''"
+      [avatarUrl]="profile()?.avatarUrl ?? null"
+      [displayName]="profile()?.displayName ?? ''"
+      (avatarUploaded)="onAvatarUploaded($event)"
+    ></app-avatar-upload>
+
+    <p class="profile__email">{{ user()?.email }}</p>
+
+    <form [formGroup]="form" (ngSubmit)="save()">
+      <p class="eyebrow profile__section">Profile</p>
+
+      <ion-input
+        class="profile__field"
+        fill="solid"
+        label="Display name"
+        labelPlacement="stacked"
+        type="text"
+        autocomplete="name"
+        formControlName="displayName"
+        placeholder="What should we call you?"
+      ></ion-input>
+
+      <ion-textarea
+        class="profile__field"
+        fill="solid"
+        label="Bio"
+        labelPlacement="stacked"
+        [autoGrow]="true"
+        [counter]="true"
+        maxlength="280"
+        formControlName="bio"
+        placeholder="A line or two about your bourbon taste."
+      ></ion-textarea>
+
+      <ion-input
+        class="profile__field"
+        fill="solid"
+        label="Home region"
+        labelPlacement="stacked"
+        type="text"
+        formControlName="homeRegion"
+        placeholder="e.g. Charlotte, NC"
+      ></ion-input>
+
+      <ion-button
+        class="profile__save"
+        expand="block"
+        type="submit"
+        [disabled]="saving || form.pristine"
+      >
+        @if (saving) {
+          <ion-spinner name="crescent"></ion-spinner>
+        } @else {
+          <span>Save</span>
+        }
+      </ion-button>
+    </form>
+
+    <p class="eyebrow profile__section">Account</p>
+
+    @if (hasPasswordProvider()) {
+      <ion-button
+        class="profile__account-btn"
+        expand="block"
+        fill="outline"
+        (click)="changePassword()"
+      >
+        <ion-icon name="key-outline" slot="start"></ion-icon>
+        Change password
+      </ion-button>
+    }
+
+    <ion-button
+      class="profile__signout"
+      expand="block"
+      fill="clear"
+      color="danger"
+      (click)="confirmSignOut()"
+    >
+      <ion-icon name="log-out-outline" slot="start"></ion-icon>
+      Sign out
+    </ion-button>
+  </div>
+</ion-content>

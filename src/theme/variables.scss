@@ -1,2 +1,115 @@
-// For information on how to create your own theme, please refer to:
-// https://ionicframework.com/docs/theming/
+/*
+ * Bourbon Buddy — Design Tokens & Ionic Theme
+ * "Bourbon Bar at Midnight." See docs/bourbon-buddy-ui-ux-brief.md.
+ * Always dark — this app does not follow the OS light/dark setting.
+ */
+
+:root {
+  /* ---- Palette ---- */
+  --color-bg-primary: #141210;   /* app background — near-black, warm brown undertone */
+  --color-bg-surface: #1e1a17;   /* card and surface background */
+  --color-bg-elevated: #272219;  /* elevated surfaces, inputs, modals */
+
+  --color-amber: #c8873a;        /* primary accent — bourbon in candlelight */
+  --color-amber-light: #e8a85a;  /* hover, highlights, active tab indicator */
+  --color-amber-dim: #8a5c28;    /* muted amber — secondary actions, borders */
+  --color-copper: #b07040;       /* secondary accent, icons, decorative */
+
+  --color-text-primary: #f0e8dc;   /* warm cream, not pure white */
+  --color-text-secondary: #a89880; /* labels, metadata */
+  --color-text-disabled: #5c5248;  /* disabled, placeholder */
+
+  --color-border: #2e2820;         /* subtle borders */
+  --color-border-bright: #4a3c30;  /* visible borders, dividers */
+
+  --color-success: #5a9e6a;        /* warm green */
+  --color-error: #c0504a;          /* error states */
+
+  --color-unicorn: #9b6fd4;        /* Grail/Unicorn tier */
+  --color-unicorn-glow: #c4a0f0;   /* unicorn badge glow */
+
+  /* ---- Category accents (3px left border on cards) ----
+   * Rye intentionally diverges from the brief's copper-red to follow the
+   * real-world green-label convention; Irish moves to burgundy (Redbreast)
+   * to avoid a green-on-green clash. See the ui-ux-brief discussion. */
+  --color-cat-bourbon: #c8873a;    /* amber */
+  --color-cat-rye: #5e9c5a;        /* herbaceous green (was #c05a3a) */
+  --color-cat-scotch: #5a7a9e;     /* slate blue */
+  --color-cat-irish: #9e5a63;      /* muted burgundy (was #5a8a6a) */
+  --color-cat-japanese: #8a9aaa;   /* cool silver */
+  --color-cat-tennessee: #b89840;  /* golden */
+  --color-cat-other: #887060;      /* neutral copper */
+
+  /* ---- Type families ---- */
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* ---- Radii ---- */
+  --radius-card: 16px;
+  --radius-input: 10px;
+  --radius-button: 12px;
+  --radius-sheet: 20px;
+}
+
+/*
+ * Map design tokens onto the Ionic CSS variables Ionic components read,
+ * so stock Ionic components stay on-theme without per-component overrides.
+ */
+:root {
+  --ion-background-color: var(--color-bg-primary);
+  --ion-background-color-rgb: 20, 18, 16;
+  --ion-text-color: var(--color-text-primary);
+  --ion-text-color-rgb: 240, 232, 220;
+
+  --ion-font-family: var(--font-body);
+
+  /* Primary (amber) */
+  --ion-color-primary: var(--color-amber);
+  --ion-color-primary-rgb: 200, 135, 58;
+  --ion-color-primary-contrast: var(--color-bg-primary);
+  --ion-color-primary-contrast-rgb: 20, 18, 16;
+  --ion-color-primary-shade: var(--color-amber-dim);
+  --ion-color-primary-tint: var(--color-amber-light);
+
+  /* Success */
+  --ion-color-success: var(--color-success);
+  --ion-color-success-rgb: 90, 158, 106;
+  --ion-color-success-contrast: #ffffff;
+  --ion-color-success-shade: #4f8b5d;
+  --ion-color-success-tint: #6ba879;
+
+  /* Danger */
+  --ion-color-danger: var(--color-error);
+  --ion-color-danger-rgb: 192, 80, 74;
+  --ion-color-danger-contrast: #ffffff;
+  --ion-color-danger-shade: #a94641;
+  --ion-color-danger-tint: #c6625c;
+
+  /* Surfaces */
+  --ion-card-background: var(--color-bg-surface);
+  --ion-item-background: var(--color-bg-elevated);
+  --ion-toolbar-background: var(--color-bg-surface);
+  --ion-toolbar-color: var(--color-text-primary);
+
+  /* Tab bar */
+  --ion-tab-bar-background: var(--color-bg-surface);
+  --ion-tab-bar-border-color: var(--color-border-bright);
+  --ion-tab-bar-color: var(--color-text-disabled);
+  --ion-tab-bar-color-selected: var(--color-amber-light);
+
+  /* Neutral stepped greys remapped onto the warm palette */
+  --ion-color-step-50: #1b1714;
+  --ion-color-step-100: #211c18;
+  --ion-color-step-150: #272219;
+  --ion-color-step-200: #2e2820;
+  --ion-color-step-250: #342d24;
+  --ion-color-step-300: #3a3228;
+  --ion-color-step-350: #41382d;
+  --ion-color-step-400: #4a3c30;
+  --ion-color-step-500: #5c5248;
+  --ion-color-step-600: #786c5e;
+  --ion-color-step-700: #948674;
+  --ion-color-step-800: #a89880;
+  --ion-color-step-850: #c4b8a4;
+  --ion-color-step-900: #f0e8dc;
+}

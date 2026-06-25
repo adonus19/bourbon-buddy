@@ -1,0 +1,55 @@
+.profile {
+  padding: 24px 20px max(24px, env(safe-area-inset-bottom));
+  max-width: 520px;
+  margin: 0 auto;
+
+  &__email {
+    text-align: center;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    margin: 12px 0 28px;
+  }
+
+  &__section {
+    margin: 24px 2px 12px;
+  }
+
+  &__field {
+    margin-bottom: 16px;
+    --background: var(--color-bg-elevated);
+    --color: var(--color-text-primary);
+    --placeholder-color: var(--color-text-disabled);
+    --highlight-color-focused: var(--color-amber);
+    border-radius: var(--radius-input);
+    border: 1px solid var(--color-border);
+  }
+
+  &__save {
+    --background: var(--color-amber);
+    --background-activated: var(--color-amber-dim);
+    --color: var(--color-bg-primary);
+    --border-radius: var(--radius-button);
+    font-weight: 600;
+    height: 50px;
+    margin-top: 8px;
+
+    ion-spinner {
+      width: 22px;
+      height: 22px;
+    }
+  }
+
+  &__account-btn {
+    --border-color: var(--color-border-bright);
+    --color: var(--color-text-primary);
+    --border-radius: var(--radius-button);
+    height: 48px;
+    margin-bottom: 12px;
+    text-transform: none;
+  }
+
+  &__signout {
+    margin-top: 4px;
+    text-transform: none;
+  }
+}
