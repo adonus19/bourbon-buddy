@@ -1,0 +1,20 @@
+<div class="photo">
+  @if (displayUrl(); as url) {
+    <div class="photo__preview">
+      <img [src]="url" alt="Bottle label" />
+      <button type="button" class="photo__remove" (click)="clear()" aria-label="Remove photo">
+        <ion-icon name="close"></ion-icon>
+      </button>
+    </div>
+    <label class="photo__replace">
+      Replace photo
+      <input type="file" accept="image/*" (change)="onFileSelected($event)" hidden />
+    </label>
+  } @else {
+    <label class="photo__add">
+      <ion-icon name="camera-outline" aria-hidden="true"></ion-icon>
+      <span>Add label photo</span>
+      <input type="file" accept="image/*" (change)="onFileSelected($event)" hidden />
+    </label>
+  }
+</div>

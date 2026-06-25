@@ -48,6 +48,14 @@ const routes: Routes = [
       ),
   },
   {
+    path: 'entry/:id/edit',
+    canActivate: [authGuard],
+    loadChildren: () =>
+      import('./features/log-entry/add-edit/add-edit-entry.module').then(
+        (m) => m.AddEditEntryPageModule
+      ),
+  },
+  {
     path: 'entry/:id',
     canActivate: [authGuard],
     loadChildren: () =>

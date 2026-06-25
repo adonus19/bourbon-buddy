@@ -5,9 +5,12 @@ import {
   addDoc,
   collection,
   collectionData,
+  deleteDoc,
+  doc,
   orderBy,
   query,
   serverTimestamp,
+  updateDoc,
 } from '@angular/fire/firestore';
 import { Observable, of } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
@@ -71,8 +74,37 @@ export class LogEntryService {
     return ref.id;
   }
 
+  /** Overwrites the editable fields of an entry and recomputes value score. */
+  async update(id: string, input: LogEntryInput): Promise<void> {
+    const uid = this.requireUid();
+    const valueScore = computeValueScore(input.rating, input.purchasePrice);
+    await updateDoc(this.entryDocRef(uid, id), {
+      ...input,
+      valueScore,
+      updatedAt: serverTimestamp(),
+    });
+  }
+
+  /** Sets (or clears) just the label photo URL — used by the photo flow. */
+  async setLabelPhotoUrl(id: string, url: string | null): Promise<void> {
+    const uid = this.requireUid();
+    await updateDoc(this.entryDocRef(uid, id), {
+      labelPhotoUrl: url,
+      updatedAt: serverTimestamp(),
+    });
+  }
+
+  async remove(id: string): Promise<void> {
+    const uid = this.requireUid();
+    await deleteDoc(this.entryDocRef(uid, id));
+  }
+
   private entriesCol(uid: string) {
     return collection(this.firestore, `users/${uid}/logEntries`);
+  }
+
+  private entryDocRef(uid: string, id: string) {
+    return doc(this.firestore, `users/${uid}/logEntries/${id}`);
   }
 
   private requireUid(): string {

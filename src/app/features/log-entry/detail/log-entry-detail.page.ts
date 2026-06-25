@@ -1,8 +1,11 @@
 import { Component, computed, inject } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
+import { AlertController, ToastController } from '@ionic/angular';
 
 import { LogEntry } from '../../../models';
 import { LogEntryService } from '../../../core/services/log-entry.service';
+import { StorageService } from '../../../core/services/storage.service';
+import { AuthService } from '../../../core/auth/auth.service';
 import {
   CATEGORY_DISPLAY,
   ENTRY_TYPE_LABELS,
@@ -18,15 +21,20 @@ import { valueScoreLabel } from '../../../shared/utils/value-score';
 export class LogEntryDetailPage {
   private readonly route = inject(ActivatedRoute);
   private readonly logService = inject(LogEntryService);
+  private readonly storage = inject(StorageService);
+  private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
+  private readonly alertCtrl = inject(AlertController);
+  private readonly toast = inject(ToastController);
 
   // Empty-path child inherits the :id from the parent route; fall back just in case.
-  private readonly id =
+  readonly entryId =
     this.route.snapshot.paramMap.get('id') ??
     this.route.snapshot.parent?.paramMap.get('id') ??
     '';
 
   /** Reads from the already-loaded entries signal — no extra Firestore read. */
-  readonly entry = this.logService.selectById(this.id);
+  readonly entry = this.logService.selectById(this.entryId);
 
   readonly categoryLabel = computed(() => {
     const e = this.entry();
@@ -95,5 +103,46 @@ export class LogEntryDetailPage {
       return 'NAS';
     }
     return e.ageStatement != null ? `${e.ageStatement} yr` : '';
+  }
+
+  async confirmDelete(): Promise<void> {
+    const alert = await this.alertCtrl.create({
+      header: 'Delete this entry?',
+      message: this.entry()?.bourbonName,
+      buttons: [
+        { text: 'Cancel', role: 'cancel' },
+        {
+          text: 'Delete',
+          role: 'destructive',
+          handler: () => {
+            void this.doDelete();
+          },
+        },
+      ],
+    });
+    await alert.present();
+  }
+
+  private async doDelete(): Promise<void> {
+    try {
+      const uid = this.auth.snapshotUser?.uid;
+      if (uid) {
+        await this.storage.deleteLabel(uid, this.entryId);
+      }
+      await this.logService.remove(this.entryId);
+      await this.presentToast('Removed.');
+      await this.router.navigateByUrl('/tabs/cellar', { replaceUrl: true });
+    } catch {
+      await this.presentToast("Couldn't delete. Try again.");
+    }
+  }
+
+  private async presentToast(message: string): Promise<void> {
+    const t = await this.toast.create({
+      message,
+      duration: 2000,
+      position: 'top',
+    });
+    await t.present();
   }
 }

@@ -8,6 +8,7 @@ import { RatingWidgetComponent } from './components/rating-widget/rating-widget.
 import { FlavorTagSelectorComponent } from './components/flavor-tag-selector/flavor-tag-selector.component';
 import { BourbonAutocompleteComponent } from './components/bourbon-autocomplete/bourbon-autocomplete.component';
 import { LogEntryCardComponent } from './components/log-entry-card/log-entry-card.component';
+import { LabelPhotoPickerComponent } from './components/label-photo-picker/label-photo-picker.component';
 
 /**
  * Shared declarations reused across feature modules (presentational
@@ -21,6 +22,7 @@ const COMPONENTS = [
   FlavorTagSelectorComponent,
   BourbonAutocompleteComponent,
   LogEntryCardComponent,
+  LabelPhotoPickerComponent,
 ];
 
 @NgModule({

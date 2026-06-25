@@ -3,6 +3,16 @@
     <ion-buttons slot="start">
       <ion-back-button defaultHref="/tabs/cellar" text=""></ion-back-button>
     </ion-buttons>
+    @if (entry()) {
+      <ion-buttons slot="end">
+        <ion-button [routerLink]="['/entry', entryId, 'edit']" aria-label="Edit">
+          <ion-icon slot="icon-only" name="create-outline"></ion-icon>
+        </ion-button>
+        <ion-button (click)="confirmDelete()" color="danger" aria-label="Delete">
+          <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+        </ion-button>
+      </ion-buttons>
+    }
   </ion-toolbar>
 </ion-header>
 
