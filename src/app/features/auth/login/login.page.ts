@@ -9,7 +9,6 @@ import { ToastController } from '@ionic/angular';
 
 import { AuthService } from '../../../core/auth/auth.service';
 import { authErrorMessage } from '../../../core/auth/auth-error';
-import { OnboardingService } from '../../../core/services/onboarding.service';
 
 @Component({
   selector: 'app-login',
@@ -22,7 +21,6 @@ export class LoginPage {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastController);
-  private readonly onboarding = inject(OnboardingService);
 
   readonly form: FormGroup = this.fb.group({
     email: ['', [Validators.required, Validators.email]],
@@ -42,9 +40,7 @@ export class LoginPage {
     try {
       const { email, password } = this.form.value;
       await this.auth.signIn(email, password);
-      await this.router.navigateByUrl(this.onboarding.postAuthRoute(), {
-        replaceUrl: true,
-      });
+      await this.router.navigateByUrl('/tabs', { replaceUrl: true });
     } catch (err) {
       this.errorMessage = authErrorMessage(err);
     } finally {
@@ -60,9 +56,7 @@ export class LoginPage {
     this.errorMessage = '';
     try {
       await this.auth.signInWithGoogle();
-      await this.router.navigateByUrl(this.onboarding.postAuthRoute(), {
-        replaceUrl: true,
-      });
+      await this.router.navigateByUrl('/tabs', { replaceUrl: true });
     } catch (err) {
       this.errorMessage = authErrorMessage(err);
     } finally {

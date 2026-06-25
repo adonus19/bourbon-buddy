@@ -4,7 +4,6 @@ import { Router } from '@angular/router';
 
 import { AuthService } from '../../../core/auth/auth.service';
 import { authErrorMessage } from '../../../core/auth/auth-error';
-import { OnboardingService } from '../../../core/services/onboarding.service';
 
 @Component({
   selector: 'app-register',
@@ -16,7 +15,6 @@ export class RegisterPage {
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
-  private readonly onboarding = inject(OnboardingService);
 
   readonly form: FormGroup = this.fb.group({
     displayName: ['', [Validators.required, Validators.maxLength(60)]],
@@ -43,9 +41,7 @@ export class RegisterPage {
     try {
       const { email, password, displayName } = this.form.value;
       await this.auth.register(email, password, displayName.trim());
-      await this.router.navigateByUrl(this.onboarding.postAuthRoute(), {
-        replaceUrl: true,
-      });
+      await this.router.navigateByUrl('/tabs', { replaceUrl: true });
     } catch (err) {
       this.errorMessage = authErrorMessage(err);
     } finally {

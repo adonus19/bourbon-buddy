@@ -32,14 +32,6 @@ const routes: Routes = [
       ),
   },
   {
-    path: 'welcome',
-    canActivate: [authGuard],
-    loadChildren: () =>
-      import('./features/onboarding/onboarding.module').then(
-        (m) => m.OnboardingPageModule
-      ),
-  },
-  {
     path: 'settings',
     canActivate: [authGuard],
     loadChildren: () =>
