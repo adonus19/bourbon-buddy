@@ -6,10 +6,9 @@ import {
   User,
   authState,
   createUserWithEmailAndPassword,
-  getRedirectResult,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
-  signInWithRedirect,
+  signInWithPopup,
   signOut,
   updateProfile,
 } from '@angular/fire/auth';
@@ -93,31 +92,16 @@ export class AuthService {
   }
 
   /**
-   * Starts Google sign-in via full-page redirect (reliable on mobile / PWA,
-   * where popups are often blocked). The page navigates away; the result is
-   * finished by init() (APP_INITIALIZER) when the app reloads.
+   * Google sign-in via popup. We use popup (not signInWithRedirect) on purpose:
+   * the redirect flow relies on cross-domain third-party storage to return the
+   * credential from the firebaseapp.com auth handler to the app's domain, which
+   * modern browsers (and incognito) block — leaving the user signed out. Popup
+   * uses postMessage instead and is Firebase's current recommendation.
    */
-  async signInWithGoogle(): Promise<void> {
-    await signInWithRedirect(this.auth, new GoogleAuthProvider());
-  }
-
-  /**
-   * App-bootstrap hook (wired via APP_INITIALIZER). Processes a pending Google
-   * redirect result BEFORE the router and route guards run, so the guards never
-   * observe a transient signed-out state on the load returning from a redirect
-   * (which otherwise bounces the user back to /login). Also awaits the first
-   * settled auth state so guard reads resolve immediately afterwards.
-   */
-  async init(): Promise<void> {
-    try {
-      const result = await getRedirectResult(this.auth);
-      if (result?.user) {
-        await this.userService.ensureProfile(result.user);
-      }
-    } catch {
-      // A failed/again redirect can simply be retried from the login screen.
-    }
-    await firstValueFrom(this.currentUser$);
+  async signInWithGoogle(): Promise<User> {
+    const cred = await signInWithPopup(this.auth, new GoogleAuthProvider());
+    await this.userService.ensureProfile(cred.user);
+    return cred.user;
   }
 
   async resetPassword(email: string): Promise<void> {
