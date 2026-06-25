@@ -29,7 +29,30 @@ Full specs live in [docs/](docs/). Read these before non-trivial work:
 - AngularFire is wired in [src/app/app.module.ts](src/app/app.module.ts) via
   `provideFirebaseApp/provideAuth/provideFirestore/provideStorage/provideFunctions`.
   Toggle `useEmulators` in [src/environments/environment.ts](src/environments/environment.ts).
-- State: Angular services + RxJS BehaviorSubjects (NgRx only if complexity demands).
+- State: signal-based **state-holder services**. A singleton service opens each
+  Firebase listener once and exposes the data as a readonly `Signal`; components
+  consume the signal and never open their own listeners.
+
+## Firebase call discipline (cost control — read before touching data code)
+- **One listener per concern, shared.** `AuthService` holds the single shared
+  `onAuthStateChanged` listener (`currentUser$` via `shareReplay({refCount:false})`)
+  and the single profile-doc listener (`switchMap` swaps it per user). Components
+  read `authService.currentUser()` / `authService.profile()` signals.
+- **Never call Firestore inside `computed()` or `effect()`.** Those re-run on
+  dependency changes and would multiply reads/writes. Derive from already-loaded
+  signals; do reads/writes in explicit methods or one-time `switchMap` streams.
+- Prefer one realtime listener over repeated one-shot `getDoc`/`getDocs` polling;
+  use `toSignal` to expose a stream as a signal in the holder service.
+- Avoid god components: extract presentational sub-components (e.g. avatar upload,
+  card, rating widget) rather than growing one page component.
+
+## Angular conventions
+- Angular **20.3** + Ionic 8. `@Injectable({providedIn:'root'})` and **Reactive
+  Forms** (NOT `@Service()` / Signal Forms — those are v21+).
+- The **angular-developer** skill (`.agents/skills/angular-developer`) is the
+  best-practice reference; consult its `references/` for signals, DI, routing, etc.
+- Scaffold with the Angular CLI (`ng generate ...`) for consistency; run
+  `ng build` after generating code.
 
 ## Key rules (see README for full list)
 - **Value Score** = `(rating/5)*100/purchasePrice`; stored on the log entry, only

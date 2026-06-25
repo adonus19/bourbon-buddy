@@ -1,4 +1,5 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, Signal, computed, inject } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import {
   Auth,
   GoogleAuthProvider,
@@ -11,34 +12,65 @@ import {
   signOut,
   updateProfile,
 } from '@angular/fire/auth';
-import { Observable, firstValueFrom } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { Observable, firstValueFrom, of } from 'rxjs';
+import { shareReplay, switchMap } from 'rxjs/operators';
 
+import { UserProfile } from '../../models';
 import { UserService } from '../services/user.service';
 
 /**
- * Wraps AngularFire Auth. Exposes the reactive auth state and the auth
- * operations the app needs, and guarantees a Firestore /users/{uid} profile
- * document exists after any successful sign-in.
+ * Session state holder. Owns the auth state and the current user's profile,
+ * and exposes them as signals so components consume already-fetched data
+ * without opening their own Firebase listeners.
  *
- * Apple and Facebook providers are planned (BB-002) but those providers are
- * not yet enabled in Firebase, so only Email/Password and Google are wired.
+ * Firebase listener budget (the whole app shares these):
+ *   - exactly ONE auth-state listener (onAuthStateChanged), via `authState$`
+ *   - exactly ONE Firestore profile listener at a time, swapped by switchMap
+ *     when the signed-in user changes (closed entirely when signed out)
+ *
+ * IMPORTANT: never read Firestore inside a `computed()` or `effect()`. Derive
+ * from these already-loaded signals instead — that keeps reads bounded.
+ *
+ * Apple/Facebook are planned (BB-002) but not yet enabled in Firebase, so only
+ * Email/Password and Google are wired.
  */
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly auth = inject(Auth);
   private readonly userService = inject(UserService);
 
-  /** Emits the Firebase user, or null when signed out. */
-  readonly currentUser$: Observable<User | null> = authState(this.auth);
-
-  /** Convenience boolean stream for guards/UI. */
-  readonly isAuthenticated$: Observable<boolean> = this.currentUser$.pipe(
-    map((user) => !!user)
+  /**
+   * Single shared auth-state stream. `shareReplay({ refCount: false })` means
+   * every consumer (signals, guards, the profile listener) attaches to ONE
+   * underlying onAuthStateChanged listener rather than each creating its own.
+   */
+  readonly currentUser$: Observable<User | null> = authState(this.auth).pipe(
+    shareReplay({ bufferSize: 1, refCount: false })
   );
 
-  /** Snapshot of the current user (may be null before auth resolves). */
-  get currentUser(): User | null {
+  /** Current Firebase user as a signal. `undefined` = auth not resolved yet. */
+  readonly currentUser: Signal<User | null | undefined> = toSignal(
+    this.currentUser$,
+    { initialValue: undefined }
+  );
+
+  readonly isAuthenticated = computed(() => !!this.currentUser());
+
+  /**
+   * The signed-in user's profile document, fed by the single shared auth
+   * stream. switchMap closes the previous doc listener when the user changes.
+   */
+  readonly profile: Signal<UserProfile | undefined> = toSignal(
+    this.currentUser$.pipe(
+      switchMap((user) =>
+        user ? this.userService.profileDoc$(user.uid) : of(undefined)
+      )
+    ),
+    { initialValue: undefined }
+  );
+
+  /** Synchronous snapshot (may be null before auth resolves). */
+  get snapshotUser(): User | null {
     return this.auth.currentUser;
   }
 
@@ -74,7 +106,7 @@ export class AuthService {
     await signOut(this.auth);
   }
 
-  /** Resolves once on the first emitted auth state (used by guards). */
+  /** Resolves on the first settled auth state (used by route guards). */
   waitForAuthInit(): Promise<User | null> {
     return firstValueFrom(this.currentUser$);
   }
