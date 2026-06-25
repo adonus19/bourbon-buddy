@@ -1,5 +1,11 @@
-import { Component, computed, inject, signal } from '@angular/core';
-import { ActionSheetController } from '@ionic/angular';
+import {
+  ChangeDetectorRef,
+  Component,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
+import { ActionSheetController, ViewWillEnter } from '@ionic/angular';
 
 import { LogEntry } from '../../models';
 import { LogEntryService } from '../../core/services/log-entry.service';
@@ -20,9 +26,10 @@ const SORT_LABELS: Record<SortKey, string> = {
   styleUrls: ['./cellar.page.scss'],
   standalone: false,
 })
-export class CellarPage {
+export class CellarPage implements ViewWillEnter {
   private readonly logService = inject(LogEntryService);
   private readonly actionSheet = inject(ActionSheetController);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   readonly entries = this.logService.entries;
   readonly sort = signal<SortKey>('date');
@@ -48,6 +55,13 @@ export class CellarPage {
         );
     }
   });
+
+  ionViewWillEnter(): void {
+    // Ionic caches this tab page and detaches its change detector while you're
+    // on the add/detail screens. The entries() signal already reflects anything
+    // added meanwhile, so force a re-check to render it on return.
+    this.cdr.detectChanges();
+  }
 
   async openSort(): Promise<void> {
     const sheet = await this.actionSheet.create({
