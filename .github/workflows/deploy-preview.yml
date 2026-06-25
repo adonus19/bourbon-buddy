@@ -1,0 +1,50 @@
+# Deploys a temporary preview of the app for every pull request to main.
+#
+# On each PR, this builds the PWA and deploys it to a Firebase Hosting
+# *preview channel* (an isolated, auto-expiring URL that never touches the
+# live site). The Firebase action posts the preview URL as a comment on the PR
+# so you can open it on your phone and test the real build before merging.
+#
+# No new secrets required — reuses FIREBASE_SERVICE_ACCOUNT_DEV (the same key
+# used by deploy.yml). Channels auto-expire after 7 days.
+
+name: Deploy Preview (PR)
+
+on:
+  pull_request:
+    branches: [main]
+
+env:
+  FIREBASE_PROJECT: bourbonbuddy-dev
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    # Needed so the Firebase action can comment the preview URL on the PR.
+    permissions:
+      checks: write
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (production)
+        run: npm run build:prod
+
+      - name: Deploy to a preview channel
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_DEV }}
+          projectId: ${{ env.FIREBASE_PROJECT }}
+          expires: 7d
+          # No channelId => the action creates/updates a PR-specific preview
+          # channel and comments the URL (channelId: live is the production deploy).
