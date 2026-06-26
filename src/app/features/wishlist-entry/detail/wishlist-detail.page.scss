@@ -104,6 +104,95 @@
   border-top: 1px solid var(--color-border);
 }
 
+.wdetail__section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  .eyebrow {
+    margin: 0;
+  }
+}
+
+.wdetail__report {
+  --color: var(--color-amber-light);
+  text-transform: none;
+  font-weight: 600;
+  margin: 0;
+}
+
+.sightings {
+  background: transparent;
+  margin-top: 8px;
+}
+
+.sighting {
+  --background: var(--color-bg-surface);
+  --inner-padding-end: 0;
+  --padding-start: 12px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  border-left: 3px solid var(--color-success);
+
+  &--stale {
+    opacity: 0.55;
+    border-left-color: var(--color-border-bright);
+  }
+
+  &__main {
+    padding: 10px 0;
+    width: 100%;
+  }
+
+  &__top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  &__price {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
+
+  &__delta {
+    font-size: 12px;
+    &.is-above {
+      color: var(--color-error);
+    }
+    &.is-below {
+      color: var(--color-success);
+    }
+  }
+
+  &__stale {
+    font-size: 12px;
+    font-style: italic;
+    color: var(--color-text-disabled);
+  }
+
+  &__store {
+    font-size: 14px;
+    color: var(--color-text-primary);
+    margin-top: 2px;
+  }
+
+  &__meta {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin-top: 2px;
+  }
+
+  &__notes {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    margin-top: 4px;
+  }
+}
+
 .wdetail-footer ion-toolbar {
   --background: var(--color-bg-surface);
   padding: 6px 12px calc(6px + env(safe-area-inset-bottom));

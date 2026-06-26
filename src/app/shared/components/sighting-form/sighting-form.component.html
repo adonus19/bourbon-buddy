@@ -1,0 +1,80 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button (click)="cancel()">Cancel</ion-button>
+    </ion-buttons>
+    <ion-title>Report a Sighting</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <form [formGroup]="form" class="sform">
+    <ion-input
+      class="sform__field"
+      fill="solid"
+      label="Store / venue"
+      labelPlacement="stacked"
+      formControlName="storeName"
+    ></ion-input>
+    @if (form.controls.storeName.touched && form.controls.storeName.invalid) {
+      <div class="sform__error">Where did you spot it?</div>
+    }
+
+    <div class="sform__row">
+      <ion-input
+        class="sform__field"
+        fill="solid"
+        label="Price"
+        labelPlacement="stacked"
+        type="number"
+        inputmode="decimal"
+        formControlName="price"
+      ></ion-input>
+      <ion-input
+        class="sform__field"
+        fill="solid"
+        label="Date seen"
+        labelPlacement="stacked"
+        type="date"
+        formControlName="sightingDate"
+      ></ion-input>
+    </div>
+    @if (form.controls.price.touched && form.controls.price.invalid) {
+      <div class="sform__error">A price is required.</div>
+    }
+
+    <div class="sform__row">
+      <ion-input
+        class="sform__field"
+        fill="solid"
+        label="City"
+        labelPlacement="stacked"
+        formControlName="city"
+      ></ion-input>
+      <ion-input
+        class="sform__field"
+        fill="solid"
+        label="State"
+        labelPlacement="stacked"
+        formControlName="state"
+      ></ion-input>
+    </div>
+
+    <ion-textarea
+      class="sform__field"
+      fill="solid"
+      label="Notes"
+      labelPlacement="stacked"
+      [autoGrow]="true"
+      formControlName="notes"
+    ></ion-textarea>
+  </form>
+</ion-content>
+
+<ion-footer>
+  <ion-toolbar>
+    <ion-button class="sform__save" expand="block" (click)="save()">
+      Log the sighting
+    </ion-button>
+  </ion-toolbar>
+</ion-footer>

@@ -1,5 +1,6 @@
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ReactiveFormsModule } from '@angular/forms';
 import { IonicModule } from '@ionic/angular';
 
 import { ComingSoonComponent } from './components/coming-soon/coming-soon.component';
@@ -10,6 +11,7 @@ import { BourbonAutocompleteComponent } from './components/bourbon-autocomplete/
 import { LogEntryCardComponent } from './components/log-entry-card/log-entry-card.component';
 import { LabelPhotoPickerComponent } from './components/label-photo-picker/label-photo-picker.component';
 import { WishlistCardComponent } from './components/wishlist-card/wishlist-card.component';
+import { SightingFormComponent } from './components/sighting-form/sighting-form.component';
 
 /**
  * Shared declarations reused across feature modules (presentational
@@ -25,11 +27,12 @@ const COMPONENTS = [
   LogEntryCardComponent,
   LabelPhotoPickerComponent,
   WishlistCardComponent,
+  SightingFormComponent,
 ];
 
 @NgModule({
   declarations: COMPONENTS,
-  imports: [CommonModule, IonicModule],
+  imports: [CommonModule, ReactiveFormsModule, IonicModule],
   exports: COMPONENTS,
 })
 export class SharedModule {}
