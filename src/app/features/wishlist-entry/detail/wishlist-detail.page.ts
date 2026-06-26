@@ -90,8 +90,6 @@ export class WishlistDetailPage {
   async openSightingForm(): Promise<void> {
     const modal = await this.modalCtrl.create({
       component: SightingFormComponent,
-      breakpoints: [0, 0.9],
-      initialBreakpoint: 0.9,
     });
     await modal.present();
     const { data, role } = await modal.onWillDismiss();
@@ -137,6 +135,26 @@ export class WishlistDetailPage {
     void this.router.navigate(['/entry/new'], {
       queryParams: { fromWishlist: this.entryId },
     });
+  }
+
+  /** Didn't get it — move to the "Got Away" archive (no Cellar entry). */
+  async markGotAway(): Promise<void> {
+    try {
+      await this.wishlist.setStatus(this.entryId, 'got_away');
+      await this.presentToast('Moved to the ones that got away.');
+    } catch {
+      await this.presentToast("Couldn't update. Try again.");
+    }
+  }
+
+  /** Bring a "Got Away" bottle back into active hunting. */
+  async backToHunting(): Promise<void> {
+    try {
+      await this.wishlist.setStatus(this.entryId, 'actively_looking');
+      await this.presentToast('Back on the hunt.');
+    } catch {
+      await this.presentToast("Couldn't update. Try again.");
+    }
   }
 
   async confirmDelete(): Promise<void> {

@@ -4,6 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { ToastController } from '@ionic/angular';
 
 import {
+  ACTIVE_WISHLIST_STATUSES,
   Bourbon,
   BourbonCategory,
   BourbonSubType,
@@ -41,6 +42,8 @@ export class AddEditWishlistPage {
 
   saving = false;
   private patched = false;
+  // Preserve archive states (logged / got_away) across an edit.
+  private originalStatus: WishlistStatus | null = null;
 
   readonly categories: { value: BourbonCategory; label: string }[] = [
     { value: 'bourbon', label: 'Bourbon' },
@@ -114,6 +117,7 @@ export class AddEditWishlistPage {
   }
 
   private patchFromEntry(e: WishlistEntry): void {
+    this.originalStatus = e.status;
     this.form.patchValue({
       bourbonName: e.bourbonName,
       bourbonId: e.bourbonId,
@@ -122,7 +126,9 @@ export class AddEditWishlistPage {
       subType: e.subType ?? null,
       msrp: e.msrp ?? null,
       priority: e.priority,
-      status: e.status === 'logged' ? 'actively_looking' : e.status,
+      status: ACTIVE_WISHLIST_STATUSES.includes(e.status)
+        ? e.status
+        : 'actively_looking',
       externalTastingNotes: e.externalTastingNotes ?? '',
       personalNotes: e.personalNotes ?? '',
       discoverySource: e.discoverySource ?? '',
@@ -209,7 +215,11 @@ export class AddEditWishlistPage {
         discoverySource: this.strOrNull(v.discoverySource),
         discoveryUrl: this.strOrNull(v.discoveryUrl),
         priority: (v.priority as WishlistPriority) ?? 'normal',
-        status: (v.status as WishlistStatus) ?? 'actively_looking',
+        // Keep an archived bottle archived even after an edit.
+        status:
+          this.originalStatus === 'logged' || this.originalStatus === 'got_away'
+            ? this.originalStatus
+            : (v.status as WishlistStatus) ?? 'actively_looking',
       };
 
       if (this.editId) {

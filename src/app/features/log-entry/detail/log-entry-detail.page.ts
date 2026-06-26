@@ -155,8 +155,6 @@ export class LogEntryDetailPage {
   async openPourForm(): Promise<void> {
     const modal = await this.modalCtrl.create({
       component: PourFormComponent,
-      breakpoints: [0, 0.9],
-      initialBreakpoint: 0.9,
     });
     await modal.present();
     const { data, role } = await modal.onWillDismiss();

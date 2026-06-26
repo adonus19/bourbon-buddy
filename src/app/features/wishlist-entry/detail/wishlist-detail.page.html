@@ -164,12 +164,31 @@
   }
 </ion-content>
 
-@if (entry()) {
+@if (entry(); as e) {
   <ion-footer class="wdetail-footer">
     <ion-toolbar>
       <ion-button class="wdetail__found" expand="block" (click)="foundItLogIt()">
         Found It — Log It
       </ion-button>
+      @if (e.status === 'got_away') {
+        <ion-button
+          class="wdetail__secondary"
+          fill="clear"
+          expand="block"
+          (click)="backToHunting()"
+        >
+          Back on the hunt
+        </ion-button>
+      } @else {
+        <ion-button
+          class="wdetail__secondary"
+          fill="clear"
+          expand="block"
+          (click)="markGotAway()"
+        >
+          Didn't get it — mark as Got Away
+        </ion-button>
+      }
     </ion-toolbar>
   </ion-footer>
 }

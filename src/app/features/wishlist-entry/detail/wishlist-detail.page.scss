@@ -207,6 +207,12 @@
   margin: 0;
 }
 
+.wdetail__secondary {
+  --color: var(--color-text-secondary);
+  text-transform: none;
+  margin: 2px 0 0;
+}
+
 .wdetail-missing {
   display: flex;
   flex-direction: column;
