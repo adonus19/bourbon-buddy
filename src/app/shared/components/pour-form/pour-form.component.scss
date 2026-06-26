@@ -1,0 +1,28 @@
+.pform {
+  padding: 12px 16px 24px;
+}
+
+.pform__rating {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0 20px;
+}
+
+.pform__field {
+  margin-bottom: 14px;
+  --background: var(--color-bg-elevated);
+  --color: var(--color-text-primary);
+  --placeholder-color: var(--color-text-disabled);
+  --highlight-color-focused: var(--color-amber);
+  border-radius: var(--radius-input);
+  border: 1px solid var(--color-border);
+  width: 100%;
+}
+
+.pform__save {
+  --background: var(--color-amber);
+  --color: var(--color-bg-primary);
+  --border-radius: var(--radius-button);
+  font-weight: 600;
+  margin: 4px 12px calc(4px + env(safe-area-inset-bottom));
+}

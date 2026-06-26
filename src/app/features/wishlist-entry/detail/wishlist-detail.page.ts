@@ -1,15 +1,22 @@
 import { Component, computed, inject } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
-import { AlertController, ToastController } from '@ionic/angular';
+import { AlertController, ModalController, ToastController } from '@ionic/angular';
+import { Timestamp } from '@angular/fire/firestore';
 
+import { Sighting } from '../../../models';
 import { WishlistService } from '../../../core/services/wishlist.service';
 import {
-  CATEGORY_DISPLAY,
-} from '../../../shared/constants/category-display';
+  SightingInput,
+  SightingService,
+} from '../../../core/services/sighting.service';
+import { CATEGORY_DISPLAY } from '../../../shared/constants/category-display';
 import {
   PRIORITY_DISPLAY,
   STATUS_DISPLAY,
 } from '../../../shared/constants/wishlist-display';
+import { isSightingStale } from '../../../shared/utils/sighting';
+import { SightingFormComponent } from '../../../shared/components/sighting-form/sighting-form.component';
 
 @Component({
   selector: 'app-wishlist-detail',
@@ -20,8 +27,10 @@ import {
 export class WishlistDetailPage {
   private readonly route = inject(ActivatedRoute);
   private readonly wishlist = inject(WishlistService);
+  private readonly sightingService = inject(SightingService);
   private readonly router = inject(Router);
   private readonly alertCtrl = inject(AlertController);
+  private readonly modalCtrl = inject(ModalController);
   private readonly toast = inject(ToastController);
 
   readonly entryId =
@@ -30,6 +39,18 @@ export class WishlistDetailPage {
     '';
 
   readonly entry = this.wishlist.selectById(this.entryId);
+
+  // One sightings listener for the viewed entry.
+  private readonly sightings = toSignal(
+    this.sightingService.sightingsFor(this.entryId),
+    { initialValue: [] as Sighting[] }
+  );
+  readonly sortedSightings = computed(() =>
+    [...this.sightings()].sort(
+      (a, b) =>
+        a.price - b.price || b.sightingDate.toMillis() - a.sightingDate.toMillis()
+    )
+  );
 
   readonly priority = computed(() => {
     const e = this.entry();
@@ -52,9 +73,88 @@ export class WishlistDetailPage {
     return { text: `${pct >= 0 ? '+' : ''}${pct}%`, below: pct < 0 };
   });
 
-  /** Navigation-only for now; the full prefill + archive flow lands in Iteration 4. */
+  isStale(s: Sighting): boolean {
+    return isSightingStale(s);
+  }
+
+  /** Per-sighting MSRP delta. */
+  sightingDelta(s: Sighting): { text: string; below: boolean } | null {
+    const e = this.entry();
+    if (e?.msrp == null || e.msrp <= 0) {
+      return null;
+    }
+    const pct = Math.round(((s.price - e.msrp) / e.msrp) * 100);
+    return { text: `${pct >= 0 ? '+' : ''}${pct}%`, below: pct < 0 };
+  }
+
+  async openSightingForm(): Promise<void> {
+    const modal = await this.modalCtrl.create({
+      component: SightingFormComponent,
+    });
+    await modal.present();
+    const { data, role } = await modal.onWillDismiss();
+    if (role !== 'save' || !data) {
+      return;
+    }
+    const input: SightingInput = {
+      storeName: (data.storeName ?? '').trim(),
+      price: Number(data.price),
+      sightingDate: Timestamp.fromDate(new Date(data.sightingDate)),
+      city: (data.city ?? '').trim() || null,
+      state: (data.state ?? '').trim() || null,
+      notes: (data.notes ?? '').trim() || null,
+    };
+    try {
+      await this.sightingService.add(this.entryId, input);
+      await this.presentToast('Sighting logged. People are going to believe you.');
+    } catch {
+      await this.presentToast("Couldn't save the sighting. Try again.");
+    }
+  }
+
+  async toggleStale(s: Sighting): Promise<void> {
+    if (!s.id) {
+      return;
+    }
+    await this.sightingService.setStale(
+      this.entryId,
+      s.id,
+      !s.markedStaleManually
+    );
+  }
+
+  async removeSighting(s: Sighting): Promise<void> {
+    if (!s.id) {
+      return;
+    }
+    await this.sightingService.remove(this.entryId, s.id);
+  }
+
+  /** Pre-fills the Add-Log form from this entry and archives it on save. */
   foundItLogIt(): void {
-    void this.router.navigateByUrl('/entry/new');
+    void this.router.navigate(['/entry/new'], {
+      queryParams: { fromWishlist: this.entryId },
+    });
+  }
+
+  /** Didn't get it — move to the "Got Away" archive (no Cellar entry). */
+  async markGotAway(): Promise<void> {
+    try {
+      await this.wishlist.setStatus(this.entryId, 'got_away');
+      await this.presentToast('Moved to the ones that got away.');
+    } catch {
+      await this.presentToast("Couldn't update. Try again.");
+    }
+  }
+
+  /** Bring a "Got Away" bottle back into active hunting. */
+  async backToHunting(): Promise<void> {
+    try {
+      await this.wishlist.setStatus(this.entryId, 'actively_looking');
+      await this.presentToast('Back on the hunt.');
+    } catch {
+      await this.presentToast("Couldn't update. Try again.");
+    }
   }
 
   async confirmDelete(): Promise<void> {

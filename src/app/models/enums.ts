@@ -38,7 +38,15 @@ export type WishlistStatus =
   | 'actively_looking'
   | 'casually_looking'
   | 'just_browsing'
-  | 'logged';
+  | 'logged' // found & added to the Cellar (lives there, hidden from Hunt List)
+  | 'got_away'; // abandoned — shown in the "Got Away" archive
+
+/** Wishlist statuses that appear in the active Hunt List. */
+export const ACTIVE_WISHLIST_STATUSES: WishlistStatus[] = [
+  'actively_looking',
+  'casually_looking',
+  'just_browsing',
+];
 
 export type ArticleState = 'read' | 'saved' | 'dismissed';
 

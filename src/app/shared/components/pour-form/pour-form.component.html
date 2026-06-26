@@ -1,0 +1,58 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button (click)="cancel()">Cancel</ion-button>
+    </ion-buttons>
+    <ion-title>Log a Dram</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <form [formGroup]="form" class="pform">
+    <div class="pform__rating">
+      <app-rating-widget
+        [rating]="rating()"
+        [interactive]="true"
+        [size]="34"
+        (ratingChange)="setRating($event)"
+      ></app-rating-widget>
+    </div>
+
+    <ion-input
+      class="pform__field"
+      fill="solid"
+      label="Pour date"
+      labelPlacement="stacked"
+      type="date"
+      formControlName="pourDate"
+    ></ion-input>
+
+    <ion-textarea
+      class="pform__field"
+      fill="solid"
+      label="Setting / occasion"
+      labelPlacement="stacked"
+      [autoGrow]="true"
+      placeholder="Where, when, who with…"
+      formControlName="settingNotes"
+    ></ion-textarea>
+
+    <ion-textarea
+      class="pform__field"
+      fill="solid"
+      label="Tasting notes"
+      labelPlacement="stacked"
+      [autoGrow]="true"
+      placeholder="How's it drinking today?"
+      formControlName="tastingNotes"
+    ></ion-textarea>
+  </form>
+</ion-content>
+
+<ion-footer>
+  <ion-toolbar>
+    <ion-button class="pform__save" expand="block" (click)="save()">
+      Log the pour
+    </ion-button>
+  </ion-toolbar>
+</ion-footer>

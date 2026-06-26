@@ -81,14 +81,35 @@
       <span class="hunt-sortbar__count">{{ visibleEntries().length }}</span>
     </div>
 
-    <div class="hunt-list">
+    <ion-list class="hunt-list" lines="none">
       @for (e of visibleEntries(); track e.id) {
-        <app-wishlist-card
-          [entry]="e"
-          [routerLink]="['/wishlist', e.id]"
-        ></app-wishlist-card>
+        <ion-item-sliding>
+          <ion-item
+            class="hunt-item"
+            lines="none"
+            detail="false"
+            button
+            [routerLink]="['/wishlist', e.id]"
+          >
+            <app-wishlist-card [entry]="e"></app-wishlist-card>
+          </ion-item>
+          <ion-item-options side="end">
+            @if (archived()) {
+              <ion-item-option color="primary" (click)="restore(e)">
+                Restore
+              </ion-item-option>
+            } @else {
+              <ion-item-option color="medium" (click)="markGotAway(e)">
+                Got Away
+              </ion-item-option>
+            }
+            <ion-item-option color="danger" (click)="confirmDelete(e)">
+              Delete
+            </ion-item-option>
+          </ion-item-options>
+        </ion-item-sliding>
       }
-    </div>
+    </ion-list>
   }
 
   <ion-fab slot="fixed" vertical="bottom" horizontal="end">

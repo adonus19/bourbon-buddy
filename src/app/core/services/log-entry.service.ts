@@ -94,6 +94,15 @@ export class LogEntryService {
     });
   }
 
+  /** Updates the bottle-remaining percentage directly from the detail screen. */
+  async setBottleRemaining(id: string, pct: number | null): Promise<void> {
+    const uid = this.requireUid();
+    await updateDoc(this.entryDocRef(uid, id), {
+      bottleRemainingPct: pct,
+      updatedAt: serverTimestamp(),
+    });
+  }
+
   async remove(id: string): Promise<void> {
     const uid = this.requireUid();
     await deleteDoc(this.entryDocRef(uid, id));

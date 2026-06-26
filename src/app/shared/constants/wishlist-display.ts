@@ -37,4 +37,5 @@ export const STATUS_DISPLAY: Record<WishlistStatus, string> = {
   casually_looking: 'Casually Looking',
   just_browsing: 'Just Browsing',
   logged: 'Logged',
+  got_away: 'Got Away',
 };

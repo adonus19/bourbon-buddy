@@ -7,11 +7,16 @@ import {
 } from '@angular/core';
 import {
   ActionSheetController,
+  AlertController,
   ModalController,
   ViewWillEnter,
 } from '@ionic/angular';
 
-import { WishlistEntry, WISHLIST_PRIORITY_ORDER } from '../../models';
+import {
+  ACTIVE_WISHLIST_STATUSES,
+  WishlistEntry,
+  WISHLIST_PRIORITY_ORDER,
+} from '../../models';
 import { WishlistService } from '../../core/services/wishlist.service';
 import {
   EMPTY_WISHLIST_FILTER,
@@ -40,6 +45,7 @@ const SORT_LABELS: Record<WishlistSort, string> = {
 export class HuntListPage implements ViewWillEnter {
   private readonly wishlist = inject(WishlistService);
   private readonly actionSheet = inject(ActionSheetController);
+  private readonly alertCtrl = inject(AlertController);
   private readonly modalCtrl = inject(ModalController);
   private readonly cdr = inject(ChangeDetectorRef);
 
@@ -52,19 +58,23 @@ export class HuntListPage implements ViewWillEnter {
   readonly chips = computed(() => wishlistChips(this.filter()));
 
   readonly activeCount = computed(
-    () => this.entries().filter((e) => e.status !== 'logged').length
+    () =>
+      this.entries().filter((e) => ACTIVE_WISHLIST_STATUSES.includes(e.status))
+        .length
   );
   readonly archivedCount = computed(
-    () => this.entries().filter((e) => e.status === 'logged').length
+    () => this.entries().filter((e) => e.status === 'got_away').length
   );
 
   readonly visibleEntries = computed<WishlistEntry[]>(() => {
     const showArchived = this.archived();
     const f = this.filter();
     const list = this.entries().filter((e) => {
+      // Active = still hunting. Archive = "Got Away". Logged bottles live in the
+      // Cellar and are intentionally hidden from the Hunt List entirely.
       const inView = showArchived
-        ? e.status === 'logged'
-        : e.status !== 'logged';
+        ? e.status === 'got_away'
+        : ACTIVE_WISHLIST_STATUSES.includes(e.status);
       return inView && matchesWishlistFilter(e, f);
     });
     return this.sortList(list);
@@ -101,6 +111,40 @@ export class HuntListPage implements ViewWillEnter {
 
   setArchived(value: boolean): void {
     this.archived.set(value);
+  }
+
+  /** Archive a bottle you didn't get to the "Got Away" list. */
+  async markGotAway(e: WishlistEntry): Promise<void> {
+    if (e.id) {
+      await this.wishlist.setStatus(e.id, 'got_away');
+    }
+  }
+
+  /** Move a "Got Away" bottle back into active hunting. */
+  async restore(e: WishlistEntry): Promise<void> {
+    if (e.id) {
+      await this.wishlist.setStatus(e.id, 'actively_looking');
+    }
+  }
+
+  async confirmDelete(e: WishlistEntry): Promise<void> {
+    const alert = await this.alertCtrl.create({
+      header: 'Delete this bottle?',
+      message: e.bourbonName,
+      buttons: [
+        { text: 'Cancel', role: 'cancel' },
+        {
+          text: 'Delete',
+          role: 'destructive',
+          handler: () => {
+            if (e.id) {
+              void this.wishlist.remove(e.id);
+            }
+          },
+        },
+      ],
+    });
+    await alert.present();
   }
 
   applyFilter(next: WishlistFilter): void {

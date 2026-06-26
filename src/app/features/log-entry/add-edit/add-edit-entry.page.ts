@@ -11,6 +11,7 @@ import {
   EntryType,
   FinishLength,
   LogEntry,
+  WishlistEntry,
   WouldBuyAgain,
 } from '../../../models';
 import {
@@ -19,6 +20,7 @@ import {
 } from '../../../core/services/log-entry.service';
 import { BourbonCatalogService } from '../../../core/services/bourbon-catalog.service';
 import { StorageService } from '../../../core/services/storage.service';
+import { WishlistService } from '../../../core/services/wishlist.service';
 import { AuthService } from '../../../core/auth/auth.service';
 
 @Component({
@@ -32,6 +34,7 @@ export class AddEditEntryPage {
   private readonly logService = inject(LogEntryService);
   private readonly catalog = inject(BourbonCatalogService);
   private readonly storage = inject(StorageService);
+  private readonly wishlist = inject(WishlistService);
   private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -45,6 +48,11 @@ export class AddEditEntryPage {
   get isEditMode(): boolean {
     return !!this.editId;
   }
+
+  // "Found It — Log It": /entry/new?fromWishlist={id} pre-fills from a wishlist
+  // entry and archives it (status: 'logged') on save.
+  readonly fromWishlistId =
+    this.route.snapshot.queryParamMap.get('fromWishlist');
 
   saving = false;
 
@@ -147,6 +155,10 @@ export class AddEditEntryPage {
   private readonly editEntry = this.editId
     ? this.logService.selectById(this.editId)
     : null;
+  private readonly sourceWishlist =
+    !this.editId && this.fromWishlistId
+      ? this.wishlist.selectById(this.fromWishlistId)
+      : null;
 
   constructor() {
     this.form.controls.entryType.valueChanges.subscribe((v) =>
@@ -161,7 +173,27 @@ export class AddEditEntryPage {
           this.patchFromEntry(e);
         }
       });
+    } else if (this.sourceWishlist) {
+      effect(() => {
+        const w = this.sourceWishlist?.();
+        if (w && !this.patched) {
+          this.patched = true;
+          this.prefillFromWishlist(w);
+        }
+      });
     }
+  }
+
+  /** Pre-fill the add-log form from a wishlist entry ("Found It — Log It"). */
+  private prefillFromWishlist(w: WishlistEntry): void {
+    this.form.patchValue({
+      bourbonName: w.bourbonName,
+      bourbonId: w.bourbonId,
+      distillery: w.distillery ?? '',
+      category: w.category ?? this.form.controls.category.value,
+      subType: w.subType ?? null,
+      personalNotes: w.externalTastingNotes ?? '',
+    });
   }
 
   private patchFromEntry(e: LogEntry): void {
@@ -383,7 +415,18 @@ export class AddEditEntryPage {
           const url = await this.storage.uploadLabel(uid, newId, this.photoFile);
           await this.logService.setLabelPhotoUrl(newId, url);
         }
-        await this.presentToast('Added to your Cellar.');
+
+        let message = 'Added to your Cellar.';
+        if (this.fromWishlistId) {
+          // Archive the wishlist entry (kept, not deleted — visible in "Got Away").
+          await this.wishlist.setStatus(this.fromWishlistId, 'logged');
+          message =
+            this.sourceWishlist?.()?.priority === 'grail'
+              ? 'You actually found one. 🦄'
+              : 'Found it — added to your Cellar.';
+        }
+
+        await this.presentToast(message);
         await this.router.navigateByUrl(`/entry/${newId}`, { replaceUrl: true });
       }
     } catch {
