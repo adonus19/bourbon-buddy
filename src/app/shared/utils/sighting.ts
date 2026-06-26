@@ -1,7 +1,7 @@
 import { Sighting } from '../../models';
 
 /** Sightings older than this (or manually flagged) are considered stale. */
-export const SIGHTING_STALE_DAYS = 60;
+export const SIGHTING_STALE_DAYS = 30;
 
 const STALE_MS = SIGHTING_STALE_DAYS * 24 * 60 * 60 * 1000;
 

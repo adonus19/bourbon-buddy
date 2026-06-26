@@ -97,6 +97,99 @@
   border-top: 1px solid var(--color-border);
 }
 
+.detail__section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  .eyebrow {
+    margin: 0;
+  }
+}
+
+.detail__log-dram {
+  --color: var(--color-amber-light);
+  text-transform: none;
+  font-weight: 600;
+  margin: 0;
+}
+
+.detail__empty {
+  font-size: 14px;
+  font-style: italic;
+  color: var(--color-text-disabled);
+  margin: 8px 0 0;
+}
+
+.remaining {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-input);
+  cursor: pointer;
+
+  &__label {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+  }
+
+  &__value {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 14px;
+    color: var(--color-amber-light);
+
+    ion-icon {
+      font-size: 14px;
+    }
+  }
+}
+
+.pours {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.pour {
+  background: var(--color-bg-surface);
+  border-radius: 12px;
+  padding: 12px;
+
+  &__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  &__date {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+  }
+
+  &__setting {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    font-style: italic;
+    margin-top: 6px;
+  }
+
+  &__notes {
+    font-size: 14px;
+    color: var(--color-text-primary);
+    margin-top: 4px;
+    line-height: 1.5;
+  }
+}
+
 .stage {
   margin: 12px 0;
 

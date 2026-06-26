@@ -1,16 +1,28 @@
 import { Component, computed, inject } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
-import { AlertController, ToastController } from '@ionic/angular';
+import {
+  ActionSheetController,
+  AlertController,
+  ModalController,
+  ToastController,
+} from '@ionic/angular';
+import { Timestamp } from '@angular/fire/firestore';
 
-import { LogEntry } from '../../../models';
+import { LogEntry, PourSession } from '../../../models';
 import { LogEntryService } from '../../../core/services/log-entry.service';
 import { StorageService } from '../../../core/services/storage.service';
+import {
+  PourSessionInput,
+  PourSessionService,
+} from '../../../core/services/pour-session.service';
 import { AuthService } from '../../../core/auth/auth.service';
 import {
   CATEGORY_DISPLAY,
   ENTRY_TYPE_LABELS,
 } from '../../../shared/constants/category-display';
 import { valueScoreLabel } from '../../../shared/utils/value-score';
+import { PourFormComponent } from '../../../shared/components/pour-form/pour-form.component';
 
 @Component({
   selector: 'app-log-entry-detail',
@@ -21,11 +33,22 @@ import { valueScoreLabel } from '../../../shared/utils/value-score';
 export class LogEntryDetailPage {
   private readonly route = inject(ActivatedRoute);
   private readonly logService = inject(LogEntryService);
+  private readonly pourService = inject(PourSessionService);
   private readonly storage = inject(StorageService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly alertCtrl = inject(AlertController);
+  private readonly actionSheet = inject(ActionSheetController);
+  private readonly modalCtrl = inject(ModalController);
   private readonly toast = inject(ToastController);
+
+  readonly remainingOptions = [
+    { value: 100, label: 'Full' },
+    { value: 75, label: 'Three-quarters' },
+    { value: 50, label: 'Half' },
+    { value: 25, label: 'One-quarter' },
+    { value: 0, label: 'Empty' },
+  ];
 
   // Empty-path child inherits the :id from the parent route; fall back just in case.
   readonly entryId =
@@ -35,6 +58,30 @@ export class LogEntryDetailPage {
 
   /** Reads from the already-loaded entries signal — no extra Firestore read. */
   readonly entry = this.logService.selectById(this.entryId);
+
+  readonly isPurchasedBottle = computed(
+    () => this.entry()?.entryType === 'bottle_purchased'
+  );
+
+  // One pour-sessions listener for the viewed entry (oldest first).
+  readonly pours = toSignal(this.pourService.sessionsFor(this.entryId), {
+    initialValue: [] as PourSession[],
+  });
+  readonly averagePourRating = computed(() => {
+    const rated = this.pours().filter((p) => p.rating != null);
+    if (!rated.length) {
+      return null;
+    }
+    const sum = rated.reduce((acc, p) => acc + (p.rating ?? 0), 0);
+    return Math.round((sum / rated.length) * 10) / 10;
+  });
+
+  remainingLabel(pct: number | null | undefined): string {
+    if (pct == null) {
+      return 'Set level';
+    }
+    return this.remainingOptions.find((o) => o.value === pct)?.label ?? `${pct}%`;
+  }
 
   readonly categoryLabel = computed(() => {
     const e = this.entry();
@@ -103,6 +150,53 @@ export class LogEntryDetailPage {
       return 'NAS';
     }
     return e.ageStatement != null ? `${e.ageStatement} yr` : '';
+  }
+
+  async openPourForm(): Promise<void> {
+    const modal = await this.modalCtrl.create({
+      component: PourFormComponent,
+      breakpoints: [0, 0.9],
+      initialBreakpoint: 0.9,
+    });
+    await modal.present();
+    const { data, role } = await modal.onWillDismiss();
+    if (role !== 'save' || !data) {
+      return;
+    }
+    const input: PourSessionInput = {
+      pourDate: Timestamp.fromDate(new Date(data.pourDate)),
+      rating: data.rating ?? null,
+      settingNotes: (data.settingNotes ?? '').trim() || null,
+      tastingNotes: (data.tastingNotes ?? '').trim() || null,
+    };
+    try {
+      await this.pourService.add(this.entryId, input);
+      await this.presentToast('Dram logged. Sláinte.');
+    } catch {
+      await this.presentToast("Couldn't save the pour. Try again.");
+    }
+  }
+
+  async removePour(p: PourSession): Promise<void> {
+    if (p.id) {
+      await this.pourService.remove(this.entryId, p.id);
+    }
+  }
+
+  async changeBottleRemaining(): Promise<void> {
+    const sheet = await this.actionSheet.create({
+      header: 'Bottle remaining',
+      buttons: [
+        ...this.remainingOptions.map((o) => ({
+          text: o.label,
+          handler: () => {
+            void this.logService.setBottleRemaining(this.entryId, o.value);
+          },
+        })),
+        { text: 'Cancel', role: 'cancel' as const },
+      ],
+    });
+    await sheet.present();
   }
 
   async confirmDelete(): Promise<void> {

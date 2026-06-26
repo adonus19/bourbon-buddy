@@ -113,9 +113,6 @@
           @if (e.bottleSizeMl) {
             <span class="kv__row">{{ e.bottleSizeMl }} mL</span>
           }
-          @if (e.bottleRemainingPct != null) {
-            <span class="kv__row">{{ e.bottleRemainingPct }}% left</span>
-          }
         </div>
         <p class="detail__meta">
           @if (e.purchaseDate) {
@@ -124,6 +121,19 @@
             Logged {{ e.entryDate.toDate() | date: 'mediumDate' }}
           }
         </p>
+        @if (isPurchasedBottle()) {
+          <button
+            type="button"
+            class="remaining"
+            (click)="changeBottleRemaining()"
+          >
+            <span class="remaining__label">Bottle remaining</span>
+            <span class="remaining__value">
+              {{ remainingLabel(e.bottleRemainingPct) }}
+              <ion-icon name="chevron-down-outline"></ion-icon>
+            </span>
+          </button>
+        }
       </div>
 
       @if (hasBottleDetails()) {
@@ -146,6 +156,59 @@
         <div class="section">
           <p class="eyebrow">Notes</p>
           <p class="detail__notes">{{ e.personalNotes }}</p>
+        </div>
+      }
+
+      @if (isPurchasedBottle()) {
+        <div class="section">
+          <div class="detail__section-head">
+            <p class="eyebrow">Pours</p>
+            <ion-button
+              class="detail__log-dram"
+              fill="clear"
+              size="small"
+              (click)="openPourForm()"
+            >
+              <ion-icon name="add" slot="start"></ion-icon>
+              Log a Dram
+            </ion-button>
+          </div>
+
+          @if (averagePourRating() !== null) {
+            <p class="detail__meta">
+              Average pour {{ averagePourRating() }}★ across
+              {{ pours().length }}
+              {{ pours().length === 1 ? 'pour' : 'pours' }}
+            </p>
+          }
+
+          @if (pours().length === 0) {
+            <p class="detail__empty">No pours logged yet.</p>
+          } @else {
+            <div class="pours">
+              @for (p of pours(); track p.id) {
+                <div class="pour">
+                  <div class="pour__top">
+                    <span class="pour__date">
+                      {{ p.pourDate.toDate() | date: 'mediumDate' }}
+                    </span>
+                    @if (p.rating != null) {
+                      <app-rating-widget
+                        [rating]="p.rating"
+                        [size]="15"
+                      ></app-rating-widget>
+                    }
+                  </div>
+                  @if (p.settingNotes) {
+                    <div class="pour__setting">{{ p.settingNotes }}</div>
+                  }
+                  @if (p.tastingNotes) {
+                    <div class="pour__notes">{{ p.tastingNotes }}</div>
+                  }
+                </div>
+              }
+            </div>
+          }
         </div>
       }
     </div>
