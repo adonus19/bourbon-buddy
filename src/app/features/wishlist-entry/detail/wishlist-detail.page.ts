@@ -132,9 +132,11 @@ export class WishlistDetailPage {
     await this.sightingService.remove(this.entryId, s.id);
   }
 
-  /** Navigation-only for now; the full prefill + archive flow lands in Iteration 4. */
+  /** Pre-fills the Add-Log form from this entry and archives it on save. */
   foundItLogIt(): void {
-    void this.router.navigateByUrl('/entry/new');
+    void this.router.navigate(['/entry/new'], {
+      queryParams: { fromWishlist: this.entryId },
+    });
   }
 
   async confirmDelete(): Promise<void> {
