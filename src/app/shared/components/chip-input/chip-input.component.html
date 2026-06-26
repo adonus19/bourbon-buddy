@@ -1,0 +1,29 @@
+<div class="chip-input">
+  @if (label()) {
+    <p class="eyebrow chip-input__label">{{ label() }}</p>
+  }
+  <div class="chip-input__row">
+    <ion-input
+      class="chip-input__field"
+      fill="solid"
+      [placeholder]="placeholder()"
+      [value]="draft()"
+      (ionInput)="onInput($event)"
+      (keyup.enter)="add()"
+    ></ion-input>
+    <ion-button class="chip-input__add" (click)="add()" aria-label="Add">
+      <ion-icon name="add" slot="icon-only"></ion-icon>
+    </ion-button>
+  </div>
+
+  @if (items().length) {
+    <div class="chip-input__chips">
+      @for (item of items(); track item; let i = $index) {
+        <button type="button" class="chip-input__chip" (click)="remove(i)">
+          {{ item }}
+          <ion-icon name="close"></ion-icon>
+        </button>
+      }
+    </div>
+  }
+</div>

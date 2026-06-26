@@ -88,6 +88,14 @@ const routes: Routes = [
       ),
   },
   {
+    path: 'feed-settings',
+    canActivate: [authGuard],
+    loadChildren: () =>
+      import('./features/feed-settings/feed-settings.module').then(
+        (m) => m.FeedSettingsPageModule
+      ),
+  },
+  {
     path: 'tabs',
     canActivate: [authGuard],
     loadChildren: () =>

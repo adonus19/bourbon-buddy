@@ -1,0 +1,59 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/tabs/dispatch" text=""></ion-back-button>
+    </ion-buttons>
+    <ion-title>Feed Settings</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <div class="fsettings">
+    <app-chip-input
+      label="Watch keywords"
+      placeholder="e.g. Blanton's, Pappy"
+      [items]="watchKeywords()"
+      (itemsChange)="watchKeywords.set($event)"
+    ></app-chip-input>
+
+    <app-chip-input
+      label="Watch distilleries"
+      placeholder="e.g. Buffalo Trace"
+      [items]="watchDistilleries()"
+      (itemsChange)="watchDistilleries.set($event)"
+    ></app-chip-input>
+
+    <p class="eyebrow fsettings__label">News categories</p>
+    <div class="fsettings__cats">
+      @for (c of categories; track c.value) {
+        <ion-item class="fsettings__cat" lines="none">
+          <ion-toggle
+            [checked]="isCategoryOn(c.value)"
+            (ionChange)="toggleCategory(c.value)"
+            >{{ c.label }}</ion-toggle
+          >
+        </ion-item>
+      }
+    </div>
+
+    <app-chip-input
+      label="Exclude keywords"
+      placeholder="Topics to hide"
+      [items]="excludeKeywords()"
+      (itemsChange)="excludeKeywords.set($event)"
+    ></app-chip-input>
+  </div>
+</ion-content>
+
+<ion-footer class="fsettings-footer">
+  <ion-toolbar>
+    <ion-button
+      class="fsettings__save"
+      expand="block"
+      (click)="save()"
+      [disabled]="saving"
+    >
+      Save
+    </ion-button>
+  </ion-toolbar>
+</ion-footer>
