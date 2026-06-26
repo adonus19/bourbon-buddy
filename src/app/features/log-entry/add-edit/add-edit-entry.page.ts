@@ -1,6 +1,6 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { FormBuilder, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { ToastController } from '@ionic/angular';
 import { Timestamp } from '@angular/fire/firestore';
 
@@ -10,6 +10,7 @@ import {
   BourbonSubType,
   EntryType,
   FinishLength,
+  LogEntry,
   WouldBuyAgain,
 } from '../../../models';
 import {
@@ -17,6 +18,8 @@ import {
   LogEntryService,
 } from '../../../core/services/log-entry.service';
 import { BourbonCatalogService } from '../../../core/services/bourbon-catalog.service';
+import { StorageService } from '../../../core/services/storage.service';
+import { AuthService } from '../../../core/auth/auth.service';
 
 @Component({
   selector: 'app-add-edit-entry',
@@ -28,10 +31,28 @@ export class AddEditEntryPage {
   private readonly fb = inject(FormBuilder);
   private readonly logService = inject(LogEntryService);
   private readonly catalog = inject(BourbonCatalogService);
+  private readonly storage = inject(StorageService);
+  private readonly auth = inject(AuthService);
+  private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastController);
 
+  // Edit mode when the route carries an :id (entry/:id/edit); else add mode.
+  readonly editId =
+    this.route.snapshot.paramMap.get('id') ??
+    this.route.snapshot.parent?.paramMap.get('id') ??
+    null;
+  get isEditMode(): boolean {
+    return !!this.editId;
+  }
+
   saving = false;
+
+  // Label photo: pending selection / removal applied on save.
+  private photoFile: File | null = null;
+  private photoRemoved = false;
+  readonly existingPhotoUrl = signal<string | null>(null);
+  private patched = false;
 
   readonly categories: { value: BourbonCategory; label: string }[] = [
     { value: 'bourbon', label: 'Bourbon' },
@@ -121,10 +142,85 @@ export class AddEditEntryPage {
     () => this.entryTypeValue() === 'bottle_purchased'
   );
 
+  // In edit mode, the entry comes from the cached entries signal; patch the
+  // form once it's available (and only once, so we don't clobber edits).
+  private readonly editEntry = this.editId
+    ? this.logService.selectById(this.editId)
+    : null;
+
   constructor() {
     this.form.controls.entryType.valueChanges.subscribe((v) =>
       this.entryTypeValue.set(v)
     );
+
+    if (this.editEntry) {
+      effect(() => {
+        const e = this.editEntry?.();
+        if (e && !this.patched) {
+          this.patched = true;
+          this.patchFromEntry(e);
+        }
+      });
+    }
+  }
+
+  private patchFromEntry(e: LogEntry): void {
+    this.form.patchValue({
+      bourbonName: e.bourbonName,
+      bourbonId: e.bourbonId,
+      distillery: e.distillery ?? '',
+      bottler: e.bottler ?? '',
+      category: e.category,
+      subType: e.subType ?? null,
+      ageStatement: e.ageStatement ?? null,
+      isNas: e.isNas,
+      proof: e.proof ?? null,
+      mashBillCorn: e.mashBillCorn ?? null,
+      mashBillRye: e.mashBillRye ?? null,
+      mashBillWheat: e.mashBillWheat ?? null,
+      mashBillMalt: e.mashBillMalt ?? null,
+      batchNumber: e.batchNumber ?? '',
+      barrelNumber: e.barrelNumber ?? '',
+      series: e.series ?? '',
+      entryType: e.entryType,
+      didNotPurchase: e.didNotPurchase,
+      purchasePrice: e.purchasePrice ?? null,
+      purchaseLocation: e.purchaseLocation ?? '',
+      purchaseDate: e.purchaseDate ? this.tsToDateStr(e.purchaseDate) : null,
+      bottleSizeMl: e.bottleSizeMl ?? null,
+      bottleRemainingPct: e.bottleRemainingPct ?? null,
+      rating: e.rating ?? null,
+      noseTags: e.noseTags ?? [],
+      noseNotes: e.noseNotes ?? '',
+      palateTags: e.palateTags ?? [],
+      palateNotes: e.palateNotes ?? '',
+      finishTags: e.finishTags ?? [],
+      finishNotes: e.finishNotes ?? '',
+      finishLength: e.finishLength ?? null,
+      wouldBuyAgain: e.wouldBuyAgain ?? null,
+      personalNotes: e.personalNotes ?? '',
+      entryDate: this.tsToDateStr(e.entryDate),
+    });
+    this.entryTypeValue.set(e.entryType);
+    if (e.isNas) {
+      this.form.controls.ageStatement.disable();
+    }
+    if (e.didNotPurchase) {
+      this.form.controls.purchasePrice.disable();
+      this.form.controls.purchaseLocation.disable();
+    }
+    this.existingPhotoUrl.set(e.labelPhotoUrl ?? null);
+  }
+
+  // --- Label photo -------------------------------------------------------
+  onPhotoSelected(file: File): void {
+    this.photoFile = file;
+    this.photoRemoved = false;
+  }
+
+  onPhotoCleared(): void {
+    this.photoFile = null;
+    this.photoRemoved = true;
   }
 
   // --- Name autocomplete -------------------------------------------------
@@ -218,7 +314,7 @@ export class AddEditEntryPage {
           series: this.strOrNull(v.series),
         }));
 
-      const input: LogEntryInput = {
+      const baseInput: Omit<LogEntryInput, 'labelPhotoUrl'> = {
         bourbonId,
         bourbonName: name,
         distillery: this.strOrNull(v.distillery),
@@ -256,13 +352,40 @@ export class AddEditEntryPage {
         finishNotes: this.strOrNull(v.finishNotes),
         finishLength: (v.finishLength as FinishLength | null) ?? null,
         personalNotes: this.strOrNull(v.personalNotes),
-        labelPhotoUrl: null, // photo support lands in Iteration 3
         entryDate: this.toTimestamp(v.entryDate) ?? Timestamp.now(),
       };
 
-      const newId = await this.logService.add(input);
-      await this.presentToast('Added to your Cellar.');
-      await this.router.navigateByUrl(`/entry/${newId}`, { replaceUrl: true });
+      if (this.editId) {
+        const uid = this.requireUid();
+        let labelPhotoUrl = this.existingPhotoUrl();
+        if (this.photoFile) {
+          labelPhotoUrl = await this.storage.uploadLabel(
+            uid,
+            this.editId,
+            this.photoFile
+          );
+        } else if (this.photoRemoved) {
+          await this.storage.deleteLabel(uid, this.editId);
+          labelPhotoUrl = null;
+        }
+        await this.logService.update(this.editId, { ...baseInput, labelPhotoUrl });
+        await this.presentToast('Updated.');
+        await this.router.navigateByUrl(`/entry/${this.editId}`, {
+          replaceUrl: true,
+        });
+      } else {
+        const newId = await this.logService.add({
+          ...baseInput,
+          labelPhotoUrl: null,
+        });
+        if (this.photoFile) {
+          const uid = this.requireUid();
+          const url = await this.storage.uploadLabel(uid, newId, this.photoFile);
+          await this.logService.setLabelPhotoUrl(newId, url);
+        }
+        await this.presentToast('Added to your Cellar.');
+        await this.router.navigateByUrl(`/entry/${newId}`, { replaceUrl: true });
+      }
     } catch {
       await this.presentToast(
         "Couldn't save. Check your connection and try again."
@@ -291,6 +414,18 @@ export class AddEditEntryPage {
     }
     const date = new Date(iso);
     return Number.isNaN(date.getTime()) ? null : Timestamp.fromDate(date);
+  }
+
+  private tsToDateStr(ts: Timestamp): string {
+    return ts.toDate().toISOString().slice(0, 10);
+  }
+
+  private requireUid(): string {
+    const uid = this.auth.snapshotUser?.uid;
+    if (!uid) {
+      throw new Error('Not signed in.');
+    }
+    return uid;
   }
 
   private async presentToast(message: string): Promise<void> {

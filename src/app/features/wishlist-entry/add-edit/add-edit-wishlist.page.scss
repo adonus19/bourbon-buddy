@@ -1,0 +1,80 @@
+.wform {
+  padding: 8px 16px 24px;
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.wform__section {
+  display: block;
+  margin: 24px 2px 12px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 20px;
+
+  &:first-of-type {
+    border-top: none;
+    padding-top: 4px;
+  }
+}
+
+.wform__field {
+  margin-bottom: 14px;
+  --background: var(--color-bg-elevated);
+  --color: var(--color-text-primary);
+  --placeholder-color: var(--color-text-disabled);
+  --highlight-color-focused: var(--color-amber);
+  border-radius: var(--radius-input);
+  border: 1px solid var(--color-border);
+  width: 100%;
+}
+
+.wform__hint {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin: 4px 2px 8px;
+}
+
+.wform__error {
+  color: var(--color-error);
+  font-size: 13px;
+  margin: -8px 2px 14px;
+}
+
+.wform__link {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-input);
+  padding: 12px 12px 4px;
+  margin-bottom: 12px;
+}
+
+.wform__link-remove {
+  text-transform: none;
+  margin: 0 0 4px;
+}
+
+.wform__add-link {
+  --border-color: var(--color-border-bright);
+  --color: var(--color-amber-light);
+  text-transform: none;
+  margin-top: 4px;
+}
+
+.wform-footer ion-toolbar {
+  --background: var(--color-bg-surface);
+  padding: 6px 12px calc(6px + env(safe-area-inset-bottom));
+}
+
+.wform__save {
+  --background: var(--color-amber);
+  --background-activated: var(--color-amber-dim);
+  --color: var(--color-bg-primary);
+  --border-radius: var(--radius-button);
+  font-weight: 600;
+  font-size: 15px;
+  height: 50px;
+  margin: 0;
+
+  ion-spinner {
+    width: 22px;
+    height: 22px;
+  }
+}

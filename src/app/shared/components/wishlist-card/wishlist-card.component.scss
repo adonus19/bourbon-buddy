@@ -1,0 +1,84 @@
+:host {
+  display: block;
+}
+
+.wcard {
+  padding: 16px;
+
+  &__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  &__name {
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin: 0;
+  }
+
+  &__unicorn {
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  &__distillery {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    margin: 2px 0 0;
+  }
+
+  &__pricing {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    margin: 10px 0 0;
+  }
+
+  &__best {
+    color: var(--color-text-primary);
+  }
+
+  &__dot {
+    color: var(--color-border-bright);
+  }
+
+  &__nosighting {
+    font-style: italic;
+    color: var(--color-text-disabled);
+  }
+
+  &__delta {
+    &.is-above {
+      color: var(--color-error);
+    }
+    &.is-below {
+      color: var(--color-success);
+    }
+  }
+
+  &__badges {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  &__badge {
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  &__status {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+  }
+}

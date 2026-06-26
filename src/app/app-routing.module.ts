@@ -48,11 +48,43 @@ const routes: Routes = [
       ),
   },
   {
+    path: 'entry/:id/edit',
+    canActivate: [authGuard],
+    loadChildren: () =>
+      import('./features/log-entry/add-edit/add-edit-entry.module').then(
+        (m) => m.AddEditEntryPageModule
+      ),
+  },
+  {
     path: 'entry/:id',
     canActivate: [authGuard],
     loadChildren: () =>
       import('./features/log-entry/detail/log-entry-detail.module').then(
         (m) => m.LogEntryDetailPageModule
+      ),
+  },
+  {
+    path: 'wishlist/new',
+    canActivate: [authGuard],
+    loadChildren: () =>
+      import('./features/wishlist-entry/add-edit/add-edit-wishlist.module').then(
+        (m) => m.AddEditWishlistPageModule
+      ),
+  },
+  {
+    path: 'wishlist/:id/edit',
+    canActivate: [authGuard],
+    loadChildren: () =>
+      import('./features/wishlist-entry/add-edit/add-edit-wishlist.module').then(
+        (m) => m.AddEditWishlistPageModule
+      ),
+  },
+  {
+    path: 'wishlist/:id',
+    canActivate: [authGuard],
+    loadChildren: () =>
+      import('./features/wishlist-entry/detail/wishlist-detail.module').then(
+        (m) => m.WishlistDetailPageModule
       ),
   },
   {

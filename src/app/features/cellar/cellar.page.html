@@ -3,6 +3,12 @@
     <ion-title>Cellar</ion-title>
     <ion-buttons slot="end">
       @if (entries().length) {
+        <ion-button (click)="openFilter()" aria-label="Filter">
+          <ion-icon
+            slot="icon-only"
+            [name]="filterActive() ? 'funnel' : 'funnel-outline'"
+          ></ion-icon>
+        </ion-button>
         <ion-button (click)="openSort()" aria-label="Sort">
           <ion-icon slot="icon-only" name="swap-vertical-outline"></ion-icon>
         </ion-button>
@@ -12,6 +18,31 @@
       </ion-button>
     </ion-buttons>
   </ion-toolbar>
+
+  @if (entries().length) {
+    <ion-toolbar>
+      <ion-searchbar
+        placeholder="Search your Cellar…"
+        [debounce]="200"
+        [value]="search()"
+        (ionInput)="onSearchInput($any($event.detail.value) || '')"
+      ></ion-searchbar>
+      @if (chips().length) {
+        <div class="cellar-chips">
+          @for (chip of chips(); track chip.label) {
+            <button
+              type="button"
+              class="cellar-chip"
+              (click)="applyFilter(chip.next)"
+            >
+              {{ chip.label }}
+              <ion-icon name="close"></ion-icon>
+            </button>
+          }
+        </div>
+      }
+    </ion-toolbar>
+  }
 </ion-header>
 
 <ion-content [fullscreen]="true">
@@ -24,16 +55,23 @@
         Log your first bourbon
       </ion-button>
     </div>
+  } @else if (visibleEntries().length === 0) {
+    <div class="cellar-empty">
+      <ion-icon name="search-outline" aria-hidden="true"></ion-icon>
+      <h2 class="cellar-empty__title">Nothing matches.</h2>
+      <p class="cellar-empty__sub">Try loosening your search or filters.</p>
+    </div>
   } @else {
     <div class="cellar-sortbar">
       <span>Sorted by {{ sortLabel() }}</span>
       <span class="cellar-sortbar__count">
-        {{ entries().length }} {{ entries().length === 1 ? 'pour' : 'pours' }}
+        {{ visibleEntries().length }}
+        {{ visibleEntries().length === 1 ? 'pour' : 'pours' }}
       </span>
     </div>
 
     <div class="cellar-list">
-      @for (e of sortedEntries(); track e.id) {
+      @for (e of visibleEntries(); track e.id) {
         <app-log-entry-card
           [entry]="e"
           [routerLink]="['/entry', e.id]"
