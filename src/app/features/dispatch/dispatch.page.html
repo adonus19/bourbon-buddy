@@ -1,13 +1,103 @@
 <ion-header [translucent]="true">
   <ion-toolbar>
     <ion-title>Dispatch</ion-title>
+    <ion-buttons slot="end">
+      <ion-button routerLink="/feed-settings" aria-label="Feed settings">
+        <ion-icon slot="icon-only" name="options-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+  <ion-toolbar>
+    <ion-segment
+      [value]="segment()"
+      (ionChange)="setSegment($any($event.detail.value))"
+    >
+      <ion-segment-button value="feed"><ion-label>Feed</ion-label></ion-segment-button>
+      <ion-segment-button value="saved"><ion-label>Saved</ion-label></ion-segment-button>
+      <ion-segment-button value="read"><ion-label>Read</ion-label></ion-segment-button>
+    </ion-segment>
   </ion-toolbar>
 </ion-header>
 
 <ion-content [fullscreen]="true">
-  <app-coming-soon
-    icon="newspaper-outline"
-    title="Nothing's breaking yet."
-    subtitle="The Dispatch — your bourbon & whiskey news feed — arrives in Iteration 5."
-  ></app-coming-soon>
+  <ion-refresher slot="fixed" (ionRefresh)="doRefresh($any($event))">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  @if (visible().length === 0) {
+    <div class="dispatch-empty">
+      <ion-icon name="newspaper-outline" aria-hidden="true"></ion-icon>
+      <h2 class="dispatch-empty__title">
+        @switch (segment()) {
+          @case ('saved') { Nothing saved yet. }
+          @case ('read') { Nothing read yet. }
+          @default { Nothing's breaking yet. }
+        }
+      </h2>
+      <p class="dispatch-empty__sub">
+        @if (segment() === 'feed') { Pull down to refresh. } @else { Swipe
+        articles in the Feed to file them here. }
+      </p>
+    </div>
+  } @else {
+    <ion-list class="dispatch-list" lines="none">
+      @for (a of visible(); track a.id) {
+        <ion-item-sliding>
+          <ion-item
+            class="article"
+            [class.article--watched]="watched(a)"
+            button
+            detail="false"
+            (click)="openArticle(a)"
+          >
+            <div class="article__body">
+              <div class="article__text">
+                <h3 class="article__headline">{{ a.headline }}</h3>
+                <p class="article__meta">
+                  @if (watched(a)) {
+                    <span class="article__watch">★ Watching</span> ·
+                  }
+                  {{ a.sourceName }}
+                  @if (relTime(a)) { · {{ relTime(a) }} }
+                </p>
+                @if (a.excerpt) {
+                  <p class="article__excerpt">{{ a.excerpt }}</p>
+                }
+              </div>
+              @if (a.thumbnailUrl) {
+                <img class="article__thumb" [src]="a.thumbnailUrl" alt="" />
+              }
+            </div>
+          </ion-item>
+
+          <ion-item-options side="end">
+            @if (segment() === 'feed') {
+              <ion-item-option class="opt opt--read" (click)="mark(a, 'read')">
+                <ion-icon slot="top" name="checkmark-done-outline"></ion-icon>
+                Read
+              </ion-item-option>
+              <ion-item-option class="opt opt--save" (click)="mark(a, 'saved')">
+                <ion-icon slot="top" name="bookmark-outline"></ion-icon>
+                Save
+              </ion-item-option>
+              <ion-item-option class="opt opt--hide" (click)="mark(a, 'dismissed')">
+                <ion-icon slot="top" name="eye-off-outline"></ion-icon>
+                Hide
+              </ion-item-option>
+            } @else if (segment() === 'saved') {
+              <ion-item-option class="opt opt--undo" (click)="clear(a)">
+                <ion-icon slot="top" name="arrow-undo-outline"></ion-icon>
+                Unsave
+              </ion-item-option>
+            } @else {
+              <ion-item-option class="opt opt--undo" (click)="clear(a)">
+                <ion-icon slot="top" name="arrow-undo-outline"></ion-icon>
+                Unread
+              </ion-item-option>
+            }
+          </ion-item-options>
+        </ion-item-sliding>
+      }
+    </ion-list>
+  }
 </ion-content>

@@ -13,6 +13,7 @@ import { LabelPhotoPickerComponent } from './components/label-photo-picker/label
 import { WishlistCardComponent } from './components/wishlist-card/wishlist-card.component';
 import { SightingFormComponent } from './components/sighting-form/sighting-form.component';
 import { PourFormComponent } from './components/pour-form/pour-form.component';
+import { ChipInputComponent } from './components/chip-input/chip-input.component';
 
 /**
  * Shared declarations reused across feature modules (presentational
@@ -30,6 +31,7 @@ const COMPONENTS = [
   WishlistCardComponent,
   SightingFormComponent,
   PourFormComponent,
+  ChipInputComponent,
 ];
 
 @NgModule({

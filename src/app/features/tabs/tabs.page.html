@@ -13,6 +13,9 @@
     <ion-tab-button tab="dispatch">
       <ion-icon name="newspaper-outline" aria-hidden="true"></ion-icon>
       <ion-label>Dispatch</ion-label>
+      @if (unreadCount() > 0) {
+        <ion-badge color="primary">{{ unreadCount() > 99 ? '99+' : unreadCount() }}</ion-badge>
+      }
     </ion-tab-button>
 
     <ion-tab-button tab="numbers">
