@@ -1,0 +1,7 @@
+<div class="metric">
+  @if (icon()) {
+    <ion-icon class="metric__icon" [name]="icon()" aria-hidden="true"></ion-icon>
+  }
+  <div class="metric__value">{{ value() }}</div>
+  <div class="metric__label">{{ label() }}</div>
+</div>

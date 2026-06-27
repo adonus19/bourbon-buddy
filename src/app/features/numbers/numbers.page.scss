@@ -1,0 +1,131 @@
+.stats {
+  padding: 16px 16px calc(24px + env(safe-area-inset-bottom));
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.stats__metrics {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.stats__section {
+  margin-bottom: 28px;
+}
+
+.stats__heading {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 12px;
+}
+
+.chart-card {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 14px;
+}
+
+.chart-card--bar {
+  height: 220px;
+}
+
+.chart-card--doughnut {
+  height: 220px;
+}
+
+.chart-card canvas {
+  max-height: 100%;
+}
+
+// Top distilleries
+.distillery {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  margin-bottom: 8px;
+
+  &__rank {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--color-amber);
+    width: 22px;
+    flex-shrink: 0;
+  }
+
+  &__name {
+    flex: 1;
+    min-width: 0;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__rating {
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
+
+  &__count {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin-left: 6px;
+  }
+}
+
+// Top flavor tags
+.flavor {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+
+  &__name {
+    width: 96px;
+    flex-shrink: 0;
+    font-size: 13px;
+    color: var(--color-text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__track {
+    flex: 1;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--color-bg-elevated);
+    overflow: hidden;
+  }
+
+  &__fill {
+    height: 100%;
+    border-radius: 999px;
+    background: var(--color-amber);
+  }
+
+  &__count {
+    width: 22px;
+    flex-shrink: 0;
+    text-align: right;
+    font-size: 12px;
+    color: var(--color-text-secondary);
+  }
+}
+
+.stats__note {
+  font-size: 12px;
+  color: var(--color-text-disabled);
+  margin: 4px 2px 0;
+}

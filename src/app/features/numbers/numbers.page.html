@@ -5,9 +5,105 @@
 </ion-header>
 
 <ion-content [fullscreen]="true">
-  <app-coming-soon
-    icon="stats-chart-outline"
-    title="Not enough data yet."
-    subtitle="The Numbers — your stats & insights — arrive in Iteration 6. Keep logging."
-  ></app-coming-soon>
+  @if (!hasData()) {
+    <app-coming-soon
+      icon="stats-chart-outline"
+      title="Not enough data yet."
+      subtitle="Log a few bourbons and your stats will appear here."
+    ></app-coming-soon>
+  } @else {
+    <div class="stats">
+      <!-- Summary metrics -->
+      <div class="stats__metrics">
+        <app-metric-card
+          icon="albums-outline"
+          [value]="summary().totalBourbons + ''"
+          label="Bourbons logged"
+        ></app-metric-card>
+        <app-metric-card
+          icon="business-outline"
+          [value]="summary().totalDistilleries + ''"
+          label="Distilleries tried"
+        ></app-metric-card>
+        <app-metric-card
+          icon="cash-outline"
+          [value]="spent()"
+          label="Total spent"
+        ></app-metric-card>
+        <app-metric-card
+          icon="star-outline"
+          [value]="avg()"
+          label="Average rating"
+        ></app-metric-card>
+      </div>
+
+      <!-- Rating distribution -->
+      <section class="stats__section">
+        <h2 class="stats__heading">Rating distribution</h2>
+        <div class="chart-card chart-card--bar">
+          <canvas
+            baseChart
+            type="bar"
+            [data]="ratingChartData()"
+            [options]="ratingChartOptions"
+          ></canvas>
+        </div>
+      </section>
+
+      <!-- Category breakdown -->
+      <section class="stats__section">
+        <h2 class="stats__heading">By category</h2>
+        <div class="chart-card chart-card--doughnut">
+          <canvas
+            baseChart
+            type="doughnut"
+            [data]="categoryChartData()"
+            [options]="categoryChartOptions"
+          ></canvas>
+        </div>
+      </section>
+
+      <!-- Top distilleries -->
+      <section class="stats__section">
+        <h2 class="stats__heading">Top distilleries</h2>
+        @if (topDistilleries().length) {
+          @for (d of topDistilleries(); track d.name; let i = $index) {
+            <div class="distillery">
+              <span class="distillery__rank">{{ i + 1 }}</span>
+              <span class="distillery__name">{{ d.name }}</span>
+              <span class="distillery__rating">
+                {{ d.avgRating.toFixed(1) }}★
+                <span class="distillery__count">({{ d.count }})</span>
+              </span>
+            </div>
+          }
+        } @else {
+          <p class="stats__note">
+            Rate at least two bourbons from the same distillery to see a ranking.
+          </p>
+        }
+      </section>
+
+      <!-- Top flavor tags -->
+      <section class="stats__section">
+        <h2 class="stats__heading">Most-used flavor notes</h2>
+        @if (topFlavorTags().length) {
+          @for (t of topFlavorTags(); track t.tag) {
+            <div class="flavor">
+              <span class="flavor__name">{{ t.tag }}</span>
+              <span class="flavor__track">
+                <span
+                  class="flavor__fill"
+                  [style.width.%]="(t.count / maxFlavorCount()) * 100"
+                ></span>
+              </span>
+              <span class="flavor__count">{{ t.count }}</span>
+            </div>
+          }
+        } @else {
+          <p class="stats__note">Add flavor notes to your entries to see this.</p>
+        }
+      </section>
+    </div>
+  }
 </ion-content>
