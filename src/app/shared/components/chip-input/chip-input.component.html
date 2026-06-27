@@ -10,6 +10,7 @@
       [value]="draft()"
       (ionInput)="onInput($event)"
       (keyup.enter)="add()"
+      (ionBlur)="add()"
     ></ion-input>
     <ion-button class="chip-input__add" (click)="add()" aria-label="Add">
       <ion-icon name="add" slot="icon-only"></ion-icon>

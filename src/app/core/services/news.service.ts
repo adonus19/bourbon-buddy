@@ -27,7 +27,9 @@ import {
 import { AuthService } from '../auth/auth.service';
 import { DEFAULT_NEWS_PREFS, NewsPrefs } from '../../shared/utils/news-filter';
 
-const FEED_LIMIT = 60;
+// Kept modest for now; bump this once the feed list uses virtual scroll
+// (ion-virtual-scroll / CDK) so we can render a longer backlog cheaply.
+const FEED_LIMIT = 40;
 
 /**
  * News feed reads. Articles are loaded on demand (one-shot query, refreshed by

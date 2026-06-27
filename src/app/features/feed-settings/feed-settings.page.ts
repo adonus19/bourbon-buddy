@@ -1,9 +1,16 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  inject,
+  signal,
+  viewChildren,
+} from '@angular/core';
 import { Router } from '@angular/router';
 import { ToastController } from '@ionic/angular';
 
 import { NewsService } from '../../core/services/news.service';
 import { NEWS_CATEGORIES } from '../../shared/utils/news-filter';
+import { ChipInputComponent } from '../../shared/components/chip-input/chip-input.component';
 
 @Component({
   selector: 'app-feed-settings',
@@ -17,6 +24,9 @@ export class FeedSettingsPage implements OnInit {
   private readonly toast = inject(ToastController);
 
   readonly categories = NEWS_CATEGORIES;
+
+  /** All chip inputs, so we can flush any pending draft text before saving. */
+  private readonly chipInputs = viewChildren(ChipInputComponent);
 
   readonly watchKeywords = signal<string[]>([]);
   readonly watchDistilleries = signal<string[]>([]);
@@ -46,6 +56,10 @@ export class FeedSettingsPage implements OnInit {
       return;
     }
     this.saving = true;
+    // Commit any text still sitting in a chip input that wasn't added yet.
+    for (const chip of this.chipInputs()) {
+      chip.add();
+    }
     try {
       await this.news.savePreferences({
         watchKeywords: this.watchKeywords(),

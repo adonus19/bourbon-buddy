@@ -45,8 +45,9 @@ export class DispatchPage implements ViewWillEnter {
       if (seg === 'saved') {
         return st === 'saved';
       }
-      // Active feed: not read/dismissed, and matches the user's prefs.
-      return st !== 'read' && st !== 'dismissed' && passesPrefs(a, prefs);
+      // Active feed: only un-actioned articles (saved/read/dismissed move out),
+      // and only those matching the user's prefs.
+      return !st && passesPrefs(a, prefs);
     });
   });
 
