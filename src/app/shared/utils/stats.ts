@@ -273,6 +273,46 @@ export function activityByMonth(
   return buckets;
 }
 
+export interface FlavorAffinity {
+  tag: string;
+  avgRating: number;
+  count: number;
+}
+
+/** Minimum bottles carrying a flavor note before it counts toward taste. */
+export const TASTE_MIN_COUNT = 2;
+
+/**
+ * Taste preference: average rating of the bottles carrying each flavor note,
+ * highest first. Surfaces which notes track with your best-rated pours. A note
+ * is counted once per entry even if it appears in multiple tasting stages.
+ */
+export function tastePreference(
+  entries: LogEntry[],
+  minCount = TASTE_MIN_COUNT,
+  limit = 6
+): FlavorAffinity[] {
+  const acc = new Map<string, { sum: number; count: number }>();
+  for (const e of ratedEntries(entries)) {
+    const tags = new Set([
+      ...(e.noseTags ?? []),
+      ...(e.palateTags ?? []),
+      ...(e.finishTags ?? []),
+    ]);
+    for (const tag of tags) {
+      const g = acc.get(tag) ?? { sum: 0, count: 0 };
+      g.sum += e.rating!;
+      g.count += 1;
+      acc.set(tag, g);
+    }
+  }
+  return [...acc.entries()]
+    .filter(([, g]) => g.count >= minCount)
+    .map(([tag, g]) => ({ tag, avgRating: g.sum / g.count, count: g.count }))
+    .sort((a, b) => b.avgRating - a.avgRating || b.count - a.count)
+    .slice(0, limit);
+}
+
 export function topFlavorTags(entries: LogEntry[], limit = 5): FlavorTagStat[] {
   const counts = new Map<string, number>();
   for (const e of entries) {

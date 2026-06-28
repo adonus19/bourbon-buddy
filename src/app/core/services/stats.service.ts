@@ -7,6 +7,7 @@ import {
   computeSummary,
   proofPreference,
   ratingDistribution,
+  tastePreference,
   topDistilleries,
   topFlavorTags,
 } from '../../shared/utils/stats';
@@ -37,4 +38,5 @@ export class StatsService {
 
   readonly proofPreference = computed(() => proofPreference(this.log.entries()));
   readonly agePreference = computed(() => agePreference(this.log.entries()));
+  readonly tastePreference = computed(() => tastePreference(this.log.entries()));
 }

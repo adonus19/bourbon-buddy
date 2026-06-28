@@ -1,5 +1,12 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectorRef,
+  Component,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { Router } from '@angular/router';
+import { ViewDidEnter } from '@ionic/angular';
 import { ChartConfiguration } from 'chart.js';
 
 import { StatsService } from '../../core/services/stats.service';
@@ -18,14 +25,23 @@ import {
   styleUrls: ['./numbers.page.scss'],
   standalone: false,
 })
-export class NumbersPage {
+export class NumbersPage implements ViewDidEnter {
   private readonly stats = inject(StatsService);
   private readonly router = inject(Router);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   readonly hasData = this.stats.hasData;
   readonly summary = this.stats.summary;
   readonly topDistilleries = this.stats.topDistilleries;
   readonly topFlavorTags = this.stats.topFlavorTags;
+  readonly tastePreference = this.stats.tastePreference;
+
+  /**
+   * Charts are only created after the page-enter transition completes, so the
+   * canvas measures its final container size and animates from the baseline
+   * instead of scaling up from a mid-transition size (mobile zoom artifact).
+   */
+  readonly chartsReady = signal(false);
 
   readonly minPoints = PREFERENCE_MIN_POINTS;
   readonly proofCurve = this.stats.proofPreference;
@@ -217,6 +233,14 @@ export class NumbersPage {
     if (id) {
       void this.router.navigateByUrl(`/entry/${id}`);
     }
+  }
+
+  ionViewDidEnter(): void {
+    // Wait one frame past the enter transition so the canvas sizes correctly.
+    requestAnimationFrame(() => {
+      this.chartsReady.set(true);
+      this.cdr.detectChanges();
+    });
   }
 
   spent(): string {

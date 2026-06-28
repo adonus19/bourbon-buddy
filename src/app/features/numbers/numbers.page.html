@@ -41,12 +41,14 @@
       <section class="stats__section">
         <h2 class="stats__heading">Rating distribution</h2>
         <div class="chart-card chart-card--bar">
-          <canvas
-            baseChart
-            type="bar"
-            [data]="ratingChartData()"
-            [options]="ratingChartOptions"
-          ></canvas>
+          @if (chartsReady()) {
+            <canvas
+              baseChart
+              type="bar"
+              [data]="ratingChartData()"
+              [options]="ratingChartOptions"
+            ></canvas>
+          }
         </div>
       </section>
 
@@ -54,12 +56,14 @@
       <section class="stats__section">
         <h2 class="stats__heading">By category</h2>
         <div class="chart-card chart-card--doughnut">
-          <canvas
-            baseChart
-            type="doughnut"
-            [data]="categoryChartData()"
-            [options]="categoryChartOptions"
-          ></canvas>
+          @if (chartsReady()) {
+            <canvas
+              baseChart
+              type="doughnut"
+              [data]="categoryChartData()"
+              [options]="categoryChartOptions"
+            ></canvas>
+          }
         </div>
       </section>
 
@@ -105,17 +109,51 @@
         }
       </section>
 
+      <!-- Taste preference (flavor notes ranked by average rating) -->
+      <section class="stats__section">
+        <h2 class="stats__heading">Taste preference</h2>
+        @if (tastePreference().length) {
+          <p class="stats__note stats__note--lead">
+            Flavor notes from your best-rated pours.
+          </p>
+          @for (t of tastePreference(); track t.tag) {
+            <div class="flavor">
+              <span class="flavor__name">{{ t.tag }}</span>
+              <span class="flavor__track">
+                <span
+                  class="flavor__fill flavor__fill--taste"
+                  [style.width.%]="(t.avgRating / 5) * 100"
+                ></span>
+              </span>
+              <span class="flavor__count flavor__count--taste">
+                {{ t.avgRating.toFixed(1) }}★
+              </span>
+            </div>
+          }
+        } @else {
+          <div class="stats__placeholder">
+            <ion-icon name="sparkles-outline" aria-hidden="true"></ion-icon>
+            <p>
+              Rate a few bottles with flavor notes and your palate profile shows
+              up here.
+            </p>
+          </div>
+        }
+      </section>
+
       <!-- Proof preference -->
       <section class="stats__section">
         <h2 class="stats__heading">Proof preference</h2>
         @if (proofCurve().totalPoints >= minPoints) {
           <div class="chart-card chart-card--bar">
-            <canvas
-              baseChart
-              type="line"
-              [data]="proofChartData()"
-              [options]="preferenceChartOptions"
-            ></canvas>
+            @if (chartsReady()) {
+              <canvas
+                baseChart
+                type="line"
+                [data]="proofChartData()"
+                [options]="preferenceChartOptions"
+              ></canvas>
+            }
           </div>
         } @else {
           <div class="stats__placeholder">
@@ -130,12 +168,14 @@
         <h2 class="stats__heading">Age preference</h2>
         @if (ageCurve().totalPoints >= minPoints) {
           <div class="chart-card chart-card--bar">
-            <canvas
-              baseChart
-              type="line"
-              [data]="ageChartData()"
-              [options]="preferenceChartOptions"
-            ></canvas>
+            @if (chartsReady()) {
+              <canvas
+                baseChart
+                type="line"
+                [data]="ageChartData()"
+                [options]="preferenceChartOptions"
+              ></canvas>
+            }
           </div>
         } @else {
           <div class="stats__placeholder">
@@ -158,13 +198,15 @@
           <ion-segment-button value="all"><ion-label>All</ion-label></ion-segment-button>
         </ion-segment>
         <div class="chart-card chart-card--bar">
-          <canvas
-            baseChart
-            type="bar"
-            [data]="activityChartData()"
-            [options]="activityChartOptions"
-            (chartClick)="onActivityClick($any($event))"
-          ></canvas>
+          @if (chartsReady()) {
+            <canvas
+              baseChart
+              type="bar"
+              [data]="activityChartData()"
+              [options]="activityChartOptions"
+              (chartClick)="onActivityClick($any($event))"
+            ></canvas>
+          }
         </div>
 
         @if (selectedMonth(); as month) {
