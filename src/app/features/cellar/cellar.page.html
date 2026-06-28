@@ -46,7 +46,9 @@
 </ion-header>
 
 <ion-content [fullscreen]="true">
-  @if (entries().length === 0) {
+  @if (!loaded()) {
+    <app-list-skeleton [count]="6"></app-list-skeleton>
+  } @else if (entries().length === 0) {
     <div class="cellar-empty">
       <ion-icon name="wine-outline" aria-hidden="true"></ion-icon>
       <h2 class="cellar-empty__title">Your glass is empty.</h2>

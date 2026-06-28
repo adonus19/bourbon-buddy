@@ -24,7 +24,9 @@
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
 
-  @if (visible().length === 0) {
+  @if (loading() && articles().length === 0) {
+    <app-list-skeleton [count]="6"></app-list-skeleton>
+  } @else if (visible().length === 0) {
     <div class="dispatch-empty">
       <ion-icon name="newspaper-outline" aria-hidden="true"></ion-icon>
       <h2 class="dispatch-empty__title">

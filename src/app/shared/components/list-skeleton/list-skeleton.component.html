@@ -1,0 +1,12 @@
+<div class="skeleton-list">
+  @for (row of rows(); track $index) {
+    <div class="skeleton-card">
+      <ion-skeleton-text [animated]="true" class="skeleton-card__thumb"></ion-skeleton-text>
+      <div class="skeleton-card__text">
+        <ion-skeleton-text [animated]="true" class="skeleton-card__line skeleton-card__line--title"></ion-skeleton-text>
+        <ion-skeleton-text [animated]="true" class="skeleton-card__line skeleton-card__line--sub"></ion-skeleton-text>
+        <ion-skeleton-text [animated]="true" class="skeleton-card__line skeleton-card__line--meta"></ion-skeleton-text>
+      </div>
+    </div>
+  }
+</div>

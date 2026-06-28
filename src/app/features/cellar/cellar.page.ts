@@ -46,6 +46,7 @@ export class CellarPage implements ViewWillEnter {
   private readonly cdr = inject(ChangeDetectorRef);
 
   readonly entries = this.logService.entries;
+  readonly loaded = this.logService.loaded;
   readonly sort = signal<SortKey>('date');
   readonly sortLabel = computed(() => SORT_LABELS[this.sort()]);
 

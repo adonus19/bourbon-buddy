@@ -1,4 +1,4 @@
-import { Injectable, Signal, computed, inject } from '@angular/core';
+import { Injectable, Signal, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import {
   Firestore,
@@ -13,7 +13,7 @@ import {
   updateDoc,
 } from '@angular/fire/firestore';
 import { Observable, of } from 'rxjs';
-import { switchMap } from 'rxjs/operators';
+import { switchMap, tap } from 'rxjs/operators';
 
 import { LogEntry } from '../../models';
 import { AuthService } from '../auth/auth.service';
@@ -39,16 +39,20 @@ export class LogEntryService {
   private readonly firestore = inject(Firestore);
   private readonly auth = inject(AuthService);
 
+  /** False until the first snapshot arrives — drives skeleton vs. empty state. */
+  readonly loaded = signal(false);
+
   /** All entries for the current user, newest first. */
   readonly entries: Signal<LogEntry[]> = toSignal(
     this.auth.currentUser$.pipe(
+      tap(() => this.loaded.set(false)),
       switchMap((user) =>
         user
           ? (collectionData(
               query(this.entriesCol(user.uid), orderBy('entryDate', 'desc')),
               { idField: 'id' }
-            ) as Observable<LogEntry[]>)
-          : of<LogEntry[]>([])
+            ) as Observable<LogEntry[]>).pipe(tap(() => this.loaded.set(true)))
+          : of<LogEntry[]>([]).pipe(tap(() => this.loaded.set(true)))
       )
     ),
     { initialValue: [] as LogEntry[] }
