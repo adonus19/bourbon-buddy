@@ -104,6 +104,92 @@
           <p class="stats__note">Add flavor notes to your entries to see this.</p>
         }
       </section>
+
+      <!-- Proof preference -->
+      <section class="stats__section">
+        <h2 class="stats__heading">Proof preference</h2>
+        @if (proofCurve().totalPoints >= minPoints) {
+          <div class="chart-card chart-card--bar">
+            <canvas
+              baseChart
+              type="line"
+              [data]="proofChartData()"
+              [options]="preferenceChartOptions"
+            ></canvas>
+          </div>
+        } @else {
+          <div class="stats__placeholder">
+            <ion-icon name="pulse-outline" aria-hidden="true"></ion-icon>
+            <p>Not enough data yet — rate {{ minPoints }}+ bottles with proof to see this.</p>
+          </div>
+        }
+      </section>
+
+      <!-- Age preference -->
+      <section class="stats__section">
+        <h2 class="stats__heading">Age preference</h2>
+        @if (ageCurve().totalPoints >= minPoints) {
+          <div class="chart-card chart-card--bar">
+            <canvas
+              baseChart
+              type="line"
+              [data]="ageChartData()"
+              [options]="preferenceChartOptions"
+            ></canvas>
+          </div>
+        } @else {
+          <div class="stats__placeholder">
+            <ion-icon name="pulse-outline" aria-hidden="true"></ion-icon>
+            <p>Not enough data yet — rate {{ minPoints }}+ bottles to see this.</p>
+          </div>
+        }
+      </section>
+
+      <!-- Activity over time -->
+      <section class="stats__section">
+        <h2 class="stats__heading">Activity over time</h2>
+        <ion-segment
+          class="stats__range"
+          [value]="range()"
+          (ionChange)="setRange($any($event.detail.value))"
+        >
+          <ion-segment-button value="3m"><ion-label>3 mo</ion-label></ion-segment-button>
+          <ion-segment-button value="12m"><ion-label>12 mo</ion-label></ion-segment-button>
+          <ion-segment-button value="all"><ion-label>All</ion-label></ion-segment-button>
+        </ion-segment>
+        <div class="chart-card chart-card--bar">
+          <canvas
+            baseChart
+            type="bar"
+            [data]="activityChartData()"
+            [options]="activityChartOptions"
+            (chartClick)="onActivityClick($any($event))"
+          ></canvas>
+        </div>
+
+        @if (selectedMonth(); as month) {
+          <div class="month-detail">
+            <p class="month-detail__title">
+              {{ month.label }} · {{ month.count }}
+              {{ month.count === 1 ? 'bottle' : 'bottles' }}
+            </p>
+            @for (e of month.entries; track e.id) {
+              <button
+                type="button"
+                class="month-detail__row"
+                (click)="openEntry(e.id)"
+              >
+                <span class="month-detail__name">{{ e.bourbonName }}</span>
+                @if (e.rating) {
+                  <span class="month-detail__rating">{{ e.rating }}★</span>
+                }
+              </button>
+            }
+          </div>
+        } @else {
+          <p class="stats__note">Tap a bar to see that month's entries.</p>
+        }
+      </section>
     </div>
   }
 </ion-content>

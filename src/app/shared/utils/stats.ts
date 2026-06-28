@@ -124,6 +124,155 @@ export function topDistilleries(
 }
 
 /** Most-used flavor tags across nose/palate/finish, most frequent first. */
+export interface PreferenceBucket {
+  label: string;
+  /** Average rating in this bucket, or null when empty. */
+  avg: number | null;
+  count: number;
+}
+
+export interface PreferenceCurve {
+  buckets: PreferenceBucket[];
+  /** Total rated data points across all buckets. */
+  totalPoints: number;
+}
+
+/** Minimum rated data points before a preference curve is worth showing. */
+export const PREFERENCE_MIN_POINTS = 5;
+
+/**
+ * Builds an average-rating-per-bucket curve. `bucketOf` returns the index of
+ * the bucket an entry falls into, or null to exclude it (e.g. missing proof).
+ */
+function buildCurve(
+  entries: LogEntry[],
+  labels: string[],
+  bucketOf: (e: LogEntry) => number | null
+): PreferenceCurve {
+  const acc = labels.map(() => ({ sum: 0, count: 0 }));
+  let totalPoints = 0;
+  for (const e of ratedEntries(entries)) {
+    const idx = bucketOf(e);
+    if (idx == null || idx < 0 || idx >= acc.length) {
+      continue;
+    }
+    acc[idx].sum += e.rating!;
+    acc[idx].count += 1;
+    totalPoints += 1;
+  }
+  return {
+    buckets: labels.map((label, i) => ({
+      label,
+      avg: acc[i].count ? acc[i].sum / acc[i].count : null,
+      count: acc[i].count,
+    })),
+    totalPoints,
+  };
+}
+
+const PROOF_LABELS = ['≤90', '91–100', '101–110', '111–120', '>120'];
+
+/** Average rating by proof range (entries need both proof and a rating). */
+export function proofPreference(entries: LogEntry[]): PreferenceCurve {
+  return buildCurve(entries, PROOF_LABELS, (e) => {
+    if (typeof e.proof !== 'number') {
+      return null;
+    }
+    const p = e.proof;
+    if (p <= 90) return 0;
+    if (p <= 100) return 1;
+    if (p <= 110) return 2;
+    if (p <= 120) return 3;
+    return 4;
+  });
+}
+
+const AGE_LABELS = ['NAS', '<6yr', '6–10yr', '11–15yr', '>15yr'];
+
+/** Average rating by age range; NAS bottles form their own bucket. */
+export function agePreference(entries: LogEntry[]): PreferenceCurve {
+  return buildCurve(entries, AGE_LABELS, (e) => {
+    if (e.isNas) {
+      return 0;
+    }
+    if (typeof e.ageStatement !== 'number') {
+      return null;
+    }
+    const a = e.ageStatement;
+    if (a < 6) return 1;
+    if (a <= 10) return 2;
+    if (a <= 15) return 3;
+    return 4;
+  });
+}
+
+export interface MonthActivity {
+  /** Sortable key, e.g. "2026-03". */
+  key: string;
+  label: string;
+  count: number;
+  entries: LogEntry[];
+}
+
+export type ActivityRange = '3m' | '12m' | 'all';
+
+function monthKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function monthLabel(d: Date): string {
+  return d.toLocaleDateString(undefined, { month: 'short', year: '2-digit' });
+}
+
+/** Bottles logged per month over the requested window (oldest → newest). */
+export function activityByMonth(
+  entries: LogEntry[],
+  range: ActivityRange
+): MonthActivity[] {
+  const now = new Date();
+  let start: Date;
+  if (range === 'all') {
+    const earliest = entries.reduce<Date | null>((min, e) => {
+      const d = e.entryDate?.toDate?.() ?? null;
+      if (!d) return min;
+      return !min || d < min ? d : min;
+    }, null);
+    start = earliest ?? now;
+  } else {
+    const months = range === '3m' ? 2 : 11; // inclusive of current month
+    start = new Date(now.getFullYear(), now.getMonth() - months, 1);
+  }
+
+  const buckets: MonthActivity[] = [];
+  const index = new Map<string, MonthActivity>();
+  const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth(), 1);
+  while (cursor <= end) {
+    const bucket: MonthActivity = {
+      key: monthKey(cursor),
+      label: monthLabel(cursor),
+      count: 0,
+      entries: [],
+    };
+    buckets.push(bucket);
+    index.set(bucket.key, bucket);
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+
+  for (const e of entries) {
+    const d = e.entryDate?.toDate?.();
+    if (!d) {
+      continue;
+    }
+    const bucket = index.get(monthKey(d));
+    if (bucket) {
+      bucket.count += 1;
+      bucket.entries.push(e);
+    }
+  }
+  return buckets;
+}
+
 export function topFlavorTags(entries: LogEntry[], limit = 5): FlavorTagStat[] {
   const counts = new Map<string, number>();
   for (const e of entries) {

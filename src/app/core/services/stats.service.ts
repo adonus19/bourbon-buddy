@@ -2,8 +2,10 @@ import { Injectable, computed, inject } from '@angular/core';
 
 import { LogEntryService } from './log-entry.service';
 import {
+  agePreference,
   categoryBreakdown,
   computeSummary,
+  proofPreference,
   ratingDistribution,
   topDistilleries,
   topFlavorTags,
@@ -18,6 +20,9 @@ import {
 export class StatsService {
   private readonly log = inject(LogEntryService);
 
+  /** Passthrough to the cached log signal (for interactive, range-keyed views). */
+  readonly entries = this.log.entries;
+
   readonly hasData = computed(() => this.log.entries().length > 0);
 
   readonly summary = computed(() => computeSummary(this.log.entries()));
@@ -29,4 +34,7 @@ export class StatsService {
   );
   readonly topDistilleries = computed(() => topDistilleries(this.log.entries()));
   readonly topFlavorTags = computed(() => topFlavorTags(this.log.entries()));
+
+  readonly proofPreference = computed(() => proofPreference(this.log.entries()));
+  readonly agePreference = computed(() => agePreference(this.log.entries()));
 }
