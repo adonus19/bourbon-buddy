@@ -5,5 +5,5 @@ import { initializeApp } from "firebase-admin/app";
 
 initializeApp();
 
-// News Feed (BB-050): scheduled RSS fetch + monthly cleanup.
-export { fetchRssFeeds, cleanupOldArticles } from "./news";
+// News Feed (BB-050): scheduled RSS fetch + monthly/read cleanup.
+export { fetchRssFeeds, cleanupOldArticles, cleanupReadArticles } from "./news";

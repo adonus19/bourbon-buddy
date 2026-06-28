@@ -70,6 +70,13 @@ export class DispatchPage implements ViewWillEnter {
 
   openArticle(a: NewsArticle): void {
     window.open(a.url, '_blank', 'noopener');
+    // Opening an unread article files it under Read; saved articles stay saved.
+    if (a.id) {
+      const st = this.news.stateMap().get(a.id);
+      if (st !== 'saved' && st !== 'read') {
+        void this.news.setState(a.id, 'read');
+      }
+    }
   }
 
   async doRefresh(event: RefresherCustomEvent): Promise<void> {

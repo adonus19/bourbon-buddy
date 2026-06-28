@@ -1,0 +1,232 @@
+.stats {
+  padding: 16px 16px calc(24px + env(safe-area-inset-bottom));
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.stats__metrics {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.stats__section {
+  margin-bottom: 28px;
+}
+
+.stats__heading {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 12px;
+}
+
+.chart-card {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 14px;
+}
+
+.chart-card--bar {
+  height: 220px;
+}
+
+.chart-card--doughnut {
+  height: 220px;
+}
+
+.chart-card canvas {
+  max-height: 100%;
+}
+
+// Top distilleries
+.distillery {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  margin-bottom: 8px;
+
+  &__rank {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--color-amber);
+    width: 22px;
+    flex-shrink: 0;
+  }
+
+  &__name {
+    flex: 1;
+    min-width: 0;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__rating {
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
+
+  &__count {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin-left: 6px;
+  }
+}
+
+// Top flavor tags
+.flavor {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+
+  &__name {
+    width: 96px;
+    flex-shrink: 0;
+    font-size: 13px;
+    color: var(--color-text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__track {
+    display: block;
+    flex: 1;
+    height: 10px;
+    border-radius: 999px;
+    background: var(--color-bg-elevated);
+    overflow: hidden;
+  }
+
+  &__fill {
+    display: block;
+    min-width: 4px;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--color-amber);
+  }
+
+  &__count {
+    width: 22px;
+    flex-shrink: 0;
+    text-align: right;
+    font-size: 12px;
+    color: var(--color-text-secondary);
+
+    &--taste {
+      width: 40px;
+      color: var(--color-amber-light);
+      font-weight: 600;
+    }
+  }
+
+  &__fill--taste {
+    background: linear-gradient(
+      90deg,
+      var(--color-amber-dim),
+      var(--color-amber-light)
+    );
+  }
+}
+
+.stats__note {
+  font-size: 12px;
+  color: var(--color-text-disabled);
+  margin: 4px 2px 0;
+
+  &--lead {
+    color: var(--color-text-secondary);
+    margin: 0 2px 12px;
+  }
+}
+
+.stats__placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 28px 20px;
+  background: var(--color-bg-surface);
+  border: 1px dashed var(--color-border-bright);
+  border-radius: var(--radius-card);
+
+  ion-icon {
+    font-size: 28px;
+    color: var(--color-amber-dim);
+  }
+
+  p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+  }
+}
+
+.stats__range {
+  margin-bottom: 12px;
+}
+
+.month-detail {
+  margin-top: 12px;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+
+  &__title {
+    margin: 0;
+    padding: 12px 14px;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--color-text-primary);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    padding: 11px 14px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--color-border);
+    text-align: left;
+    cursor: pointer;
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  &__name {
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
+    color: var(--color-text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__rating {
+    flex-shrink: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-amber-light);
+  }
+}

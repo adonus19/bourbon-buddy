@@ -2,12 +2,68 @@
   <ion-toolbar>
     <ion-title>Search</ion-title>
   </ion-toolbar>
+  <ion-toolbar class="search-toolbar">
+    <ion-searchbar
+      placeholder="Search your cellar & hunt list"
+      [debounce]="300"
+      (ionInput)="onSearch($event)"
+      (ionClear)="query.set('')"
+    ></ion-searchbar>
+  </ion-toolbar>
 </ion-header>
 
 <ion-content [fullscreen]="true">
-  <app-coming-soon
-    icon="search-outline"
-    title="Nothing found. Like most Bigfoot photos."
-    subtitle="Global search across your Cellar and Hunt List arrives in Iteration 6."
-  ></app-coming-soon>
+  @if (!active()) {
+    <div class="search-empty">
+      <ion-icon name="search-outline" aria-hidden="true"></ion-icon>
+      <p>Type at least two characters to search by name or distillery.</p>
+    </div>
+  } @else if (!hasResults()) {
+    <div class="search-empty">
+      <ion-icon name="sad-outline" aria-hidden="true"></ion-icon>
+      <p>No matches for “{{ query().trim() }}”.</p>
+    </div>
+  } @else {
+    <div class="results">
+      @if (logResults().length) {
+        <section class="results__group">
+          <p class="eyebrow results__heading">In your cellar</p>
+          @for (e of logResults(); track e.id) {
+            <button type="button" class="result" (click)="openLog(e.id)">
+              <span class="result__text">
+                <span class="result__name">{{ e.bourbonName }}</span>
+                @if (e.distillery) {
+                  <span class="result__sub">{{ e.distillery }}</span>
+                }
+              </span>
+              @if (ratingLabel(e); as r) {
+                <span class="result__detail">{{ r }}</span>
+              }
+              <ion-icon class="result__chevron" name="chevron-forward"></ion-icon>
+            </button>
+          }
+        </section>
+      }
+
+      @if (wishlistResults().length) {
+        <section class="results__group">
+          <p class="eyebrow results__heading">On your hunt list</p>
+          @for (e of wishlistResults(); track e.id) {
+            <button type="button" class="result" (click)="openWishlist(e.id)">
+              <span class="result__text">
+                <span class="result__name">{{ e.bourbonName }}</span>
+                @if (e.distillery) {
+                  <span class="result__sub">{{ e.distillery }}</span>
+                }
+              </span>
+              @if (priceLabel(e); as p) {
+                <span class="result__detail">{{ p }}</span>
+              }
+              <ion-icon class="result__chevron" name="chevron-forward"></ion-icon>
+            </button>
+          }
+        </section>
+      }
+    </div>
+  }
 </ion-content>

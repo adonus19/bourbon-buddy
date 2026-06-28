@@ -42,9 +42,12 @@
       ]
     },
     {
-      "collectionGroup": "bourbons",
-      "queryScope": "COLLECTION",
-      "fields": [{ "fieldPath": "nameLowercase", "order": "ASCENDING" }]
+      "collectionGroup": "articleStates",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "state", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

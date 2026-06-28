@@ -14,6 +14,8 @@ import { WishlistCardComponent } from './components/wishlist-card/wishlist-card.
 import { SightingFormComponent } from './components/sighting-form/sighting-form.component';
 import { PourFormComponent } from './components/pour-form/pour-form.component';
 import { ChipInputComponent } from './components/chip-input/chip-input.component';
+import { MetricCardComponent } from './components/metric-card/metric-card.component';
+import { InputHelpersDirective } from './directives/input-helpers.directive';
 
 /**
  * Shared declarations reused across feature modules (presentational
@@ -21,6 +23,7 @@ import { ChipInputComponent } from './components/chip-input/chip-input.component
  * them. Keep singletons/services out of here — those belong in core.
  */
 const COMPONENTS = [
+  InputHelpersDirective,
   ComingSoonComponent,
   WordmarkComponent,
   RatingWidgetComponent,
@@ -32,6 +35,7 @@ const COMPONENTS = [
   SightingFormComponent,
   PourFormComponent,
   ChipInputComponent,
+  MetricCardComponent,
 ];
 
 @NgModule({
