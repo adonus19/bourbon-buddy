@@ -1,11 +1,16 @@
 import { Component, computed, effect, inject } from '@angular/core';
 import { FormBuilder, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
-import { AlertController, ToastController } from '@ionic/angular';
+import {
+  ActionSheetController,
+  AlertController,
+  ToastController,
+} from '@ionic/angular';
 import { Auth, updateProfile } from '@angular/fire/auth';
 
 import { AuthService } from '../../core/auth/auth.service';
 import { UserService } from '../../core/services/user.service';
+import { ExportKind, ExportService } from '../../core/services/export.service';
 
 @Component({
   selector: 'app-profile',
@@ -21,6 +26,8 @@ export class ProfilePage {
   private readonly router = inject(Router);
   private readonly toast = inject(ToastController);
   private readonly alertCtrl = inject(AlertController);
+  private readonly actionSheet = inject(ActionSheetController);
+  private readonly exportService = inject(ExportService);
 
   // Already-loaded signals from the session state holder — no new Firebase reads.
   readonly user = this.auth.currentUser;
@@ -111,6 +118,34 @@ export class ProfilePage {
       await this.presentToast('Password reset email sent.');
     } catch {
       await this.presentToast('Something went wrong. Try again.');
+    }
+  }
+
+  async exportData(): Promise<void> {
+    const sheet = await this.actionSheet.create({
+      header: 'Export to CSV',
+      buttons: [
+        { text: 'Cellar & Hunt List', handler: () => void this.runExport('both') },
+        { text: 'Cellar only', handler: () => void this.runExport('log') },
+        {
+          text: 'Hunt List only',
+          handler: () => void this.runExport('wishlist'),
+        },
+        { text: 'Cancel', role: 'cancel' },
+      ],
+    });
+    await sheet.present();
+  }
+
+  private async runExport(kind: ExportKind): Promise<void> {
+    if (!this.exportService.hasData(kind)) {
+      await this.presentToast('Nothing to export yet.');
+      return;
+    }
+    try {
+      await this.exportService.export(kind);
+    } catch {
+      await this.presentToast("Couldn't export. Try again.");
     }
   }
 

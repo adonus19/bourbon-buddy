@@ -68,6 +68,18 @@
       </ion-button>
     </form>
 
+    <p class="eyebrow profile__section">Your data</p>
+
+    <ion-button
+      class="profile__account-btn"
+      expand="block"
+      fill="outline"
+      (click)="exportData()"
+    >
+      <ion-icon name="download-outline" slot="start"></ion-icon>
+      Export to CSV
+    </ion-button>
+
     <p class="eyebrow profile__section">Account</p>
 
     @if (hasPasswordProvider()) {
