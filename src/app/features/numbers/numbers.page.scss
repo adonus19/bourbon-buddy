@@ -102,14 +102,17 @@
   }
 
   &__track {
+    display: block;
     flex: 1;
-    height: 8px;
+    height: 10px;
     border-radius: 999px;
     background: var(--color-bg-elevated);
     overflow: hidden;
   }
 
   &__fill {
+    display: block;
+    min-width: 4px;
     height: 100%;
     border-radius: 999px;
     background: var(--color-amber);

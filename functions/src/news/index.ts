@@ -1,8 +1,10 @@
 /**
  * News Feed Cloud Functions (BB-050).
- *   fetchRssFeeds      — every 12h: parse RSS sources, dedupe by URL hash,
- *                        write /newsArticles, skip items older than 90 days.
- *   cleanupOldArticles — monthly: delete /newsArticles older than 90 days.
+ *   fetchRssFeeds       — every 12h: parse RSS sources, dedupe by URL hash,
+ *                         write /newsArticles, skip items older than 90 days.
+ *   cleanupOldArticles  — monthly: delete /newsArticles older than 90 days.
+ *   cleanupReadArticles — hourly: delete read articleStates older than 24h and
+ *                         their /newsArticles docs (Read tab is transient).
  */
 import { createHash } from "crypto";
 import { logger } from "firebase-functions/v2";
@@ -14,6 +16,7 @@ import { RSS_SOURCES } from "./sources";
 
 const MAX_AGE_DAYS = 90;
 const MAX_AGE_MS = MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
+const READ_RETENTION_MS = 24 * 60 * 60 * 1000;
 
 type FeedItem = Parser.Item & {
   enclosure?: { url?: string };
@@ -145,5 +148,46 @@ export const cleanupOldArticles = onSchedule(
       }
     }
     logger.info(`cleanupOldArticles removed ${deleted} articles`);
+  }
+);
+
+/**
+ * Read articles are transient: 24h after a user marks one read, drop the read
+ * state (clears it from the Read tab) and delete the shared article document.
+ * Saved articles are untouched. Runs hourly via a collection-group query over
+ * every user's articleStates (requires the composite index in
+ * firestore.indexes.json).
+ */
+export const cleanupReadArticles = onSchedule(
+  { schedule: "every 1 hours", timeoutSeconds: 300 },
+  async () => {
+    const db = getFirestore();
+    const cutoff = Timestamp.fromMillis(Date.now() - READ_RETENTION_MS);
+    let cleared = 0;
+
+    for (;;) {
+      const snap = await db
+        .collectionGroup("articleStates")
+        .where("state", "==", "read")
+        .where("updatedAt", "<", cutoff)
+        .limit(300)
+        .get();
+      if (snap.empty) {
+        break;
+      }
+      const batch = db.batch();
+      for (const stateDoc of snap.docs) {
+        batch.delete(stateDoc.ref); // remove from the user's Read tab
+        if (stateDoc.id) {
+          batch.delete(db.collection("newsArticles").doc(stateDoc.id));
+        }
+      }
+      await batch.commit();
+      cleared += snap.size;
+      if (snap.size < 300) {
+        break;
+      }
+    }
+    logger.info(`cleanupReadArticles cleared ${cleared} read articles`);
   }
 );
