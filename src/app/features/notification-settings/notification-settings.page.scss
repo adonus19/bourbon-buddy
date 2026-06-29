@@ -42,3 +42,32 @@
   font-weight: 600;
   height: 50px;
 }
+
+.nsettings__section {
+  display: block;
+  margin: 28px 2px 4px;
+}
+
+.nsettings__hint {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin: 0 2px 12px;
+}
+
+.nsettings__list {
+  background: transparent;
+}
+
+.nsettings__item {
+  --background: var(--color-bg-surface);
+  --border-radius: var(--radius-card);
+  margin-bottom: 8px;
+  border-radius: var(--radius-card);
+}
+
+.nsettings__desc {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin: 2px 0 0;
+  white-space: normal;
+}

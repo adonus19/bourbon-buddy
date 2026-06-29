@@ -1,4 +1,5 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import {
   Messaging,
   deleteToken,
@@ -10,13 +11,21 @@ import {
   Firestore,
   deleteDoc,
   doc,
+  docData,
   serverTimestamp,
   setDoc,
 } from '@angular/fire/firestore';
 import { ToastController } from '@ionic/angular';
+import { Observable, of } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
 
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../auth/auth.service';
+import {
+  DEFAULT_NOTIFICATION_PREFS,
+  NotificationPrefKey,
+  NotificationPrefs,
+} from '../../models';
 
 /** Permission state surfaced to the UI. */
 export type PushState =
@@ -52,6 +61,25 @@ export class NotificationService {
   readonly state = signal<PushState>('default');
   private currentToken: string | null = null;
   private foregroundBound = false;
+
+  /** Live notification preferences for the signed-in user (defaults until set). */
+  private readonly prefsDocData = toSignal(
+    this.auth.currentUser$.pipe(
+      switchMap((user) =>
+        user
+          ? (docData(this.prefsDoc(user.uid)) as Observable<
+              Partial<NotificationPrefs> | undefined
+            >)
+          : of<Partial<NotificationPrefs> | undefined>(undefined)
+      )
+    ),
+    { initialValue: undefined }
+  );
+
+  readonly prefs = computed<NotificationPrefs>(() => ({
+    ...DEFAULT_NOTIFICATION_PREFS,
+    ...(this.prefsDocData() ?? {}),
+  }));
 
   /** Resolves the initial state (call once, e.g. when opening settings). */
   async refreshState(): Promise<void> {
@@ -107,6 +135,38 @@ export class NotificationService {
   /** Called before sign-out so the signed-out device stops receiving pushes. */
   async cleanupForSignOut(): Promise<void> {
     await this.removeCurrentToken();
+  }
+
+  // --- Preferences (BB-091) ---
+
+  /**
+   * Flips a single preference. Turning a notification type on while push isn't
+   * granted requests permission first (contextual prompt). The preference is
+   * still saved either way so it takes effect once push is enabled.
+   */
+  async setPref(key: NotificationPrefKey, value: boolean): Promise<PushState> {
+    let result: PushState = this.state();
+    if (value && key !== 'pausedAll' && this.state() !== 'granted') {
+      result = await this.enable();
+    }
+    await this.savePrefs({ [key]: value });
+    return result;
+  }
+
+  async savePrefs(partial: Partial<NotificationPrefs>): Promise<void> {
+    const uid = this.auth.snapshotUser?.uid;
+    if (!uid) {
+      return;
+    }
+    await setDoc(
+      this.prefsDoc(uid),
+      { ...partial, updatedAt: serverTimestamp() },
+      { merge: true }
+    );
+  }
+
+  private prefsDoc(uid: string) {
+    return doc(this.firestore, `users/${uid}/settings/notifications`);
   }
 
   private async saveToken(token: string): Promise<void> {
