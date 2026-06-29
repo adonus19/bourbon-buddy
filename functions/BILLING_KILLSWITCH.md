@@ -21,10 +21,21 @@ degrades to the free tier until you re-enable billing manually.
 Project: **bourbonbuddy-dev** · project number **906555272492** · region
 **us-central1**.
 
+> **Two tips that prevent most confusion:**
+> 1. The **project picker** at the very top of the Console must say
+>    **bourbonbuddy-dev** on every page below.
+> 2. Use the Console's **top search bar** to navigate — menu layouts move, search
+>    doesn't. The exact term to type is given in each step.
+>
+> **Verify your project number first:** search bar → `Dashboard` → the
+> "Project info" card → **Project number** should be **906555272492**. If yours
+> differs, your service-account email uses your number instead (format
+> `PROJECTNUMBER-compute@developer.gserviceaccount.com`).
+
 ### 1. Create the Pub/Sub topic
 
-Console → **Pub/Sub → Topics → Create topic** → Topic ID: **`billing-alerts`**
-→ Create. (Or `gcloud pubsub topics create billing-alerts`.)
+Search bar → `Pub/Sub` → **Topics** → **`+ CREATE TOPIC`** → Topic ID exactly
+**`billing-alerts`** → **Create**. (Or `gcloud pubsub topics create billing-alerts`.)
 
 ### 2. Deploy the function
 
@@ -32,36 +43,43 @@ Console → **Pub/Sub → Topics → Create topic** → Topic ID: **`billing-ale
 firebase deploy --only functions:capBillingAtBudget
 ```
 
-It subscribes to the `billing-alerts` topic automatically. (Deploy the topic in
+It subscribes to the `billing-alerts` topic automatically. (Create the topic in
 step 1 first, or the trigger has nothing to bind to.)
 
 ### 3. Create the budget and connect it to the topic
 
-Console → **Billing → Budgets & alerts → Create budget**:
-- **Scope:** this project (bourbonbuddy-dev).
-- **Amount:** your ceiling, e.g. **$25/month** (start low; raise as real usage warrants).
-- **Threshold rules:** leave the defaults (50% / 90% / 100% of *actual*) — these
-  drive the warning emails. The kill-switch itself fires on the 100%-of-actual
-  condition the function evaluates.
-- **Manage notifications → "Connect a Pub/Sub topic to this budget"** → select
-  this project and the **`billing-alerts`** topic → **Save**.
+Search bar → `Budgets` (or **Billing → Budgets & alerts**) → **`CREATE BUDGET`**:
+- **Scope** page: under "Projects," select **bourbonbuddy-dev** → Next.
+- **Amount** page: Target amount → **`25`** (your monthly ceiling; start low) → Next.
+- **Actions** page: leave the default 50 / 90 / 100% alert thresholds (these drive
+  the warning emails). Then check **"Connect a Pub/Sub topic to this budget,"**
+  choose this project, and select the **`billing-alerts`** topic → **Finish**.
+
+The kill-switch fires on the cost-vs-budget check the function does on each
+message, independent of those email thresholds.
 
 ### 4. Grant the function permission to detach billing
 
-Find the function's runtime service account: Console → **Cloud Functions →
-capBillingAtBudget → Details**. For gen-2 it's the Compute Engine default SA:
-**`906555272492-compute@developer.gserviceaccount.com`**.
+The function runs as the Compute Engine default service account:
+**`906555272492-compute@developer.gserviceaccount.com`**. Grant it a role that
+can unlink billing.
 
-Grant it a role that can unlink billing (pick one):
-- **Recommended (least privilege):** Console → **IAM & Admin → IAM → Grant
-  access** → principal = the SA above → role = **Project Billing Manager**
-  (`roles/billing.projectManager`).
-- **Fallback (Google's documented option):** Console → **Billing → Account
-  management → Add principal** → the SA above → role = **Billing Account
-  Administrator** (`roles/billing.admin`).
+**Recommended (least privilege), click by click:**
+1. Search bar → `IAM` → open **"IAM"** (under IAM & Admin). Project picker must
+   say **bourbonbuddy-dev**.
+2. Click **`+ GRANT ACCESS`** near the top.
+3. In **"New principals,"** paste the service-account email above.
+4. Under **"Select a role,"** filter for **`Project Billing Manager`** and choose
+   it (in the "Billing" group).
+5. **Save**.
 
-If the kill-switch ever logs a permissions error when trying to disable billing,
-use the fallback role.
+You do **not** need the function's details page — the SA email is given directly
+above.
+
+**Fallback** (only if the kill-switch later logs a permission error when
+disabling billing): search bar → `Billing` → left nav **"Account management"** →
+**"ADD PRINCIPAL"** → same SA email → role **Billing Account Administrator**
+(`roles/billing.admin`) → Save.
 
 ---
 
