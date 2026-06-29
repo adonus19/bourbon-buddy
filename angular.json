@@ -21,6 +21,7 @@
             "inlineStyleLanguage": "scss",
             "assets": [
               "src/manifest.webmanifest",
+              "src/firebase-messaging-sw.js",
               {
                 "glob": "**/*",
                 "input": "src/assets",
@@ -32,7 +33,10 @@
                 "output": "./svg"
               }
             ],
-            "styles": ["src/global.scss", "src/theme/variables.scss"],
+            "styles": [
+              "src/global.scss",
+              "src/theme/variables.scss"
+            ],
             "scripts": []
           },
           "configurations": {
@@ -128,7 +132,10 @@
                 "output": "./svg"
               }
             ],
-            "styles": ["src/global.scss", "src/theme/variables.scss"],
+            "styles": [
+              "src/global.scss",
+              "src/theme/variables.scss"
+            ],
             "scripts": []
           },
           "configurations": {

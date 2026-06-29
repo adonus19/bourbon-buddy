@@ -28,6 +28,7 @@ import {
   getFunctions,
   provideFunctions,
 } from '@angular/fire/functions';
+import { getMessaging, provideMessaging } from '@angular/fire/messaging';
 
 import { environment } from '../environments/environment';
 import { AppComponent } from './app.component';
@@ -73,6 +74,9 @@ import { AppRoutingModule } from './app-routing.module';
       }
       return functions;
     }),
+    // FCM has no emulator; messaging always targets the live project. The
+    // NotificationService guards usage behind isSupported()/permission.
+    provideMessaging(() => getMessaging()),
   ],
   bootstrap: [AppComponent],
 })

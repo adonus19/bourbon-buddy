@@ -17,6 +17,10 @@ export const environment = {
     appId: '1:906555272492:web:f0b394b4f243213b5a5089',
     measurementId: 'G-ZV4Y6VD31N',
   },
+  // Web Push (FCM) public VAPID key. Generate in Firebase Console → Project
+  // settings → Cloud Messaging → Web Push certificates → Generate key pair,
+  // then paste the public key here. Push stays disabled until this is set.
+  vapidKey: '',
   emulators: {
     auth: { host: 'localhost', port: 9099 },
     firestore: { host: 'localhost', port: 8080 },
