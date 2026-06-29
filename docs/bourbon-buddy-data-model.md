@@ -1,7 +1,7 @@
 # Bourbon Buddy — Firestore Data Model
 
-**Version:** 1.1
-**Last Updated:** 2026-06-24
+**Version:** 1.2
+**Last Updated:** 2026-06-29
 **Database:** Cloud Firestore (Firebase)
 
 ---
@@ -288,6 +288,143 @@ Only documents where the user has taken an action exist. Absence of a document =
 **Query Patterns:**
 - All saved articles: `.where('state', '==', 'saved').orderBy('updatedAt', 'desc')`
 - All dismissed: `.where('state', '==', 'dismissed')` — fetched to exclude from feed
+
+---
+
+# Post-MVP Collections — Social, Sightings & Notifications
+
+> **Scope:** Not part of the single-user MVP. These collections back the
+> Phase 2 notification foundation and the Phase 4 social features (stories
+> BB-090–BB-113). Listed here so the schema is decided up front and the work
+> isn't re-derived later. The `/users/{userId}` document gains a few **additive,
+> optional** fields (below); existing MVP fields are unchanged.
+
+### Additive fields on `/users/{userId}` *(Phase 4)*
+
+```
+users/{userId}
+  // ...existing MVP fields...
+  username:        string | null        // unique handle; mirrors /usernames/{usernameLower}
+  isDiscoverable:  boolean              // opt-in to username search; default false
+  friendCount:     number               // denormalized, maintained on friend add/remove
+```
+
+### Collection: `/usernames/{usernameLower}` *(Phase 4 — BB-100)*
+
+Reservation docs that enforce unique, case-insensitive handles. Written
+transactionally when a username is claimed or changed.
+
+```
+usernames/{usernameLower}
+  uid:        string        // owner of this username
+  createdAt:  Timestamp
+```
+
+**Rule:** create allowed only if the doc doesn't exist and `uid == auth.uid`.
+
+### Subcollection: `/users/{userId}/fcmTokens/{tokenId}` *(Phase 2 — BB-090)*
+
+One doc per device/browser. Used by the send-helper to fan out push messages;
+stale tokens are pruned when FCM reports them unregistered.
+
+```
+fcmTokens/{tokenId}
+  token:       string
+  platform:    string        // "web" | "ios" | "android"
+  userAgent:   string | null
+  updatedAt:   Timestamp
+```
+
+### Document: `/users/{userId}/notificationPrefs` *(Phase 2 — BB-091)*
+
+Single fixed-ID doc (`/users/{uid}/settings/notificationPrefs` or a top-level
+field map). Every type defaults `false`.
+
+```
+notificationPrefs
+  sightingMatch:   boolean      // BB-112
+  priceAlert:      boolean
+  friendRequest:   boolean
+  newsDigest:      boolean
+  pausedAll:       boolean      // master kill-switch
+  updatedAt:       Timestamp
+```
+
+### Collection: `/friendRequests/{requestId}` *(Phase 4 — BB-101/102)*
+
+```
+friendRequests/{requestId}
+  fromUid:    string
+  toUid:      string
+  status:     string        // "pending" | "accepted" | "declined" | "cancelled"
+  createdAt:  Timestamp
+  updatedAt:  Timestamp
+```
+
+**Query Patterns:** incoming = `.where('toUid','==',uid).where('status','==','pending')`;
+outgoing = `.where('fromUid','==',uid).where('status','==','pending')`.
+
+### Subcollection: `/users/{userId}/friends/{friendUid}` *(Phase 4 — BB-102/103)*
+
+Reciprocal edges — written on both sides inside one transaction when a request
+is accepted, deleted on both sides when removed.
+
+```
+friends/{friendUid}
+  since:      Timestamp
+```
+
+### Subcollection: `/users/{userId}/blocks/{blockedUid}` *(Phase 4 — BB-103)*
+
+```
+blocks/{blockedUid}
+  createdAt:  Timestamp
+```
+
+### Collection: `/sightings/{sightingId}` *(Phase 4 — BB-110)*
+
+The **shared** mirror of a private wishlist sighting, created only when the
+owner marks a sighting "share with friends." Top-level so a Cloud Function can
+match `bourbonId` against friends' Hunt Lists. Private sightings stay under
+`/users/{uid}/wishlistEntries/{entryId}/sightings` and are never copied here.
+
+```
+sightings/{sightingId}
+  ownerUid:      string
+  bourbonId:     string        // match key against friends' wishlist entries
+  bourbonName:   string        // denormalized for display
+  storeName:     string
+  price:         number
+  city:          string | null
+  state:         string | null
+  sightingDate:  Timestamp
+  visibility:    string        // "friends" (only value for now)
+  createdAt:     Timestamp
+```
+
+**Security:** readable only by the owner's accepted, non-blocked friends;
+writable only by `ownerUid`. **Match query (in function):**
+`.where('bourbonId','==', x)` joined against each friend's active wishlist.
+
+### Subcollection: `/users/{userId}/notifications/{notificationId}` *(Phase 4 — BB-113)*
+
+In-app inbox; one doc written alongside each push so missed notifications are
+recoverable. Auto-expired (~30 days) by a scheduled cleanup function.
+
+```
+notifications/{notificationId}
+  type:        string        // "sightingMatch" | "friendRequest" | "priceAlert"
+  title:       string
+  body:        string
+  data:        map           // deep-link payload (e.g. sightingId, entryId)
+  read:        boolean
+  createdAt:   Timestamp
+```
+
+**Additional indexes (add to `firestore.indexes.json` when built):**
+`friendRequests` (toUid ASC, status ASC), `friendRequests` (fromUid ASC,
+status ASC), `sightings` (bourbonId ASC, createdAt DESC),
+`notifications` collection-group (read ASC, createdAt DESC).
 
 ---
 
