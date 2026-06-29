@@ -888,3 +888,29 @@ Each story includes:
 | BB-160 | Bourbon Catalog Canonicalization | Data Quality | 5 |
 
 **Going-Public Total: 50 SP** · **Grand Post-MVP Total: 105 SP**
+
+---
+
+# Backlog (Not Yet Iteration-Scoped)
+
+### BB-170 — News Full-Text Search (Algolia)
+**As a** user, **I want to** search the entire news archive, **so that** I can find any article, not just the pages I've already scrolled.
+
+**Context:** the Dispatch feed has cursor pagination + client-side search over
+loaded articles (good for browsing). True "find that one article from weeks ago"
+needs a hosted full-text index. Chosen direction: **Algolia** (best DX, the
+official Firebase "Search with Algolia" extension auto-syncs a collection, and
+the rolling ~90-day shared `newsArticles` corpus should fit the free tier).
+Typesense is the cheaper-at-scale alternative if Algolia costs grow.
+
+**AC:**
+- `newsArticles` is synced to an Algolia index on add (`fetchRssFeeds`) and on
+  delete (cleanup functions) — via the Firebase extension or a small Cloud Function
+- Dispatch search queries the index for full-text matches (headline, source,
+  excerpt) across **all** stored articles, not just loaded pages
+- Results respect article-state filtering (read/saved/dismissed) and open like
+  feed articles
+- Stays within Algolia's free tier for the shared corpus; usage monitored
+- Falls back to the current client-side search if the index is unavailable
+
+**SP:** 5
