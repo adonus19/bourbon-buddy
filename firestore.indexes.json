@@ -42,6 +42,14 @@
       ]
     },
     {
+      "collectionGroup": "newsArticles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "sourceName", "order": "ASCENDING" },
+        { "fieldPath": "publishedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "articleStates",
       "queryScope": "COLLECTION_GROUP",
       "fields": [

@@ -6,6 +6,7 @@ import {
   signal,
 } from '@angular/core';
 import {
+  InfiniteScrollCustomEvent,
   RefresherCustomEvent,
   ToastController,
   ViewWillEnter,
@@ -15,6 +16,11 @@ import { ArticleState, NewsArticle } from '../../models';
 import { NewsService } from '../../core/services/news.service';
 import { relativeTime } from '../../shared/utils/relative-time';
 import { isWatched, passesPrefs } from '../../shared/utils/news-filter';
+import {
+  NEWS_SOURCE_NAMES,
+  NEWS_WINDOWS,
+  NewsWindow,
+} from '../../shared/constants/news-sources';
 
 type Segment = 'feed' | 'read' | 'saved';
 
@@ -30,25 +36,42 @@ export class DispatchPage implements ViewWillEnter {
   private readonly cdr = inject(ChangeDetectorRef);
 
   readonly loading = this.news.loading;
+  readonly loadingMore = this.news.loadingMore;
   readonly error = this.news.error;
   readonly articles = this.news.articles;
+  readonly hasMore = this.news.hasMore;
+  readonly window = this.news.window;
+  readonly source = this.news.source;
   readonly segment = signal<Segment>('feed');
+  readonly search = signal('');
+
+  readonly windows = NEWS_WINDOWS;
+  readonly sources = NEWS_SOURCE_NAMES;
 
   readonly visible = computed<NewsArticle[]>(() => {
     const map = this.news.stateMap();
     const seg = this.segment();
     const prefs = this.news.effectivePrefs();
+    const term = this.search().trim().toLowerCase();
+    const matches = (a: NewsArticle): boolean =>
+      !term ||
+      a.headline.toLowerCase().includes(term) ||
+      (a.sourceName?.toLowerCase().includes(term) ?? false) ||
+      (a.excerpt?.toLowerCase().includes(term) ?? false);
+
+    // Saved uses its own by-id pool so nothing is hidden by feed pagination.
+    if (seg === 'saved') {
+      return this.news
+        .savedArticles()
+        .filter((a) => (a.id ? map.get(a.id) === 'saved' : false) && matches(a));
+    }
     return this.news.articles().filter((a) => {
       const st = a.id ? map.get(a.id) : undefined;
       if (seg === 'read') {
-        return st === 'read';
+        return st === 'read' && matches(a);
       }
-      if (seg === 'saved') {
-        return st === 'saved';
-      }
-      // Active feed: only un-actioned articles (saved/read/dismissed move out),
-      // and only those matching the user's prefs.
-      return !st && passesPrefs(a, prefs);
+      // Active feed: un-actioned articles matching prefs.
+      return !st && passesPrefs(a, prefs) && matches(a);
     });
   });
 
@@ -63,6 +86,31 @@ export class DispatchPage implements ViewWillEnter {
 
   setSegment(value: Segment): void {
     this.segment.set(value);
+    if (value === 'saved') {
+      void this.news.loadSaved();
+    }
+  }
+
+  onSearch(event: Event): void {
+    this.search.set(
+      (event as CustomEvent<{ value?: string }>).detail?.value ?? ''
+    );
+  }
+
+  setWindow(value: NewsWindow): void {
+    this.news.setWindow(value);
+  }
+
+  setSource(value: string | null): void {
+    this.news.setSource(value || null);
+  }
+
+  async loadMore(event: InfiniteScrollCustomEvent): Promise<void> {
+    try {
+      await this.news.loadMore();
+    } finally {
+      await event.target.complete();
+    }
   }
 
   relTime(a: NewsArticle): string {
