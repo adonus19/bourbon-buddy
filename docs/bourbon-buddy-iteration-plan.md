@@ -1,7 +1,7 @@
 # Bourbon Buddy — Iteration Plan (MVP)
 
-**Version:** 1.1
-**Last Updated:** 2026-06-24
+**Version:** 1.2
+**Last Updated:** 2026-06-29
 **Methodology:** Agile / Scrum-style iterations (2-week sprints)
 **Velocity Assumption:** ~25 story points per iteration (solo developer, part-time; adjust based on actual pace)
 **Total MVP Scope:** 152 SP across 7 iterations (not counting Iteration 0)
@@ -312,8 +312,14 @@ The order reflects both technical dependencies (auth before features, log before
 - Offline / offline-first (Firestore offline persistence enabled)
 - Barcode scanning for bottle entry (Capacitor ML Kit or Quagga.js)
 - AI "Find Bottles" from news articles (Claude API via Firebase Function)
-- FCM push notifications (price alerts, new article summaries)
-- Price alerts for wishlist bottles
+- **Notifications & Alerts Foundation (Epic 9)** — the plumbing every alert
+  needs, built here so later phases can layer on top:
+  - **BB-090 Push Notification Setup (FCM)** — permission flow, device-token
+    storage, a reusable send-helper Cloud Function, web-push via service worker
+  - **BB-091 Notification Preferences** — per-type opt-in toggles, default off
+- Price alerts for wishlist bottles (uses BB-090; richer once Phase 4 adds
+  crowd-sourced sightings)
+- News digest push (uses BB-090)
 
 ### Phase 3 — Native App
 - Capacitor iOS build and TestFlight
@@ -321,12 +327,39 @@ The order reflects both technical dependencies (auth before features, log before
 - Android Capacitor build and Google Play
 
 ### Phase 4 — Social / Multi-User
-- Friend connections and social following
+
+The headline of this phase is **Sighting Match Alerts (BB-112)** — you get
+notified when a friend spots a bottle on your Hunt List, with the store and
+price. It sits on top of the social graph, shareable sightings, and the Phase 2
+push foundation. Build in this order:
+
+**Social Graph (Epic 10)** — the prerequisite network:
+- **BB-100 Public Profile & Username** — opt-in discoverable handle
+- **BB-101 Find & Add Friends** — search + send requests
+- **BB-102 Respond to Friend Requests** — accept/decline, reciprocal edges
+- **BB-103 Manage Friends** — list, remove, block
+
+**Social Sightings & Alerts (Epic 11)** — the payoff:
+- **BB-110 Share Sightings with Friends** — per-sighting privacy, queryable
+  top-level `/sightings` collection
+- **BB-111 Friends' Sightings Feed** — see friends' shared finds, Hunt-List
+  matches highlighted
+- **BB-112 Sighting Match Alerts** ★ — Cloud Function matches a new shared
+  sighting against friends' active Hunt Lists and pushes the alert
+- **BB-113 Notification Inbox** — in-app, recoverable record of every alert
+
+> **Dependency chain:** BB-112 requires BB-110 (shared sightings) + BB-101/102
+> (friends) + BB-090 (push from Phase 2). Don't start BB-112 until those land.
+
+**Further social backlog (not yet story-scoped):**
 - Shared wishlists
 - Activity feed (friends' recent tries)
-- Crowd-sourced bottle sightings visible across friend network
 - Group tasting events and sessions
-- Bottle splits
+- Bottle splits and trade board
+
+Full acceptance criteria for BB-090–BB-113 live in
+[bourbon-buddy-user-stories.md](bourbon-buddy-user-stories.md); supporting
+schemas in [bourbon-buddy-data-model.md](bourbon-buddy-data-model.md).
 
 ### Phase 5 — Gamification
 - Palate badges and achievements

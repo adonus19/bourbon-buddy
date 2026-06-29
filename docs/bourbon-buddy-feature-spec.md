@@ -1,8 +1,8 @@
 # Bourbon Buddy — Product Feature Specification
 
-**Version:** 1.1
-**Last Updated:** 2026-06-24
-**Scope:** MVP — Single User
+**Version:** 1.2
+**Last Updated:** 2026-06-29
+**Scope:** MVP — Single User (+ Post-MVP social features scoped in the backlog)
 
 ---
 
@@ -302,14 +302,42 @@ Tapping a chart bar shows the contributing log entries for that data point.
 - Native iOS / Android app (Capacitor builds)
 - Android support
 - Public-facing website
-- Friend connections, social following, activity feed
-- Shared wishlists
-- Group tasting events and sessions
-- Bottle splits and trade board
-- Crowd-sourced sightings across users
 - Gamification (badges, leaderboards, passport)
 - Barcode scanning
 - AI "Find Bottles" from news articles (Claude API integration)
-- Push notifications (FCM wiring deferred)
-- Price alerts
 - Flavor profile recommendation engine
+
+### Planned: Social, Sightings & Notifications (Phases 2 & 4)
+
+Now fully scoped with acceptance criteria — see stories **BB-090–BB-113** in
+[bourbon-buddy-user-stories.md](bourbon-buddy-user-stories.md) and the supporting
+schemas in [bourbon-buddy-data-model.md](bourbon-buddy-data-model.md).
+
+**Headline feature — Sighting Match Alerts (BB-112):** When a connected friend
+logs a sighting of a bottle and chooses to share it, any friend who has that
+exact bottle on their **active Hunt List** is pushed a notification with the
+store, price, and city/state — so they can chase the bottle before it's gone.
+This is the moment the wishlist and the sightings system pay off socially: the
+self-sourced sighting of MVP (see *Bottle Sightings*, above) becomes
+crowd-sourced.
+
+Supporting features it depends on, each its own scoped story:
+
+- **Notification foundation (Phase 2):** FCM setup (BB-090) and per-type
+  notification preferences, default off (BB-091). Also powers wishlist price
+  alerts and the news digest.
+- **Social graph (Phase 4):** opt-in public profile + unique username (BB-100),
+  find & add friends (BB-101), accept/decline requests (BB-102), and manage /
+  remove / block (BB-103).
+- **Shareable sightings (Phase 4):** per-sighting "share with friends" privacy
+  toggle writing to a queryable shared collection (BB-110), a friends' sightings
+  feed with Hunt-List matches highlighted (BB-111), and an in-app notification
+  inbox so alerts are recoverable (BB-113).
+
+**Privacy posture:** sightings are private by default and only shared on an
+explicit opt-in; shared sightings are visible only to accepted, non-blocked
+friends; location is limited to store + city/state (no precise geolocation).
+
+**Further social backlog (not yet story-scoped):** shared wishlists, activity
+feed of friends' recent tries, group tasting events, bottle splits and trade
+board.

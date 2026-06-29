@@ -1,8 +1,8 @@
 # Bourbon Buddy — User Stories
 
-**Version:** 1.1
-**Last Updated:** 2026-06-24
-**Scope:** MVP — Single User (Daniel)
+**Version:** 1.2
+**Last Updated:** 2026-06-29
+**Scope:** MVP — Single User (Daniel) + Post-MVP Social stories (Phases 2 & 4)
 
 ---
 
@@ -535,3 +535,181 @@ Each story includes:
 | BB-080 | Export Data as CSV | Data | 3 |
 
 **Total Story Points: 152**
+
+---
+
+# Post-MVP User Stories — Social, Sightings & Notifications
+
+> **Scope:** Beyond the single-user MVP. These stories deliver the headline
+> social feature — **Sighting Match Alerts** (be notified when a friend spots a
+> bottle on your Hunt List) — and every supporting capability it depends on.
+> They map to **Phase 2 (Notifications foundation)** and **Phase 4 (Social /
+> Multi-User)** in the iteration plan. The dependency chain is:
+> BB-112 (the alert) → BB-110 (shared sightings) + BB-101/102 (friends) +
+> BB-090 (push). Build the foundation first.
+
+## Epic 9: Notifications & Alerts Foundation *(Phase 2)*
+
+### BB-090 — Push Notification Setup (FCM)
+**As a** user, **I want** the app to send me push notifications, **so that** I'm alerted to time-sensitive events even when the app is closed.
+
+**AC:**
+- Notification permission is requested contextually (when the user first enables a notification-backed feature), never on cold first launch
+- On grant, an FCM registration token is obtained and stored at `/users/{uid}/fcmTokens/{tokenId}` with device metadata and `updatedAt`
+- Tokens refresh on rotation and are deleted on sign-out or permission revocation
+- A reusable Cloud Function helper delivers to all of a user's valid tokens and prunes any that return `messaging/registration-token-not-registered`
+- Works as a PWA (web push via the service worker) and is forward-compatible with a future Capacitor native build
+- If permission is denied, the app degrades gracefully and relies on the in-app inbox (BB-113) only
+
+**SP:** 8
+
+---
+
+### BB-091 — Notification Preferences
+**As a** user, **I want to** control which notifications I receive, **so that** I only get the alerts I care about.
+
+**AC:**
+- Settings exposes a per-type toggle for each notification category (Sighting match alerts, Wishlist price alerts, Friend requests, News digest)
+- Preferences are stored at `/users/{uid}/notificationPrefs`; every type defaults **off** until explicitly enabled
+- A master "Pause all notifications" switch overrides the individual toggles
+- Every sending Cloud Function checks the recipient's preference before delivering; a disabled type is never sent
+- Preference changes take effect on the next event with no redeploy
+
+**SP:** 3
+
+---
+
+## Epic 10: Social Graph *(Phase 4)*
+
+### BB-100 — Public Profile & Username
+**As a** user, **I want** an opt-in public handle and profile, **so that** friends can find and recognize me.
+
+**AC:**
+- User can claim a unique, case-insensitive username (3–20 chars, alphanumeric + underscore); uniqueness enforced by a `/usernames/{usernameLower}` reservation document written transactionally
+- Profile has a "Discoverable by username" toggle (default off); when off the user cannot be found in search
+- A public profile exposes only displayName, username, avatar, home region, and aggregate counts — never log/wishlist contents
+- Username changes release the previous reservation atomically
+- Security rules block claiming a taken username and reading other users' private fields
+
+**SP:** 5
+
+---
+
+### BB-101 — Find & Add Friends
+**As a** user, **I want to** search for people and send friend requests, **so that** I can build my network.
+
+**AC:**
+- Search by exact username returns matching discoverable profiles (self and blocked users excluded)
+- "Add friend" creates `/friendRequests/{requestId}` with `fromUid`, `toUid`, and `pending` status
+- Sending to an existing friend or with a request already pending is prevented; you cannot friend yourself
+- Sender sees the pending state and can cancel an outgoing request
+- Outgoing pending requests are rate-limited to deter spam
+
+**SP:** 5
+
+---
+
+### BB-102 — Respond to Friend Requests
+**As a** user, **I want to** accept or decline incoming requests, **so that** I control who is in my network.
+
+**AC:**
+- Incoming requests list shows the sender's public profile with Accept / Decline actions
+- Accept transactionally creates a reciprocal edge for both users (`/users/{uid}/friends/{friendUid}` on each side) and marks the request `accepted` — both edges or neither
+- Decline marks the request `declined` and clears it from the list; the sender is not separately notified of a decline
+- The recipient receives a push + inbox notification when a request arrives (respects BB-091)
+- Accepting an already-accepted request is idempotent
+
+**SP:** 5
+
+---
+
+### BB-103 — Manage Friends (List, Remove, Block)
+**As a** user, **I want to** view, remove, and block people, **so that** I manage my connections and safety.
+
+**AC:**
+- Friends list shows all connections with profile and tap-through to the public profile
+- Remove friend deletes both friendship edges and revokes each side's access to the other's shared content
+- Block (stored at `/users/{uid}/blocks/{blockedUid}`) prevents the blocked user from searching, friending, or seeing the blocker's shared sightings
+- Friend/aggregate counts remain consistent after removal or block
+- A blocked user can be unblocked
+
+**SP:** 3
+
+---
+
+## Epic 11: Social Sightings & Alerts *(Phase 4)*
+
+### BB-110 — Share Sightings with Friends
+**As a** user, **I want to** optionally share a bottle sighting with my friends, **so that** they learn about relevant finds while my private sightings stay private.
+
+**AC:**
+- When logging or editing a sighting, a "Share with friends" toggle (defaulting to a user-level preference) controls visibility
+- A shared sighting is written to a queryable top-level `/sightings/{sightingId}` carrying `ownerUid`, `bourbonId`, `bourbonName`, `storeName`, `price`, `city`, `state`, `sightingDate`, `visibility`, `createdAt`
+- Private sightings remain only under `/users/{uid}/wishlistEntries/{entryId}/sightings` and are never copied to the shared collection
+- Turning a shared sighting private, or deleting it, removes the top-level document
+- Security rules make a `/sightings` doc readable only by the owner's accepted, non-blocked friends and writable only by the owner
+- Location is limited to store + city/state (no precise geolocation) for privacy
+
+**SP:** 8
+
+---
+
+### BB-111 — Friends' Sightings Feed
+**As a** user, **I want to** see recent sightings shared by my friends, **so that** I can act on local finds.
+
+**AC:**
+- A feed lists friends' shared sightings newest-first: bottle, store, price, city/state, who shared it, and relative time
+- Sightings matching a bottle on my **active** Hunt List are highlighted ("On your hunt list")
+- Stale sightings (beyond the staleness window) are de-emphasized, with a toggle to hide them
+- Tapping a sighting opens its detail; a match offers a shortcut to the corresponding Hunt List entry
+- Reads are paginated/limited to control Firestore cost
+
+**SP:** 5
+
+---
+
+### BB-112 — Sighting Match Alerts ★ *(headline feature)*
+**As a** user, **I want to** be notified when a friend spots a bottle on my Hunt List, **so that** I can chase it down before it's gone.
+
+**AC:**
+- When a shared sighting is created (BB-110), a Cloud Function finds the owner's friends who have the same `bourbonId` on their **active** Hunt List
+- Each matched friend who has the alert enabled (BB-091) and has not blocked / been blocked by the owner receives a push notification with: bottle name, store, price, city/state, and who spotted it
+- Tapping the notification deep-links to the sighting and the matching Hunt List entry
+- An inbox record (BB-113) is created alongside every push so a missed notification is recoverable
+- De-duplication: a given (sighting → recipient) alert is delivered at most once; later price edits do not re-spam beyond a meaningful price-drop threshold
+- No alert is sent to the owner, to non-friends, for private sightings, or for sightings back-dated beyond the staleness window
+
+**SP:** 8
+
+---
+
+### BB-113 — Notification Inbox
+**As a** user, **I want** an in-app list of my alerts, **so that** I don't lose notifications I missed.
+
+**AC:**
+- An inbox lists notifications (sighting matches, friend requests, price alerts) newest-first with read/unread state
+- Records are stored at `/users/{uid}/notifications/{notificationId}` and created alongside each push
+- Tapping an item deep-links to the relevant screen and marks it read
+- An unread count badges the inbox entry point
+- Notifications auto-expire (e.g., after 30 days) via a scheduled cleanup function
+
+**SP:** 5
+
+---
+
+## Post-MVP Story Summary (Phases 2 & 4)
+
+| Story ID | Title | Epic | Phase | SP |
+|---|---|---|---|---|
+| BB-090 | Push Notification Setup (FCM) | Notifications | 2 | 8 |
+| BB-091 | Notification Preferences | Notifications | 2 | 3 |
+| BB-100 | Public Profile & Username | Social Graph | 4 | 5 |
+| BB-101 | Find & Add Friends | Social Graph | 4 | 5 |
+| BB-102 | Respond to Friend Requests | Social Graph | 4 | 5 |
+| BB-103 | Manage Friends (List, Remove, Block) | Social Graph | 4 | 3 |
+| BB-110 | Share Sightings with Friends | Social Sightings | 4 | 8 |
+| BB-111 | Friends' Sightings Feed | Social Sightings | 4 | 5 |
+| BB-112 | Sighting Match Alerts | Social Sightings | 4 | 8 |
+| BB-113 | Notification Inbox | Social Sightings | 4 | 5 |
+
+**Post-MVP Total: 55 SP** (Phase 2: 11 · Phase 4: 44)
