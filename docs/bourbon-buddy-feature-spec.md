@@ -341,3 +341,74 @@ friends; location is limited to store + city/state (no precise geolocation).
 **Further social backlog (not yet story-scoped):** shared wishlists, activity
 feed of friends' recent tries, group tasting events, bottle splits and trade
 board.
+
+---
+
+## Going Public: Cost, Monetization & Compliance
+
+The MVP and the small-circle phase run comfortably on Firebase's free tier.
+Opening the app to the public changes both the economics and the legal posture.
+This section records the plan so it isn't re-derived. Stories: **BB-120–BB-160**
+in [bourbon-buddy-user-stories.md](bourbon-buddy-user-stories.md).
+
+### Cost reality (the honest version)
+
+With the app's one-listener / cached-signal discipline, infrastructure stays
+cheap well into the thousands of users. Rough model at **~5,000 monthly active
+users**: Firestore reads ~$80/mo, writes ~$9/mo, functions + push (push is free)
+~$10/mo, AI ~$20–30/mo *total* (see below), for **~$150–400/mo** with good image
+hygiene. The larger risk of going public is **distribution, not cost** — the
+subscription-app market is saturated (≈14,700 new apps/month in 2026, revenue
+concentrated in the top decile).
+
+**Watch-items (where cost actually comes from):**
+- **Image storage + egress bandwidth** (label photos) — resize on upload and put
+  a CDN in front, or this becomes the biggest line item.
+- **Abuse** — bots/scrapers hitting Firestore and AI (mitigated by App Check,
+  BB-121, and quotas, BB-122).
+- **No default spend cap on Blaze** — a bug or attack can run an unbounded bill.
+  The billing kill-switch (BB-120) is mandatory before public exposure and cheap
+  enough to build early.
+
+### AI cost: an architecture decision, not a pricing problem
+
+The "Find Bottles" feature (BB-130) extracts bottle names from **shared** news
+articles. Run extraction **once per article, server-side, at ingest** and cache
+the result on the article doc — every user reads it for zero marginal cost. AI
+spend is therefore **O(articles) (~$1/day total), not O(users × articles)**, which
+neutralizes the "friends/users make AI expensive" concern. Any *future per-user*
+AI is bounded by per-user credits, a cheap model, prompt caching, the Batch API,
+and an optional bring-your-own-key path (BB-131).
+
+### Monetization
+
+**Model: freemium / hybrid (the 2026 default).** Core tracking — log, wishlist,
+sightings — is **free forever**. A **Pro tier (~$3–5/mo or ~$25/yr)** unlocks the
+cost-heavy/power features: unlimited AI finds (free tier ~10/mo), price & sighting
+alerts, advanced stats, full history. Infrastructure via **RevenueCat** (free
+under $2.5k MTR, then 1%). Unit economics work at modest conversion: ~5,000 MAU ×
+~2% × ~$4, net of the Apple/Google 15–30% cut, lands near break-even and improves
+with scale. Stories BB-140 (infra) and BB-141 (gating/paywall).
+
+**Considered and rejected / parked:** ads (low revenue, hurts a premium feel,
+alcohol restrictions); donations (fine for goodwill, unreliable at scale);
+aggregated/anonymized sightings data as a B2B play (real value, privacy-fraught —
+parked).
+
+### Compliance (alcohol app + public users)
+
+Going public means operating a business: an **LLC** to shield personal liability,
+authored **ToS + Privacy Policy**, **age-gating** (of-age by region; BB-150),
+**account deletion + data export** for store and GDPR/CCPA requirements (BB-151),
+and **app-store alcohol-category** compliance. Selling/shipping spirits is heavily
+regulated — the **trade board and bottle splits stay out of scope** unless a
+dedicated legal review says otherwise.
+
+### Sequencing
+
+The small-circle phase needs none of the above. Build the social experience now;
+fold in the billing kill-switch (BB-120) and App Check (BB-121) as cheap
+insurance; and treat monetization + compliance as the explicit **gate to public
+launch** (Iteration 11), after the circle validates the product. See the Post-MVP
+Iteration Roadmap in
+[bourbon-buddy-iteration-plan.md](bourbon-buddy-iteration-plan.md).
