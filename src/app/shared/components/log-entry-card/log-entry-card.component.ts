@@ -29,4 +29,7 @@ export class LogEntryCardComponent {
     () => ENTRY_TYPE_LABELS[this.entry().entryType] ?? ''
   );
   readonly entryDate = computed(() => this.entry().entryDate?.toDate() ?? null);
+  readonly lastPouredAt = computed(
+    () => this.entry().lastPouredAt?.toDate() ?? null
+  );
 }

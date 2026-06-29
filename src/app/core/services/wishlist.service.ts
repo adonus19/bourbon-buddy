@@ -13,7 +13,7 @@ import {
   updateDoc,
 } from '@angular/fire/firestore';
 import { Observable, of } from 'rxjs';
-import { switchMap, tap } from 'rxjs/operators';
+import { catchError, switchMap, tap } from 'rxjs/operators';
 
 import { WishlistEntry, WishlistStatus } from '../../models';
 import { AuthService } from '../auth/auth.service';
@@ -46,7 +46,13 @@ export class WishlistService {
           ? (collectionData(
               query(this.col(user.uid), orderBy('bourbonName')),
               { idField: 'id' }
-            ) as Observable<WishlistEntry[]>).pipe(tap(() => this.loaded.set(true)))
+            ) as Observable<WishlistEntry[]>).pipe(
+              tap(() => this.loaded.set(true)),
+              catchError(() => {
+                this.loaded.set(true);
+                return of<WishlistEntry[]>([]);
+              })
+            )
           : of<WishlistEntry[]>([]).pipe(tap(() => this.loaded.set(true)))
       )
     ),

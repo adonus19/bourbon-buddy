@@ -13,7 +13,7 @@ import {
   updateDoc,
 } from '@angular/fire/firestore';
 import { Observable, of } from 'rxjs';
-import { switchMap, tap } from 'rxjs/operators';
+import { catchError, switchMap, tap } from 'rxjs/operators';
 
 import { LogEntry } from '../../models';
 import { AuthService } from '../auth/auth.service';
@@ -22,7 +22,7 @@ import { computeValueScore } from '../../shared/utils/value-score';
 /** Caller-supplied fields for a new entry; the service fills the rest. */
 export type LogEntryInput = Omit<
   LogEntry,
-  'id' | 'valueScore' | 'createdAt' | 'updatedAt'
+  'id' | 'valueScore' | 'lastPouredAt' | 'createdAt' | 'updatedAt'
 >;
 
 /**
@@ -51,7 +51,13 @@ export class LogEntryService {
           ? (collectionData(
               query(this.entriesCol(user.uid), orderBy('entryDate', 'desc')),
               { idField: 'id' }
-            ) as Observable<LogEntry[]>).pipe(tap(() => this.loaded.set(true)))
+            ) as Observable<LogEntry[]>).pipe(
+              tap(() => this.loaded.set(true)),
+              catchError(() => {
+                this.loaded.set(true);
+                return of<LogEntry[]>([]);
+              })
+            )
           : of<LogEntry[]>([]).pipe(tap(() => this.loaded.set(true)))
       )
     ),
