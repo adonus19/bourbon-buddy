@@ -1,0 +1,67 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/settings" text=""></ion-back-button>
+    </ion-buttons>
+    <ion-title>Notifications</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <div class="nsettings">
+    <p class="nsettings__lead">
+      Get a heads-up on this device when something worth knowing happens — like a
+      friend spotting a bottle on your Hunt List (coming soon).
+    </p>
+
+    @switch (state()) {
+      @case ('granted') {
+        <div class="nsettings__status nsettings__status--on">
+          <ion-icon name="notifications" aria-hidden="true"></ion-icon>
+          <span>Enabled on this device.</span>
+        </div>
+        <ion-button
+          expand="block"
+          fill="outline"
+          color="medium"
+          [disabled]="busy"
+          (click)="disable()"
+        >
+          Turn off on this device
+        </ion-button>
+      }
+      @case ('denied') {
+        <div class="nsettings__status nsettings__status--off">
+          <ion-icon name="notifications-off-outline" aria-hidden="true"></ion-icon>
+          <span>Blocked. Allow notifications for this site in your browser settings, then reload.</span>
+        </div>
+      }
+      @case ('unsupported') {
+        <div class="nsettings__status nsettings__status--off">
+          <ion-icon name="alert-circle-outline" aria-hidden="true"></ion-icon>
+          <span>This browser doesn’t support push notifications. On iPhone, add Bourbon Buddy to your Home Screen first.</span>
+        </div>
+      }
+      @case ('unconfigured') {
+        <div class="nsettings__status nsettings__status--off">
+          <ion-icon name="construct-outline" aria-hidden="true"></ion-icon>
+          <span>Push isn’t configured yet. Check back soon.</span>
+        </div>
+      }
+      @default {
+        <ion-button
+          class="nsettings__enable"
+          expand="block"
+          [disabled]="busy"
+          (click)="enable()"
+        >
+          @if (busy) {
+            <ion-spinner name="crescent"></ion-spinner>
+          } @else {
+            <span>Enable notifications</span>
+          }
+        </ion-button>
+      }
+    }
+  </div>
+</ion-content>

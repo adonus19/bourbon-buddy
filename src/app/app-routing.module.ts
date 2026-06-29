@@ -96,6 +96,14 @@ const routes: Routes = [
       ),
   },
   {
+    path: 'notification-settings',
+    canActivate: [authGuard],
+    loadChildren: () =>
+      import(
+        './features/notification-settings/notification-settings.module'
+      ).then((m) => m.NotificationSettingsPageModule),
+  },
+  {
     path: 'tabs',
     canActivate: [authGuard],
     loadChildren: () =>

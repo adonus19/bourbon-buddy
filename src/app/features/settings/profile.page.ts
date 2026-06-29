@@ -11,6 +11,7 @@ import { Auth, updateProfile } from '@angular/fire/auth';
 import { AuthService } from '../../core/auth/auth.service';
 import { UserService } from '../../core/services/user.service';
 import { ExportKind, ExportService } from '../../core/services/export.service';
+import { NotificationService } from '../../core/services/notification.service';
 
 @Component({
   selector: 'app-profile',
@@ -28,6 +29,7 @@ export class ProfilePage {
   private readonly alertCtrl = inject(AlertController);
   private readonly actionSheet = inject(ActionSheetController);
   private readonly exportService = inject(ExportService);
+  private readonly notifications = inject(NotificationService);
 
   // Already-loaded signals from the session state holder — no new Firebase reads.
   readonly user = this.auth.currentUser;
@@ -167,6 +169,8 @@ export class ProfilePage {
   }
 
   private async signOut(): Promise<void> {
+    // Drop this device's push token before the session ends.
+    await this.notifications.cleanupForSignOut();
     await this.auth.signOut();
     await this.presentToast('See you next pour.');
     await this.router.navigateByUrl('/login', { replaceUrl: true });
