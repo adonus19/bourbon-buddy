@@ -428,6 +428,74 @@ status ASC), `sightings` (bourbonId ASC, createdAt DESC),
 
 ---
 
+# Post-MVP Collections — Going Public (Cost, AI, Monetization & Compliance)
+
+> Schema for the public-launch epics (BB-120–BB-160). Mostly **additive fields**
+> on existing collections plus a small amount of new state. Subscription truth
+> lives in RevenueCat; Firestore only caches the entitlement.
+
+### Additive fields on `/users/{userId}` *(Iterations 8 & 11)*
+
+```
+users/{userId}
+  // ...existing fields...
+  // Compliance (BB-150)
+  ageVerified:        boolean
+  ageVerifiedAt:      Timestamp | null
+  tosAcceptedVersion: string | null
+  tosAcceptedAt:      Timestamp | null
+  // Monetization (BB-140) — cached from RevenueCat; RevenueCat is source of truth
+  proEntitlement:     boolean
+  proExpiresAt:       Timestamp | null
+  // AI guardrails (BB-131)
+  aiCreditsUsed:      number          // resets monthly
+  aiCreditsResetAt:   Timestamp
+  byoAiKeyRef:        string | null   // reference/secret-manager handle, NEVER the raw key
+```
+
+### Additive fields on `/newsArticles/{articleId}` *(BB-130)*
+
+Bottle candidates are extracted **once per article** at ingest (cached, shared)
+so no per-user AI calls occur.
+
+```
+newsArticles/{articleId}
+  // ...existing fields...
+  bottleCandidates:  array<{ name: string, distillery: string | null, confidence: number }>
+  aiExtractedAt:     Timestamp | null
+```
+
+### Additive fields on `/bourbons/{bourbonId}` *(BB-160)*
+
+```
+bourbons/{bourbonId}
+  // ...existing fields...
+  nameLowercase:  string            // already indexed; normalized match key
+  aliases:        array<string>     // alternate spellings folded into this entry
+  canonicalId:    string | null     // set on a duplicate that was merged into another
+```
+
+**Merge rule:** when two catalog docs are found to be the same bottle, keep one
+as canonical, set `canonicalId` on the loser, fold its name into `aliases`, and
+repoint references. Sighting Match (BB-112) and stats group on the canonical id.
+
+### Account deletion *(BB-151)*
+
+No new collection — a Cloud Function fan-out deletes the Auth user and every
+owned document across `/users/{uid}/**`, the user's `/sightings` (where
+`ownerUid == uid`), `/friendRequests` involving the user, reciprocal
+`/users/{friendUid}/friends/{uid}` edges, `/usernames/{username}` reservation,
+and `/fcmTokens`. Logged for compliance evidence.
+
+### Cost controls *(BB-120/121/122)*
+
+Infrastructure, not schema: GCP billing budget + a Pub/Sub-triggered
+billing-disable function (BB-120), App Check enforcement on Firestore / Functions
+/ Storage (BB-121), and `limit()`-bounded reads + server-side per-user/day action
+counters for abuse guards (BB-122).
+
+---
+
 ## Firestore Indexes Required
 
 Composite indexes must be defined in `firestore.indexes.json`. Key indexes:

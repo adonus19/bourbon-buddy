@@ -713,3 +713,178 @@ Each story includes:
 | BB-113 | Notification Inbox | Social Sightings | 4 | 5 |
 
 **Post-MVP Total: 55 SP** (Phase 2: 11 · Phase 4: 44)
+
+---
+
+# Post-MVP User Stories — Going Public (Cost, AI, Monetization & Compliance)
+
+> **Why these exist:** the social features above are built for a small circle on
+> Firebase's free tier. Opening the app to the public changes the economics and
+> the legal posture. These epics make a public launch *sustainable and safe*.
+> See "Going Public: Cost, Monetization & Compliance" in
+> [bourbon-buddy-feature-spec.md](bourbon-buddy-feature-spec.md) for the full
+> reasoning and unit-economics model. Sequencing lives in the **Post-MVP
+> Iteration Roadmap** in [bourbon-buddy-iteration-plan.md](bourbon-buddy-iteration-plan.md).
+
+## Epic 12: Cost Controls & Abuse Prevention
+
+### BB-120 — Billing Budget Alerts & Kill-Switch
+**As the** owner, **I want** a hard ceiling on spend, **so that** a bug or abuse can't run up an unbounded Firebase bill.
+
+**AC:**
+- A GCP billing budget is configured with alert thresholds (e.g., 50 / 90 / 100%) emailing the owner
+- A Pub/Sub-triggered Cloud Function disables project billing at a defined cap (Google's documented "cap usage" pattern), with a written runbook to re-enable
+- The documented monthly budget and the degradation behavior when hit are recorded (app should fail to read-only/offline, not silently break)
+- Verified against a test billing trigger
+- **Built early** (cheap insurance) even though it's a public-launch concern
+
+**SP:** 3
+
+---
+
+### BB-121 — App Check Enforcement
+**As the** owner, **I want** only my genuine app to reach my backend, **so that** bots and scrapers can't drive up cost or harvest data.
+
+**AC:**
+- App Check enabled with reCAPTCHA (web/PWA) and DeviceCheck / App Attest (when native)
+- Enforcement turned on for Firestore, Cloud Functions, and Storage
+- Legitimate app traffic is unaffected; unattested requests are rejected
+- A debug provider is configured for local dev and CI
+
+**SP:** 5
+
+---
+
+### BB-122 — Read/Write Quotas & Abuse Guards
+**As the** owner, **I want** per-user bounds on expensive actions, **so that** one account can't hammer the database or AI.
+
+**AC:**
+- Security rules cap unbounded list reads (require `limit()` where feasible)
+- Per-user/day soft limits on expensive actions (AI calls, sighting creation) are tracked and enforced server-side
+- Abusive patterns are logged and alertable
+- Limits are configurable without a redeploy where practical
+
+**SP:** 3
+
+---
+
+## Epic 13: AI Features
+
+### BB-130 — AI "Find Bottles" from Articles
+**As a** user, **I want** bottles mentioned in a news article surfaced as one-tap wishlist adds, **so that** I can act on releases I read about.
+
+**AC:**
+- Extraction runs server-side **once per article** inside `fetchRssFeeds` (shared + cached), using a low-cost model (Claude Haiku); results are stored on the `/newsArticles` doc as `bottleCandidates` (name, optional distillery, confidence)
+- **No per-user AI calls** — every user reads the cached candidates, so cost is O(articles), not O(users × articles)
+- On an article, detected bottles render as chips with one-tap "Add to Hunt List" that pre-fills the wishlist form via catalog autocomplete / canonical match (BB-160)
+- Extraction failures are non-fatal (the article still ingests); token-limited, Batch API used where latency allows
+- Low-confidence candidates are de-emphasized or hidden; candidates dedupe against the catalog
+
+**SP:** 8
+
+---
+
+### BB-131 — AI Usage Guardrails & Bring-Your-Own-Key
+**As the** owner, **I want** any *per-user* AI bounded, **so that** users (including friends) can't run up my AI bill.
+
+**AC:**
+- Per-user monthly AI credit (free tier N, Pro tier higher) tracked server-side; over-limit prompts an upgrade or BYO key
+- Cheapest viable model used, with prompt caching and Batch API where applicable
+- Optional "bring your own Claude API key," stored server-side (never plaintext on the client), grants unlimited personal use
+- AI spend is logged per feature for the owner
+- *Only required once a per-user AI feature exists — BB-130 does not need it*
+
+**SP:** 5
+
+---
+
+## Epic 14: Monetization
+
+### BB-140 — Subscription Infrastructure
+**As the** owner, **I want to** sell a Pro subscription, **so that** revenue covers infrastructure at public scale.
+
+**AC:**
+- RevenueCat integrated (web now, native-ready); monthly + annual products and a `pro` entitlement defined
+- The Pro entitlement is exposed as a signal the app reads to gate features
+- Purchases, restores, and cancellations are handled; entitlement state syncs to the user
+- Sandbox/test purchases verified end-to-end
+- Store fees (Apple/Google 15–30%) and RevenueCat's 1% (over $2.5k MTR) are documented in the revenue model
+
+**SP:** 8
+
+---
+
+### BB-141 — Pro Gating & Paywall
+**As a** user, **I want** a clear sense of free vs Pro value, **so that** I understand what I'm paying for.
+
+**AC:**
+- A free-vs-Pro matrix is enforced (e.g., free: 10 AI finds/mo, basic stats, limited sighting history; Pro: unlimited AI, price & sighting alerts, advanced stats, full history)
+- A paywall screen presents the value prop and a trial (17–32 days, per conversion benchmarks)
+- Gated features show an upgrade prompt, never a dead end
+- **Core tracking (log, wishlist, sightings) stays free forever**
+
+**SP:** 5
+
+---
+
+## Epic 15: Compliance & Public Launch
+
+### BB-150 — Age Gate & Legal Acceptance
+**As the** owner, **I want** age verification and ToS / Privacy acceptance, **so that** the app meets alcohol-app and app-store requirements.
+
+**AC:**
+- An age gate (of-age by region, 21+ in the US) appears on first run; the result is recorded on the user doc
+- Terms of Service and Privacy Policy are presented; acceptance is recorded with version + timestamp
+- App-store alcohol category metadata and content rating are set
+- Re-acceptance is prompted when the ToS/Privacy version changes
+
+**SP:** 3
+
+---
+
+### BB-151 — Account Deletion & Data Rights
+**As a** user, **I want to** delete my account and export my data, **so that** I control my information (and the app meets store and privacy-law requirements).
+
+**AC:**
+- In-app "Delete my account" removes the Auth user and all owned Firestore + Storage data via a Cloud Function fan-out
+- Deletion cascades social edges (friends, friend requests, shared sightings) and revokes FCM tokens
+- Data export is available on request (reuses the CSV export)
+- A confirmation flow prevents accidental deletion
+- Completion is logged for compliance evidence
+
+**SP:** 5
+
+---
+
+## Epic 16: Data Quality
+
+### BB-160 — Bourbon Catalog Canonicalization
+**As the** owner, **I want** one canonical catalog entry per real bottle, **so that** social matching and statistics are accurate.
+
+**AC:**
+- Catalog writes normalize the name (trim/case/punctuation) and store `nameLowercase` + optional `aliases`
+- New-entry creation matches against existing canonical names/aliases to avoid duplicates
+- An admin/maintenance path merges duplicate catalog docs and repoints references
+- Sighting Match (BB-112) and stats group on the canonical `bourbonId`
+- Improves stats grouping immediately, independent of social
+
+**SP:** 5
+
+---
+
+## Post-MVP Story Summary — Going Public
+
+| Story ID | Title | Epic | SP |
+|---|---|---|---|
+| BB-120 | Billing Budget Alerts & Kill-Switch | Cost Controls | 3 |
+| BB-121 | App Check Enforcement | Cost Controls | 5 |
+| BB-122 | Read/Write Quotas & Abuse Guards | Cost Controls | 3 |
+| BB-130 | AI "Find Bottles" from Articles | AI Features | 8 |
+| BB-131 | AI Usage Guardrails & BYO Key | AI Features | 5 |
+| BB-140 | Subscription Infrastructure | Monetization | 8 |
+| BB-141 | Pro Gating & Paywall | Monetization | 5 |
+| BB-150 | Age Gate & Legal Acceptance | Compliance | 3 |
+| BB-151 | Account Deletion & Data Rights | Compliance | 5 |
+| BB-160 | Bourbon Catalog Canonicalization | Data Quality | 5 |
+
+**Going-Public Total: 50 SP** · **Grand Post-MVP Total: 105 SP**

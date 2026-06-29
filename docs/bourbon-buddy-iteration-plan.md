@@ -306,6 +306,53 @@ The order reflects both technical dependencies (auth before features, log before
 
 ---
 
+## Post-MVP Iteration Roadmap (Iterations 7+)
+
+> Sequenced in dependency order. **Decision (2026-06-29):** build the social
+> experience for a **small circle** now (free tier), and treat the public launch
+> as a later, explicit gate. The cost/monetization/compliance reasoning lives in
+> "Going Public" in [bourbon-buddy-feature-spec.md](bourbon-buddy-feature-spec.md);
+> full ACs for every story below are in
+> [bourbon-buddy-user-stories.md](bourbon-buddy-user-stories.md).
+
+### Iteration 7 — Foundations & No-Regrets Wins
+**Stories:** BB-090, BB-091, BB-120, plus Firestore offline persistence, personal wishlist price alerts
+**Goal:** Infrastructure that serves both the circle and a future public launch.
+- **Offline persistence** — enable Firestore offline; genuinely valuable since the app is used in liquor stores with poor signal
+- **Notifications foundation** — BB-090 (FCM setup) + BB-091 (preferences); unlocks alerts now and social alerts later
+- **BB-120 Billing kill-switch + budget alerts** — cheap insurance, built before any public exposure
+- **Personal price alerts** on your own wishlist (uses BB-090)
+
+### Iteration 8 — AI Find Bottles & Catalog Quality
+**Stories:** BB-130, BB-160
+**Goal:** High-delight AI at near-zero cost, plus the data hygiene social matching depends on.
+- **BB-130 AI "Find Bottles"** — extraction cached **once per shared article**, so cost is independent of user count
+- **BB-160 Catalog canonicalization** — one entry per real bottle; improves stats now and is a prerequisite for accurate sighting matching
+
+### Iteration 9 — Social Graph
+**Stories:** BB-100, BB-101, BB-102, BB-103
+**Goal:** Friends. The prerequisite network for everything social.
+
+### Iteration 10 — Social Sightings & Alerts (the circle payoff)
+**Stories:** BB-110, BB-111, BB-112, BB-113
+**Goal:** The headline — get notified when a friend spots a bottle on your Hunt List.
+- **Push caveat:** iOS PWA web-push is workable but flaky. For the *circle* it's good enough to validate; reliable push is a reason native iOS (Iteration 12) precedes a true public launch.
+
+### Iteration 11 — Public-Launch Readiness (the gate)
+**Stories:** BB-121, BB-122, BB-131, BB-140, BB-141, BB-150, BB-151
+**Goal:** Everything required before opening the doors — do **not** start until the circle validates the product.
+- Abuse/cost: BB-121 App Check, BB-122 quotas, BB-131 AI guardrails/BYO key
+- Revenue: BB-140 subscription infra, BB-141 Pro gating & paywall
+- Legal: BB-150 age gate + ToS/Privacy, BB-151 account deletion & data rights
+- Business setup (non-code): LLC, ToS/Privacy authored, tax, app-store alcohol compliance
+
+### Iteration 12+ — Native iOS (Phase 3)
+Capacitor iOS build, reliable native push, barcode scanning, TestFlight, App
+Store submission. Best paired with / just ahead of the public launch so push and
+camera are first-class. Android follows after iOS is proven.
+
+---
+
 ## Backlog (Post-MVP / Future Phases)
 
 ### Phase 2 — Personal Features Completion
