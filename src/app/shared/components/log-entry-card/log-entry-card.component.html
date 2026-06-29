@@ -29,6 +29,12 @@
         <span class="card__dot">·</span>
         <span>{{ entryDate() | date: 'MMM d' }}</span>
       }
+      @if (lastPouredAt(); as poured) {
+        <span class="card__dot">·</span>
+        <span class="card__last-pour">
+          Last pour {{ poured | date: 'MMM d' }}
+        </span>
+      }
     </div>
   </div>
 </div>

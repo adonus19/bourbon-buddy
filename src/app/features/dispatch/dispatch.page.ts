@@ -30,6 +30,7 @@ export class DispatchPage implements ViewWillEnter {
   private readonly cdr = inject(ChangeDetectorRef);
 
   readonly loading = this.news.loading;
+  readonly error = this.news.error;
   readonly articles = this.news.articles;
   readonly segment = signal<Segment>('feed');
 
@@ -85,6 +86,10 @@ export class DispatchPage implements ViewWillEnter {
     } finally {
       await event.target.complete();
     }
+  }
+
+  async retry(): Promise<void> {
+    await this.news.loadLatest();
   }
 
   async mark(a: NewsArticle, state: ArticleState): Promise<void> {

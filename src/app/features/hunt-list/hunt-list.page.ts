@@ -50,6 +50,7 @@ export class HuntListPage implements ViewWillEnter {
   private readonly cdr = inject(ChangeDetectorRef);
 
   readonly entries = this.wishlist.entries;
+  readonly loaded = this.wishlist.loaded;
   readonly archived = signal(false);
   readonly sort = signal<WishlistSort>('priority');
   readonly sortLabel = computed(() => SORT_LABELS[this.sort()]);

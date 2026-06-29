@@ -1,14 +1,18 @@
 import { Injectable, inject } from '@angular/core';
 import {
   Firestore,
+  Timestamp,
   addDoc,
   collection,
   collectionData,
   deleteDoc,
   doc,
+  getDocs,
+  limit,
   orderBy,
   query,
   serverTimestamp,
+  updateDoc,
 } from '@angular/fire/firestore';
 import { Observable, of } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
@@ -49,6 +53,7 @@ export class PourSessionService {
       ...input,
       createdAt: serverTimestamp(),
     });
+    await this.refreshLastPoured(uid, entryId);
   }
 
   async remove(entryId: string, sessionId: string): Promise<void> {
@@ -58,6 +63,25 @@ export class PourSessionService {
         this.firestore,
         `users/${uid}/logEntries/${entryId}/pourSessions/${sessionId}`
       )
+    );
+    await this.refreshLastPoured(uid, entryId);
+  }
+
+  /**
+   * Denormalizes the latest pour date onto the parent entry so the Cellar list
+   * can show "last pour" without opening a listener per card. Recomputed from
+   * the sessions (one read) so it's correct after both adds and deletes.
+   */
+  private async refreshLastPoured(uid: string, entryId: string): Promise<void> {
+    const snap = await getDocs(
+      query(this.col(uid, entryId), orderBy('pourDate', 'desc'), limit(1))
+    );
+    const latest = snap.empty
+      ? null
+      : ((snap.docs[0].data()['pourDate'] as Timestamp | undefined) ?? null);
+    await updateDoc(
+      doc(this.firestore, `users/${uid}/logEntries/${entryId}`),
+      { lastPouredAt: latest, updatedAt: serverTimestamp() }
     );
   }
 

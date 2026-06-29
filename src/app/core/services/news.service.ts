@@ -44,6 +44,7 @@ export class NewsService {
 
   readonly articles = signal<NewsArticle[]>([]);
   readonly loading = signal(false);
+  readonly error = signal(false);
   private loadedOnce = false;
 
   private readonly states = toSignal(
@@ -134,6 +135,7 @@ export class NewsService {
   /** Loads the latest articles (newest first). */
   async loadLatest(): Promise<void> {
     this.loading.set(true);
+    this.error.set(false);
     try {
       const snap = await getDocs(
         query(
@@ -146,6 +148,8 @@ export class NewsService {
         snap.docs.map((d) => ({ id: d.id, ...d.data() }) as NewsArticle)
       );
       this.loadedOnce = true;
+    } catch {
+      this.error.set(true);
     } finally {
       this.loading.set(false);
     }

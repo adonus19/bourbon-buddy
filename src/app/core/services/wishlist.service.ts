@@ -1,4 +1,4 @@
-import { Injectable, Signal, computed, inject } from '@angular/core';
+import { Injectable, Signal, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import {
   Firestore,
@@ -13,7 +13,7 @@ import {
   updateDoc,
 } from '@angular/fire/firestore';
 import { Observable, of } from 'rxjs';
-import { switchMap } from 'rxjs/operators';
+import { catchError, switchMap, tap } from 'rxjs/operators';
 
 import { WishlistEntry, WishlistStatus } from '../../models';
 import { AuthService } from '../auth/auth.service';
@@ -35,15 +35,25 @@ export class WishlistService {
   private readonly firestore = inject(Firestore);
   private readonly auth = inject(AuthService);
 
+  /** False until the first snapshot arrives — drives skeleton vs. empty state. */
+  readonly loaded = signal(false);
+
   readonly entries: Signal<WishlistEntry[]> = toSignal(
     this.auth.currentUser$.pipe(
+      tap(() => this.loaded.set(false)),
       switchMap((user) =>
         user
           ? (collectionData(
               query(this.col(user.uid), orderBy('bourbonName')),
               { idField: 'id' }
-            ) as Observable<WishlistEntry[]>)
-          : of<WishlistEntry[]>([])
+            ) as Observable<WishlistEntry[]>).pipe(
+              tap(() => this.loaded.set(true)),
+              catchError(() => {
+                this.loaded.set(true);
+                return of<WishlistEntry[]>([]);
+              })
+            )
+          : of<WishlistEntry[]>([]).pipe(tap(() => this.loaded.set(true)))
       )
     ),
     { initialValue: [] as WishlistEntry[] }

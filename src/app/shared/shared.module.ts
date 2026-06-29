@@ -15,6 +15,7 @@ import { SightingFormComponent } from './components/sighting-form/sighting-form.
 import { PourFormComponent } from './components/pour-form/pour-form.component';
 import { ChipInputComponent } from './components/chip-input/chip-input.component';
 import { MetricCardComponent } from './components/metric-card/metric-card.component';
+import { ListSkeletonComponent } from './components/list-skeleton/list-skeleton.component';
 import { InputHelpersDirective } from './directives/input-helpers.directive';
 
 /**
@@ -36,6 +37,7 @@ const COMPONENTS = [
   PourFormComponent,
   ChipInputComponent,
   MetricCardComponent,
+  ListSkeletonComponent,
 ];
 
 @NgModule({

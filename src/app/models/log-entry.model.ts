@@ -53,8 +53,9 @@ export interface LogEntry {
   personalNotes?: string | null;
   labelPhotoUrl?: string | null;
 
-  // Computed
+  // Computed / denormalized
   valueScore?: number | null; // (rating/5)*100/purchasePrice; null if missing data
+  lastPouredAt?: Timestamp | null; // latest pour session's date; null if none
 
   // Metadata
   entryDate: Timestamp;

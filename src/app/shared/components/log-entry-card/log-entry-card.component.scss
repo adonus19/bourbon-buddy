@@ -70,4 +70,10 @@
   &__dot {
     color: var(--color-border-bright);
   }
+
+  &__last-pour {
+    color: var(--color-amber-light);
+    font-weight: 500;
+    white-space: nowrap;
+  }
 }
