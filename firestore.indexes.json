@@ -56,6 +56,15 @@
         { "fieldPath": "state", "order": "ASCENDING" },
         { "fieldPath": "updatedAt", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "sightings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "bourbonId", "order": "ASCENDING" },
+        { "fieldPath": "spotterUid", "order": "ASCENDING" },
+        { "fieldPath": "price", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

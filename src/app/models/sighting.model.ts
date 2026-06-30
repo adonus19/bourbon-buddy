@@ -1,10 +1,20 @@
 import { Timestamp } from '@angular/fire/firestore';
 
-// Subcollection: /users/{userId}/wishlistEntries/{entryId}/sightings/{sightingId}
+/** Who may see a sighting. Friends-visibility is wired up in BB-110. */
+export type SightingVisibility = 'private' | 'friends';
+
+// Collection: /sightings/{sightingId}  (BB-161 — first-class, catalog-keyed).
+// Decoupled from any wishlist: a sighting is an observation about a catalog
+// bottle, keyed by bourbonId, that any user can log for any bottle. A wishlist
+// entry's sightings are a query by bourbonId, not a stored subcollection.
+//
 // Staleness is computed on read:
 //   isStale = markedStaleManually || (today - sightingDate > 30 days)
 export interface Sighting {
   id?: string;
+  bourbonId: string; // catalog match key (BB-160 canonicalized)
+  bourbonName?: string | null; // denormalized for display
+  spotterUid: string; // who logged it
   storeName: string;
   price: number;
   sightingDate: Timestamp;
@@ -12,5 +22,6 @@ export interface Sighting {
   state?: string | null;
   notes?: string | null;
   markedStaleManually: boolean;
+  visibility: SightingVisibility;
   createdAt: Timestamp;
 }

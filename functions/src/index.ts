@@ -15,3 +15,6 @@ export { sendTestNotification } from "./notifications";
 
 // Wishlist price alerts (It7): sighting-at-or-below-target trigger.
 export { onSightingCreated } from "./alerts";
+
+// Sighting guards (BB-163): rate-limited create callable + stale cleanup.
+export { logSighting, cleanupStaleSightings } from "./sightings";

@@ -1,7 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import {
   Firestore,
-  addDoc,
   collection,
   collectionData,
   deleteDoc,
@@ -11,39 +10,47 @@ import {
   query,
   serverTimestamp,
   updateDoc,
+  where,
 } from '@angular/fire/firestore';
+import { Functions, httpsCallable } from '@angular/fire/functions';
 import { Observable, of } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 
-import { Sighting } from '../../models';
+import { Sighting, SightingVisibility } from '../../models';
 import { AuthService } from '../auth/auth.service';
 import { bestNonStalePrice } from '../../shared/utils/sighting';
 
 /** Caller-supplied sighting fields; the service fills the rest. */
-export type SightingInput = Omit<
+export type SightingInput = Pick<
   Sighting,
-  'id' | 'markedStaleManually' | 'createdAt'
+  'storeName' | 'price' | 'sightingDate' | 'city' | 'state' | 'notes'
 >;
 
 /**
- * Price sightings live under a wishlist entry:
- *   /users/{uid}/wishlistEntries/{entryId}/sightings/{sightingId}
- *
- * Each mutation recomputes the parent entry's cached bestSightingPrice (lowest
- * non-stale price). Listeners are opened per-viewed-entry by the detail page.
+ * First-class, catalog-keyed sightings (BB-161): top-level `/sightings`,
+ * keyed by `bourbonId`, decoupled from any wishlist. A wishlist entry's
+ * sightings are a query by `bourbonId`. Each mutation recomputes the user's
+ * cached `bestSightingPrice` for any of their wishlist entries on that bottle.
+ * (Friend visibility + cross-user recompute land in BB-110/112.)
  */
 @Injectable({ providedIn: 'root' })
 export class SightingService {
   private readonly firestore = inject(Firestore);
+  private readonly functions = inject(Functions);
   private readonly auth = inject(AuthService);
 
-  /** Realtime sightings for an entry, lowest price first. */
-  sightingsFor(entryId: string): Observable<Sighting[]> {
+  /** The current user's own sightings for a bottle, lowest price first. */
+  sightingsForBottle(bourbonId: string): Observable<Sighting[]> {
     return this.auth.currentUser$.pipe(
       switchMap((user) =>
         user
           ? (collectionData(
-              query(this.col(user.uid, entryId), orderBy('price', 'asc')),
+              query(
+                this.col(),
+                where('bourbonId', '==', bourbonId),
+                where('spotterUid', '==', user.uid),
+                orderBy('price', 'asc')
+              ),
               { idField: 'id' }
             ) as Observable<Sighting[]>)
           : of<Sighting[]>([])
@@ -51,60 +58,92 @@ export class SightingService {
     );
   }
 
-  async add(entryId: string, input: SightingInput): Promise<void> {
+  /**
+   * Creates a sighting via the `logSighting` callable (BB-163) — server-side
+   * validation + per-user daily rate limit; direct client writes to /sightings
+   * are denied by the rules. Then recomputes the user's cached best price.
+   */
+  async add(
+    bourbonId: string,
+    bourbonName: string | null,
+    input: SightingInput,
+    visibility: SightingVisibility = 'private'
+  ): Promise<void> {
     const uid = this.requireUid();
-    await addDoc(this.col(uid, entryId), {
-      ...input,
-      markedStaleManually: false,
-      createdAt: serverTimestamp(),
+    const callable = httpsCallable<unknown, { id: string }>(
+      this.functions,
+      'logSighting'
+    );
+    await callable({
+      bourbonId,
+      bourbonName: bourbonName ?? null,
+      storeName: input.storeName,
+      price: input.price,
+      sightingDateMillis: input.sightingDate.toMillis(),
+      city: input.city ?? null,
+      state: input.state ?? null,
+      notes: input.notes ?? null,
+      visibility,
     });
-    await this.recomputeBestPrice(uid, entryId);
+    await this.recomputeBestPrice(uid, bourbonId);
   }
 
   async setStale(
-    entryId: string,
     sightingId: string,
+    bourbonId: string,
     stale: boolean
   ): Promise<void> {
     const uid = this.requireUid();
-    await updateDoc(this.sightingDoc(uid, entryId, sightingId), {
-      markedStaleManually: stale,
-    });
-    await this.recomputeBestPrice(uid, entryId);
+    await updateDoc(this.sightingDoc(sightingId), { markedStaleManually: stale });
+    await this.recomputeBestPrice(uid, bourbonId);
   }
 
-  async remove(entryId: string, sightingId: string): Promise<void> {
+  async remove(sightingId: string, bourbonId: string): Promise<void> {
     const uid = this.requireUid();
-    await deleteDoc(this.sightingDoc(uid, entryId, sightingId));
-    await this.recomputeBestPrice(uid, entryId);
+    await deleteDoc(this.sightingDoc(sightingId));
+    await this.recomputeBestPrice(uid, bourbonId);
   }
 
-  /** Recomputes and caches the parent entry's bestSightingPrice. */
-  private async recomputeBestPrice(uid: string, entryId: string): Promise<void> {
-    const snap = await getDocs(this.col(uid, entryId));
+  /**
+   * Recomputes `bestSightingPrice` (lowest non-stale price among the user's own
+   * sightings) onto any of the user's wishlist entries for this bottle.
+   */
+  private async recomputeBestPrice(
+    uid: string,
+    bourbonId: string
+  ): Promise<void> {
+    const mine = await getDocs(
+      query(
+        this.col(),
+        where('bourbonId', '==', bourbonId),
+        where('spotterUid', '==', uid)
+      )
+    );
     const best = bestNonStalePrice(
-      snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Sighting)
+      mine.docs.map((d) => ({ id: d.id, ...d.data() }) as Sighting)
     );
-    await updateDoc(this.entryDoc(uid, entryId), {
-      bestSightingPrice: best,
-      updatedAt: serverTimestamp(),
-    });
+
+    const entries = await getDocs(
+      query(
+        collection(this.firestore, `users/${uid}/wishlistEntries`),
+        where('bourbonId', '==', bourbonId)
+      )
+    );
+    await Promise.all(
+      entries.docs.map((d) =>
+        updateDoc(d.ref, {
+          bestSightingPrice: best,
+          updatedAt: serverTimestamp(),
+        })
+      )
+    );
   }
 
-  private col(uid: string, entryId: string) {
-    return collection(
-      this.firestore,
-      `users/${uid}/wishlistEntries/${entryId}/sightings`
-    );
+  private col() {
+    return collection(this.firestore, 'sightings');
   }
-  private sightingDoc(uid: string, entryId: string, sightingId: string) {
-    return doc(
-      this.firestore,
-      `users/${uid}/wishlistEntries/${entryId}/sightings/${sightingId}`
-    );
-  }
-  private entryDoc(uid: string, entryId: string) {
-    return doc(this.firestore, `users/${uid}/wishlistEntries/${entryId}`);
+  private sightingDoc(sightingId: string) {
+    return doc(this.firestore, `sightings/${sightingId}`);
   }
 
   private requireUid(): string {
