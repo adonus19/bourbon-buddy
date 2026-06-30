@@ -1,6 +1,6 @@
 # Bourbon Buddy — User Stories
 
-**Version:** 1.3
+**Version:** 1.4
 **Last Updated:** 2026-06-30
 **Scope:** MVP — Single User (Daniel) + Post-MVP Social stories (Phases 2 & 4)
 
@@ -912,6 +912,32 @@ Each story includes:
 
 **SP:** 5
 
+### BB-163 — Sighting Abuse & Fan-out Controls
+**As the** owner, **I want** sighting creation and the alerts it triggers to be rate-limited, validated, and dedup'd, **so that** one careless or malicious user can't spam friends, poison prices, bloat the DB, or run up cost.
+
+> **The threat:** decoupled sightings let anyone log anything. Worst cases: a user
+> logs every bottle in a store (notification storm + DB writes + function fan-out
+> cost); a troll posts fake low prices to grief friends; a bot mass-creates fake
+> sightings/catalog bottles. Protect the **app, DB, users, and the bill**. Splits
+> across two iterations — creation guards ship with the decouple (It8), fan-out
+> guards ship with social sightings (It10).
+
+**AC — creation-side (Iteration 8, with BB-161/162):**
+- Per-user sighting rate limit (e.g. ≤ N/day + a short cooldown), enforced server-side via a counter; over-limit writes are rejected
+- Input validation in security rules + function: price within sane bounds (> 0, below an absurd ceiling), store/city/state length caps, required fields
+- Creating a **new catalog bottle** from "Spotted it" is rate-limited and dedup'd against the canonical catalog (BB-160) to block catalog spam
+- App Check (BB-121) required on sighting/catalog writes so bots can't hit the endpoint directly
+- A scheduled cleanup purges sightings well past the staleness window so the `/sightings` collection stays bounded
+
+**AC — fan-out-side (Iteration 10, with BB-110/112):**
+- Per-spotter cap on alerts generated per day; per-recipient cap on alerts from one spotter per window (anti-harassment)
+- Bulk logging **coalesces**: several sightings to the same recipient in a short window batch into one push ("Daniel spotted 3 bottles on your list at Total Wine") instead of N pushes
+- (sighting → recipient) dedup; price edits don't re-alert beyond a meaningful drop
+- Users can **flag** a sighting as inaccurate; auto-hide after K flags; repeat-offender spotters are throttled/suppressed
+- Friends-only visibility bounds blast radius to your circle; the billing kill-switch (BB-120) is the hard backstop
+
+**SP:** 8
+
 ---
 
 ## Post-MVP Story Summary — Going Public
@@ -930,9 +956,11 @@ Each story includes:
 | BB-160 | Bourbon Catalog Canonicalization | Data Quality | 5 |
 | BB-161 | Decouple Sightings (First-Class, Catalog-Keyed) | Sightings Decoupling | 8 |
 | BB-162 | "Spotted It" Standalone Capture | Sightings Decoupling | 5 |
+| BB-163 | Sighting Abuse & Fan-out Controls | Sightings Decoupling | 8 |
 
-**Going-Public + Foundations Total: 63 SP** · **Grand Post-MVP Total: 115 SP**
-(BB-110 reduced 8→5 with the decoupled model, so net new is +10.)
+**Going-Public + Foundations Total: 71 SP** · **Grand Post-MVP Total: 123 SP**
+(BB-110 reduced 8→5 with the decoupled model; +18 net for the sightings
+foundation incl. abuse controls.)
 
 ---
 

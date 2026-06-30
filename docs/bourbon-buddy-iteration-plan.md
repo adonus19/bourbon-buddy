@@ -1,6 +1,6 @@
 # Bourbon Buddy — Iteration Plan (MVP)
 
-**Version:** 1.3
+**Version:** 1.4
 **Last Updated:** 2026-06-30
 **Methodology:** Agile / Scrum-style iterations (2-week sprints)
 **Velocity Assumption:** ~25 story points per iteration (solo developer, part-time; adjust based on actual pace)
@@ -329,6 +329,7 @@ The order reflects both technical dependencies (auth before features, log before
 - **BB-160 Catalog canonicalization** — one entry per real bottle; improves stats now and is the hard prerequisite for sighting↔wishlist matching
 - **BB-161 Decouple sightings** — move sightings to first-class, catalog-keyed `/sightings`; a Hunt List entry's sightings become a query; migrate existing data; repoint the Iteration 7 price-alert trigger
 - **BB-162 "Spotted it" capture** — log a sighting for *any* bottle, not just ones on your own list (the change that makes crowd-sourcing possible)
+- **BB-163 (creation-side) abuse guards** — per-user sighting rate limits, price/input validation, catalog-spam limits, App Check, stale-sighting cleanup. Ship *with* the decouple, since open creation is the new attack surface.
 - *Why now:* MVP sightings are welded to your own wishlist, so a spotter can't report a bottle a friend wants. Building BB-110/112 on that would be building on sand.
 
 > **AI "Find Bottles" (BB-130) moved out of this iteration.** It's independent of
@@ -342,6 +343,7 @@ The order reflects both technical dependencies (auth before features, log before
 ### Iteration 10 — Social Sightings & Alerts (the circle payoff)
 **Stories:** BB-110, BB-111, BB-112, BB-113
 **Goal:** The headline — get notified when a friend spots a bottle on your Hunt List. Now built on the decoupled `/sightings` foundation from Iteration 8.
+- **BB-163 (fan-out-side) abuse guards** — per-spotter/per-recipient alert caps, bulk-logging coalescing, dedup, sighting flagging/auto-hide. Essential here because this is when alerts actually fan out to friends.
 - **Contribution caveat:** crowd-sourcing only works if logging is fast and spotters see that it helps friends (the BB-162 nudge + barcode/geo). Without that, friends won't log sightings for bottles they don't want.
 - **Push caveat:** iOS PWA web-push is workable but flaky. For the *circle* it's good enough to validate; reliable push is a reason native iOS (Iteration 12) precedes a true public launch.
 

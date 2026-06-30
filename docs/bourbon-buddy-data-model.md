@@ -1,6 +1,6 @@
 # Bourbon Buddy — Firestore Data Model
 
-**Version:** 1.3
+**Version:** 1.4
 **Last Updated:** 2026-06-30
 **Database:** Cloud Firestore (Firebase)
 
@@ -432,6 +432,12 @@ non-blocked friends when `visibility == 'friends'`; writable only by
 **Migration:** existing `/users/{uid}/wishlistEntries/{entryId}/sightings` docs
 are copied to `/sightings` (carrying `bourbonId` from the parent entry,
 `spotterUid = uid`, `visibility = 'private'`) by a one-time script.
+
+**Abuse controls (BB-163):** a `flagCount` field (auto-hide past a threshold) and
+a per-user rate-limit counter doc (e.g. `/users/{uid}/rateLimits/sightings` with a
+rolling daily count) gate creation; a scheduled job purges sightings well past the
+staleness window so the collection stays bounded. Exact shapes decided at
+implementation (Iteration 8 creation-side, Iteration 10 fan-out-side).
 
 ### Subcollection: `/users/{userId}/notifications/{notificationId}` *(Phase 4 — BB-113)*
 

@@ -1,6 +1,6 @@
 # Bourbon Buddy — Product Feature Specification
 
-**Version:** 1.3
+**Version:** 1.4
 **Last Updated:** 2026-06-30
 **Scope:** MVP — Single User (+ Post-MVP social features scoped in the backlog)
 
@@ -410,6 +410,31 @@ with scale. Stories BB-140 (infra) and BB-141 (gating/paywall).
 alcohol restrictions); donations (fine for goodwill, unreliable at scale);
 aggregated/anonymized sightings data as a B2B play (real value, privacy-fraught —
 parked).
+
+### Abuse & Trust Surface
+
+User-generated, fan-out, and AI features create abuse vectors that threaten the
+app, the database, other users, and the bill. The defenses (mostly the cost-
+control epic + sighting controls):
+
+| Vector | Risk | Defense |
+|---|---|---|
+| **Sighting spam** (log every bottle in a store / bot mass-posts) | notification storms, DB writes, function fan-out cost | BB-163: per-user rate limits, fan-out caps + coalescing, dedup, stale-sighting cleanup |
+| **Fake / poisoned prices** | griefing friends, bad data | BB-163: price sanity bounds, flagging + auto-hide, spotter throttling |
+| **Catalog spam** (junk bottles via "Spotted it") | polluted catalog, broken matching | BB-160 canonicalization + BB-163 create rate limits |
+| **Friend-request spam** | harassment | BB-101 rate limits; block (BB-103) |
+| **Profile / username abuse** (impersonation, offensive handles) | trust, safety | moderation + reporting (public phase) |
+| **Malicious URLs** in notes/review links | phishing | friends-only blast radius; link warnings at public scale |
+| **Storage abuse** (huge / illicit images) | cost, safety | size limits + content moderation (public phase) |
+| **AI abuse** (per-user calls) | runaway cost | BB-131 per-user credits + BYO key |
+| **Bots hitting the backend directly** | cost, scraping | App Check (BB-121), per-user quotas (BB-122) |
+| **Anything unforeseen spiking spend** | the bill | billing kill-switch (BB-120) — hard backstop |
+
+**Posture:** friends-only visibility keeps the blast radius inside a trusted
+circle for the small-circle phase, so the urgent controls are the **creation-side
+guards** (rate limits, validation, App Check). The heavier **fan-out + moderation**
+controls become essential at public scale. None of it removes the need for the
+kill-switch as the last line of defense.
 
 ### Compliance (alcohol app + public users)
 
