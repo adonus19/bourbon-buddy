@@ -1,6 +1,7 @@
 export * from './enums';
 export * from './user-profile.model';
 export * from './public-profile.model';
+export * from './friend-request.model';
 export * from './log-entry.model';
 export * from './pour-session.model';
 export * from './wishlist-entry.model';
