@@ -22,6 +22,8 @@ export interface WishlistEntry {
   category?: BourbonCategory | null;
   subType?: BourbonSubType | null;
   msrp?: number | null;
+  /** Alert me when a sighting is logged at or below this price (null = off). */
+  targetPrice?: number | null;
 
   // Research
   externalTastingNotes?: string | null;

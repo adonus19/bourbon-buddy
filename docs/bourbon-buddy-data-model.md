@@ -145,6 +145,7 @@ wishlistEntries/{entryId}
   category:               string | null
   subType:                string | null
   msrp:                   number | null
+  targetPrice:            number | null    // price-alert threshold (It7); null = off
 
   // Research
   externalTastingNotes:   string | null

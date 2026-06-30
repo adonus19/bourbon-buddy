@@ -10,3 +10,6 @@ export { fetchRssFeeds, cleanupOldArticles, cleanupReadArticles } from "./news";
 
 // Notifications (BB-090): callable test sender (reuses the send-helper).
 export { sendTestNotification } from "./notifications";
+
+// Wishlist price alerts (It7): sighting-at-or-below-target trigger.
+export { onSightingCreated } from "./alerts";

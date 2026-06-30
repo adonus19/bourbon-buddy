@@ -87,6 +87,7 @@ export class AddEditWishlistPage {
     category: [null as BourbonCategory | null],
     subType: [null as string | null],
     msrp: [null as number | null],
+    targetPrice: [null as number | null],
     priority: ['normal' as WishlistPriority],
     status: ['actively_looking' as WishlistStatus],
     externalTastingNotes: [''],
@@ -125,6 +126,7 @@ export class AddEditWishlistPage {
       category: e.category ?? null,
       subType: e.subType ?? null,
       msrp: e.msrp ?? null,
+      targetPrice: e.targetPrice ?? null,
       priority: e.priority,
       status: ACTIVE_WISHLIST_STATUSES.includes(e.status)
         ? e.status
@@ -209,6 +211,7 @@ export class AddEditWishlistPage {
         category: (v.category as BourbonCategory | null) ?? null,
         subType: (v.subType as BourbonSubType | null) ?? null,
         msrp: this.numOrNull(v.msrp),
+        targetPrice: this.numOrNull(v.targetPrice),
         externalTastingNotes: this.strOrNull(v.externalTastingNotes),
         reviewLinks,
         personalNotes: this.strOrNull(v.personalNotes),
