@@ -39,6 +39,33 @@
     }
   }
 
+  &__hint {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    margin: 0 2px 16px;
+    line-height: 1.4;
+  }
+
+  &__at {
+    color: var(--color-text-secondary);
+    font-weight: 600;
+    margin-inline-end: 2px;
+  }
+
+  &__toggle {
+    --background: var(--color-bg-elevated);
+    --border-radius: var(--radius-input);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-input);
+    margin-bottom: 12px;
+  }
+
+  &__toggle-hint {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin: 2px 0 0;
+  }
+
   &__account-btn {
     --border-color: var(--color-border-bright);
     --color: var(--color-text-primary);

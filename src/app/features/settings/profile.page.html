@@ -68,6 +68,61 @@
       </ion-button>
     </form>
 
+    <p class="eyebrow profile__section">Public profile</p>
+    <p class="profile__hint">
+      Claim a handle so friends can find you. You're hidden from search until you
+      turn on discoverability.
+    </p>
+
+    <form [formGroup]="usernameForm" (ngSubmit)="claimUsername()">
+      <ion-input
+        class="profile__field"
+        fill="solid"
+        label="Username"
+        labelPlacement="stacked"
+        type="text"
+        autocapitalize="off"
+        autocomplete="off"
+        spellcheck="false"
+        formControlName="username"
+        placeholder="3–20 letters, numbers, or _"
+      >
+        <span slot="start" class="profile__at">@</span>
+      </ion-input>
+
+      <ion-button
+        class="profile__save"
+        expand="block"
+        type="submit"
+        [disabled]="claimingUsername || usernameForm.pristine || usernameForm.invalid"
+      >
+        @if (claimingUsername) {
+          <ion-spinner name="crescent"></ion-spinner>
+        } @else {
+          <span>{{ currentUsername() ? 'Update handle' : 'Claim handle' }}</span>
+        }
+      </ion-button>
+    </form>
+
+    <ion-item class="profile__toggle" lines="none">
+      <ion-toggle
+        [checked]="isDiscoverable()"
+        [disabled]="!currentUsername()"
+        (ionChange)="toggleDiscoverable($event.detail.checked)"
+      >
+        <ion-label>
+          Discoverable by username
+          <p class="profile__toggle-hint">
+            @if (currentUsername()) {
+              Let people find you at &commat;{{ currentUsername() }}.
+            } @else {
+              Claim a handle first.
+            }
+          </p>
+        </ion-label>
+      </ion-toggle>
+    </ion-item>
+
     <p class="eyebrow profile__section">Notifications</p>
 
     <ion-button

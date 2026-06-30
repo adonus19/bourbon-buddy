@@ -21,6 +21,29 @@ service cloud.firestore {
       allow read, write: if isOwner(userId);
     }
 
+    // Public profile projection (BB-100): the only cross-user-readable view of
+    // a user. Holds public fields only (displayName, username, avatar, region,
+    // counts) — never email/bio/log/wishlist. Owner-written, mirrored from the
+    // private /users doc by UserService. friendCount is also written by the
+    // friend callables via the Admin SDK (which bypasses these rules).
+    match /publicProfiles/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId);
+    }
+
+    // Username reservations (BB-100): one doc per claimed handle, ID = lowercased
+    // username, enforcing case-insensitive uniqueness. Create only if it doesn't
+    // already exist (Firestore create semantics) and you claim it for yourself;
+    // delete only your own (releases the handle). Never updated in place.
+    match /usernames/{usernameLower} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+                    && request.resource.data.uid == request.auth.uid;
+      allow delete: if isSignedIn()
+                    && resource.data.uid == request.auth.uid;
+      allow update: if false;
+    }
+
     // Shared bourbon catalog: any signed-in user can read or create;
     // only the original creator may update their addition. No deletes.
     match /bourbons/{bourbonId} {
