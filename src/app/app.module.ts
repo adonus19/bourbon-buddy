@@ -5,6 +5,7 @@ import { RouteReuseStrategy } from '@angular/router';
 import { IonicModule, IonicRouteStrategy } from '@ionic/angular';
 
 import {
+  getApp,
   initializeApp,
   provideFirebaseApp,
 } from '@angular/fire/app';
@@ -15,7 +16,9 @@ import {
 } from '@angular/fire/auth';
 import {
   connectFirestoreEmulator,
-  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   provideFirestore,
 } from '@angular/fire/firestore';
 import {
@@ -51,7 +54,14 @@ import { AppRoutingModule } from './app-routing.module';
       return auth;
     }),
     provideFirestore(() => {
-      const firestore = getFirestore();
+      // Offline persistence: an IndexedDB-backed cache so the app works without
+      // a connection (e.g. in a liquor store with poor signal) and serves reads
+      // from cache to cut Firestore cost. Multi-tab manager keeps tabs in sync.
+      const firestore = initializeFirestore(getApp(), {
+        localCache: persistentLocalCache({
+          tabManager: persistentMultipleTabManager(),
+        }),
+      });
       if (environment.useEmulators) {
         const { host, port } = environment.emulators.firestore;
         connectFirestoreEmulator(firestore, host, port);
