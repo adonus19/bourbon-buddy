@@ -73,6 +73,25 @@ export class NotificationSettingsPage implements OnInit {
     await this.notifications.savePrefs({ pausedAll: checked });
   }
 
+  async sendTest(): Promise<void> {
+    if (this.busy) {
+      return;
+    }
+    this.busy = true;
+    try {
+      const sent = await this.notifications.sendTest();
+      await this.present(
+        sent > 0
+          ? 'Test sent — check your notifications.'
+          : 'No devices registered to notify yet.'
+      );
+    } catch {
+      await this.present("Couldn't send a test. Try again.");
+    } finally {
+      this.busy = false;
+    }
+  }
+
   async enable(): Promise<void> {
     if (this.busy) {
       return;

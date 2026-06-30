@@ -23,6 +23,15 @@
         <ion-button
           expand="block"
           fill="outline"
+          [disabled]="busy"
+          (click)="sendTest()"
+        >
+          <ion-icon name="paper-plane-outline" slot="start"></ion-icon>
+          Send a test notification
+        </ion-button>
+        <ion-button
+          expand="block"
+          fill="clear"
           color="medium"
           [disabled]="busy"
           (click)="disable()"

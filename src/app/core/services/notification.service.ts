@@ -15,6 +15,7 @@ import {
   serverTimestamp,
   setDoc,
 } from '@angular/fire/firestore';
+import { Functions, httpsCallable } from '@angular/fire/functions';
 import { ToastController } from '@ionic/angular';
 import { Observable, of } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
@@ -55,6 +56,7 @@ function hashToken(token: string): string {
 export class NotificationService {
   private readonly messaging = inject(Messaging);
   private readonly firestore = inject(Firestore);
+  private readonly functions = inject(Functions);
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastController);
 
@@ -167,6 +169,16 @@ export class NotificationService {
 
   private prefsDoc(uid: string) {
     return doc(this.firestore, `users/${uid}/settings/notifications`);
+  }
+
+  /** Sends a test push to this user via the callable; returns devices reached. */
+  async sendTest(): Promise<number> {
+    const callable = httpsCallable<unknown, { sent: number }>(
+      this.functions,
+      'sendTestNotification'
+    );
+    const res = await callable({});
+    return res.data.sent;
   }
 
   private async saveToken(token: string): Promise<void> {
