@@ -498,10 +498,15 @@ newsArticles/{articleId}
 ```
 bourbons/{bourbonId}
   // ...existing fields...
-  nameLowercase:  string            // already indexed; normalized match key
-  aliases:        array<string>     // alternate spellings folded into this entry
+  nameLowercase:  string            // lowercase, for prefix search (autocomplete)
+  nameNormalized: string            // canonical dedupe key: case/punct/diacritics folded
+  aliases:        array<string>     // normalized names folded into this entry
   canonicalId:    string | null     // set on a duplicate that was merged into another
 ```
+
+`nameNormalized` is the dedupe key (e.g. "Blanton's Single Barrel" →
+"blantons single barrel"). `findOrCreate` matches on it (plus `aliases` and legacy
+`nameLowercase`) before creating, so cosmetic variants resolve to one entry.
 
 **Merge rule:** when two catalog docs are found to be the same bottle, keep one
 as canonical, set `canonicalId` on the loser, fold its name into `aliases`, and
