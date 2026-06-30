@@ -17,12 +17,49 @@
       <ion-segment-button value="read"><ion-label>Read</ion-label></ion-segment-button>
     </ion-segment>
   </ion-toolbar>
+  <ion-toolbar>
+    <ion-searchbar
+      placeholder="Search articles"
+      [debounce]="200"
+      [value]="search()"
+      (ionInput)="onSearch($event)"
+      (ionClear)="search.set('')"
+    ></ion-searchbar>
+  </ion-toolbar>
 </ion-header>
 
 <ion-content [fullscreen]="true">
   <ion-refresher slot="fixed" (ionRefresh)="doRefresh($any($event))">
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
+
+  @if (segment() === 'feed') {
+    <div class="feed-filters">
+      <ion-select
+        class="feed-filters__select"
+        label="When"
+        interface="popover"
+        [value]="window()"
+        (ionChange)="setWindow($any($event.detail.value))"
+      >
+        @for (w of windows; track w.value) {
+          <ion-select-option [value]="w.value">{{ w.label }}</ion-select-option>
+        }
+      </ion-select>
+      <ion-select
+        class="feed-filters__select"
+        label="Source"
+        interface="popover"
+        [value]="source()"
+        (ionChange)="setSource($any($event.detail.value))"
+      >
+        <ion-select-option [value]="null">All sources</ion-select-option>
+        @for (s of sources; track s) {
+          <ion-select-option [value]="s">{{ s }}</ion-select-option>
+        }
+      </ion-select>
+    </div>
+  }
 
   @if (loading() && articles().length === 0) {
     <app-list-skeleton [count]="6"></app-list-skeleton>
@@ -37,18 +74,29 @@
     </div>
   } @else if (visible().length === 0) {
     <div class="dispatch-empty">
-      <ion-icon name="newspaper-outline" aria-hidden="true"></ion-icon>
-      <h2 class="dispatch-empty__title">
-        @switch (segment()) {
-          @case ('saved') { Nothing saved yet. }
-          @case ('read') { Nothing read yet. }
-          @default { Nothing's breaking yet. }
-        }
-      </h2>
-      <p class="dispatch-empty__sub">
-        @if (segment() === 'feed') { Pull down to refresh. } @else { Swipe
-        articles in the Feed to file them here. }
-      </p>
+      @if (search().trim()) {
+        <ion-icon name="search-outline" aria-hidden="true"></ion-icon>
+        <h2 class="dispatch-empty__title">No matches.</h2>
+        <p class="dispatch-empty__sub">
+          Nothing here matches “{{ search().trim() }}”.
+          @if (segment() === 'feed' && hasMore()) {
+            Scroll to load more, then search again.
+          }
+        </p>
+      } @else {
+        <ion-icon name="newspaper-outline" aria-hidden="true"></ion-icon>
+        <h2 class="dispatch-empty__title">
+          @switch (segment()) {
+            @case ('saved') { Nothing saved yet. }
+            @case ('read') { Nothing read yet. }
+            @default { Nothing's breaking yet. }
+          }
+        </h2>
+        <p class="dispatch-empty__sub">
+          @if (segment() === 'feed') { Pull down to refresh. } @else { Swipe
+          articles in the Feed to file them here. }
+        </p>
+      }
     </div>
   } @else {
     <ion-list class="dispatch-list" lines="none">
@@ -111,4 +159,11 @@
       }
     </ion-list>
   }
+
+  <ion-infinite-scroll
+    [disabled]="segment() !== 'feed' || !hasMore()"
+    (ionInfinite)="loadMore($any($event))"
+  >
+    <ion-infinite-scroll-content loadingSpinner="crescent"></ion-infinite-scroll-content>
+  </ion-infinite-scroll>
 </ion-content>

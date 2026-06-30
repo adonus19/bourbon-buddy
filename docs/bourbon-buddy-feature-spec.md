@@ -1,7 +1,7 @@
 # Bourbon Buddy — Product Feature Specification
 
-**Version:** 1.2
-**Last Updated:** 2026-06-29
+**Version:** 1.4
+**Last Updated:** 2026-06-30
 **Scope:** MVP — Single User (+ Post-MVP social features scoped in the backlog)
 
 ---
@@ -158,7 +158,16 @@ The best (lowest) price from all non-stale sightings is surfaced on the wishlist
 
 ### 4. Bottle Sightings
 
-Records of where the user found a specific bottle and at what price. In MVP this is self-sourced. In future social versions this becomes crowd-sourced.
+Records of where the user found a specific bottle and at what price.
+
+> **Architecture note (Iteration 8 — BB-161/162).** In the MVP, a sighting is
+> stored *under a wishlist entry*, so you can only log one for a bottle already on
+> your own Hunt List. That blocks crowd-sourcing — you can't report a bottle you
+> spot *for a friend*. Iteration 8 decouples sightings into first-class,
+> catalog-keyed `/sightings` records that **any** user can create for **any**
+> catalog bottle via a global "Spotted it" action; a Hunt List entry's sightings
+> become a query by `bourbonId`. This is the foundation the social-sightings
+> features (BB-110/111/112) require.
 
 Sightings can be created from:
 - A wishlist entry detail screen
@@ -309,29 +318,36 @@ Tapping a chart bar shows the contributing log entries for that data point.
 
 ### Planned: Social, Sightings & Notifications (Phases 2 & 4)
 
-Now fully scoped with acceptance criteria — see stories **BB-090–BB-113** in
+Now fully scoped with acceptance criteria — see stories **BB-090–BB-162** in
 [bourbon-buddy-user-stories.md](bourbon-buddy-user-stories.md) and the supporting
 schemas in [bourbon-buddy-data-model.md](bourbon-buddy-data-model.md).
 
 **Headline feature — Sighting Match Alerts (BB-112):** When a connected friend
-logs a sighting of a bottle and chooses to share it, any friend who has that
-exact bottle on their **active Hunt List** is pushed a notification with the
-store, price, and city/state — so they can chase the bottle before it's gone.
-This is the moment the wishlist and the sightings system pay off socially: the
-self-sourced sighting of MVP (see *Bottle Sightings*, above) becomes
-crowd-sourced.
+logs a sighting of a bottle (visibility = friends), any friend who has that exact
+bottle on their **active Hunt List** is pushed a notification with the store,
+price, and city/state — so they can chase the bottle before it's gone. This is
+the moment the wishlist and the sightings system pay off socially.
+
+**Critical foundation (Iteration 8, do first):** the MVP welds sightings to the
+spotter's *own* wishlist, so they can't report a bottle a friend wants. The
+**sightings decoupling (BB-161/162)** and **catalog canonicalization (BB-160)**
+fix that — sightings become first-class, catalog-keyed records anyone can log for
+any bottle. Without this, the social-sightings features have no usable data shape.
 
 Supporting features it depends on, each its own scoped story:
 
+- **Social-data foundation (Iteration 8):** catalog canonicalization (BB-160),
+  decoupled first-class sightings (BB-161), and a standalone "Spotted it" capture
+  for any bottle (BB-162).
 - **Notification foundation (Phase 2):** FCM setup (BB-090) and per-type
   notification preferences, default off (BB-091). Also powers wishlist price
   alerts and the news digest.
 - **Social graph (Phase 4):** opt-in public profile + unique username (BB-100),
   find & add friends (BB-101), accept/decline requests (BB-102), and manage /
   remove / block (BB-103).
-- **Shareable sightings (Phase 4):** per-sighting "share with friends" privacy
-  toggle writing to a queryable shared collection (BB-110), a friends' sightings
-  feed with Hunt-List matches highlighted (BB-111), and an in-app notification
+- **Sighting visibility (Phase 4):** per-sighting private/friends visibility on
+  the decoupled `/sightings` records (BB-110), a friends' sightings feed with
+  Hunt-List matches highlighted (BB-111), and an in-app notification
   inbox so alerts are recoverable (BB-113).
 
 **Privacy posture:** sightings are private by default and only shared on an
@@ -341,3 +357,99 @@ friends; location is limited to store + city/state (no precise geolocation).
 **Further social backlog (not yet story-scoped):** shared wishlists, activity
 feed of friends' recent tries, group tasting events, bottle splits and trade
 board.
+
+---
+
+## Going Public: Cost, Monetization & Compliance
+
+The MVP and the small-circle phase run comfortably on Firebase's free tier.
+Opening the app to the public changes both the economics and the legal posture.
+This section records the plan so it isn't re-derived. Stories: **BB-120–BB-160**
+in [bourbon-buddy-user-stories.md](bourbon-buddy-user-stories.md).
+
+### Cost reality (the honest version)
+
+With the app's one-listener / cached-signal discipline, infrastructure stays
+cheap well into the thousands of users. Rough model at **~5,000 monthly active
+users**: Firestore reads ~$80/mo, writes ~$9/mo, functions + push (push is free)
+~$10/mo, AI ~$20–30/mo *total* (see below), for **~$150–400/mo** with good image
+hygiene. The larger risk of going public is **distribution, not cost** — the
+subscription-app market is saturated (≈14,700 new apps/month in 2026, revenue
+concentrated in the top decile).
+
+**Watch-items (where cost actually comes from):**
+- **Image storage + egress bandwidth** (label photos) — resize on upload and put
+  a CDN in front, or this becomes the biggest line item.
+- **Abuse** — bots/scrapers hitting Firestore and AI (mitigated by App Check,
+  BB-121, and quotas, BB-122).
+- **No default spend cap on Blaze** — a bug or attack can run an unbounded bill.
+  The billing kill-switch (BB-120) is mandatory before public exposure and cheap
+  enough to build early.
+
+### AI cost: an architecture decision, not a pricing problem
+
+The "Find Bottles" feature (BB-130) extracts bottle names from **shared** news
+articles. Run extraction **once per article, server-side, at ingest** and cache
+the result on the article doc — every user reads it for zero marginal cost. AI
+spend is therefore **O(articles) (~$1/day total), not O(users × articles)**, which
+neutralizes the "friends/users make AI expensive" concern. Any *future per-user*
+AI is bounded by per-user credits, a cheap model, prompt caching, the Batch API,
+and an optional bring-your-own-key path (BB-131).
+
+### Monetization
+
+**Model: freemium / hybrid (the 2026 default).** Core tracking — log, wishlist,
+sightings — is **free forever**. A **Pro tier (~$3–5/mo or ~$25/yr)** unlocks the
+cost-heavy/power features: unlimited AI finds (free tier ~10/mo), price & sighting
+alerts, advanced stats, full history. Infrastructure via **RevenueCat** (free
+under $2.5k MTR, then 1%). Unit economics work at modest conversion: ~5,000 MAU ×
+~2% × ~$4, net of the Apple/Google 15–30% cut, lands near break-even and improves
+with scale. Stories BB-140 (infra) and BB-141 (gating/paywall).
+
+**Considered and rejected / parked:** ads (low revenue, hurts a premium feel,
+alcohol restrictions); donations (fine for goodwill, unreliable at scale);
+aggregated/anonymized sightings data as a B2B play (real value, privacy-fraught —
+parked).
+
+### Abuse & Trust Surface
+
+User-generated, fan-out, and AI features create abuse vectors that threaten the
+app, the database, other users, and the bill. The defenses (mostly the cost-
+control epic + sighting controls):
+
+| Vector | Risk | Defense |
+|---|---|---|
+| **Sighting spam** (log every bottle in a store / bot mass-posts) | notification storms, DB writes, function fan-out cost | BB-163: per-user rate limits, fan-out caps + coalescing, dedup, stale-sighting cleanup |
+| **Fake / poisoned prices** | griefing friends, bad data | BB-163: price sanity bounds, flagging + auto-hide, spotter throttling |
+| **Catalog spam** (junk bottles via "Spotted it") | polluted catalog, broken matching | BB-160 canonicalization + BB-163 create rate limits |
+| **Friend-request spam** | harassment | BB-101 rate limits; block (BB-103) |
+| **Profile / username abuse** (impersonation, offensive handles) | trust, safety | moderation + reporting (public phase) |
+| **Malicious URLs** in notes/review links | phishing | friends-only blast radius; link warnings at public scale |
+| **Storage abuse** (huge / illicit images) | cost, safety | size limits + content moderation (public phase) |
+| **AI abuse** (per-user calls) | runaway cost | BB-131 per-user credits + BYO key |
+| **Bots hitting the backend directly** | cost, scraping | App Check (BB-121), per-user quotas (BB-122) |
+| **Anything unforeseen spiking spend** | the bill | billing kill-switch (BB-120) — hard backstop |
+
+**Posture:** friends-only visibility keeps the blast radius inside a trusted
+circle for the small-circle phase, so the urgent controls are the **creation-side
+guards** (rate limits, validation, App Check). The heavier **fan-out + moderation**
+controls become essential at public scale. None of it removes the need for the
+kill-switch as the last line of defense.
+
+### Compliance (alcohol app + public users)
+
+Going public means operating a business: an **LLC** to shield personal liability,
+authored **ToS + Privacy Policy**, **age-gating** (of-age by region; BB-150),
+**account deletion + data export** for store and GDPR/CCPA requirements (BB-151),
+and **app-store alcohol-category** compliance. Selling/shipping spirits is heavily
+regulated — the **trade board and bottle splits stay out of scope** unless a
+dedicated legal review says otherwise.
+
+### Sequencing
+
+The small-circle phase needs none of the above. Build the social experience now;
+fold in the billing kill-switch (BB-120) and App Check (BB-121) as cheap
+insurance; and treat monetization + compliance as the explicit **gate to public
+launch** (Iteration 11), after the circle validates the product. See the Post-MVP
+Iteration Roadmap in
+[bourbon-buddy-iteration-plan.md](bourbon-buddy-iteration-plan.md).

@@ -5,6 +5,7 @@ import { RouteReuseStrategy } from '@angular/router';
 import { IonicModule, IonicRouteStrategy } from '@ionic/angular';
 
 import {
+  getApp,
   initializeApp,
   provideFirebaseApp,
 } from '@angular/fire/app';
@@ -15,7 +16,9 @@ import {
 } from '@angular/fire/auth';
 import {
   connectFirestoreEmulator,
-  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   provideFirestore,
 } from '@angular/fire/firestore';
 import {
@@ -28,6 +31,7 @@ import {
   getFunctions,
   provideFunctions,
 } from '@angular/fire/functions';
+import { getMessaging, provideMessaging } from '@angular/fire/messaging';
 
 import { environment } from '../environments/environment';
 import { AppComponent } from './app.component';
@@ -50,7 +54,14 @@ import { AppRoutingModule } from './app-routing.module';
       return auth;
     }),
     provideFirestore(() => {
-      const firestore = getFirestore();
+      // Offline persistence: an IndexedDB-backed cache so the app works without
+      // a connection (e.g. in a liquor store with poor signal) and serves reads
+      // from cache to cut Firestore cost. Multi-tab manager keeps tabs in sync.
+      const firestore = initializeFirestore(getApp(), {
+        localCache: persistentLocalCache({
+          tabManager: persistentMultipleTabManager(),
+        }),
+      });
       if (environment.useEmulators) {
         const { host, port } = environment.emulators.firestore;
         connectFirestoreEmulator(firestore, host, port);
@@ -73,6 +84,9 @@ import { AppRoutingModule } from './app-routing.module';
       }
       return functions;
     }),
+    // FCM has no emulator; messaging always targets the live project. The
+    // NotificationService guards usage behind isSupported()/permission.
+    provideMessaging(() => getMessaging()),
   ],
   bootstrap: [AppComponent],
 })

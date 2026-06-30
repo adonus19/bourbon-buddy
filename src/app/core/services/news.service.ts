@@ -2,6 +2,9 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import {
   Firestore,
+  QueryConstraint,
+  QueryDocumentSnapshot,
+  Timestamp,
   collection,
   collectionData,
   deleteDoc,
@@ -14,6 +17,8 @@ import {
   query,
   serverTimestamp,
   setDoc,
+  startAfter,
+  where,
 } from '@angular/fire/firestore';
 import { Observable, of } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
@@ -26,10 +31,22 @@ import {
 } from '../../models';
 import { AuthService } from '../auth/auth.service';
 import { DEFAULT_NEWS_PREFS, NewsPrefs } from '../../shared/utils/news-filter';
+import { NewsWindow } from '../../shared/constants/news-sources';
 
-// Kept modest for now; bump this once the feed list uses virtual scroll
-// (ion-virtual-scroll / CDK) so we can render a longer backlog cheaply.
-const FEED_LIMIT = 40;
+/** Page size for cursor-based feed pagination (infinite scroll). */
+const PAGE_SIZE = 25;
+
+function windowCutoff(w: NewsWindow): Timestamp | null {
+  if (w === 'all') {
+    return null;
+  }
+  const days = w === '7d' ? 7 : 30;
+  return Timestamp.fromMillis(Date.now() - days * 24 * 60 * 60 * 1000);
+}
+
+function toArticle(d: QueryDocumentSnapshot): NewsArticle {
+  return { id: d.id, ...d.data() } as NewsArticle;
+}
 
 /**
  * News feed reads. Articles are loaded on demand (one-shot query, refreshed by
@@ -44,7 +61,20 @@ export class NewsService {
 
   readonly articles = signal<NewsArticle[]>([]);
   readonly loading = signal(false);
+  readonly loadingMore = signal(false);
   readonly error = signal(false);
+  readonly hasMore = signal(false);
+
+  /** Feed filters (drive the Firestore query — changing one reloads the feed). */
+  readonly window = signal<NewsWindow>('all');
+  readonly source = signal<string | null>(null);
+
+  /** Saved articles loaded by id, so the Saved tab is complete regardless of
+   * how far the paginated feed has been scrolled. */
+  readonly savedArticles = signal<NewsArticle[]>([]);
+  readonly savedLoading = signal(false);
+
+  private lastDoc: QueryDocumentSnapshot | null = null;
   private loadedOnce = false;
 
   private readonly states = toSignal(
@@ -132,26 +162,96 @@ export class NewsService {
     );
   }
 
-  /** Loads the latest articles (newest first). */
+  private articlesCol() {
+    return collection(this.firestore, 'newsArticles');
+  }
+
+  /** Query constraints honoring the source + time-window filters. */
+  private feedConstraints(paged: boolean): QueryConstraint[] {
+    const cons: QueryConstraint[] = [];
+    const src = this.source();
+    if (src) {
+      cons.push(where('sourceName', '==', src));
+    }
+    const cutoff = windowCutoff(this.window());
+    if (cutoff) {
+      cons.push(where('publishedAt', '>=', cutoff));
+    }
+    cons.push(orderBy('publishedAt', 'desc'));
+    if (paged && this.lastDoc) {
+      cons.push(startAfter(this.lastDoc));
+    }
+    cons.push(limit(PAGE_SIZE));
+    return cons;
+  }
+
+  /** Loads the first page (newest first), resetting pagination. */
   async loadLatest(): Promise<void> {
     this.loading.set(true);
     this.error.set(false);
+    this.lastDoc = null;
     try {
-      const snap = await getDocs(
-        query(
-          collection(this.firestore, 'newsArticles'),
-          orderBy('publishedAt', 'desc'),
-          limit(FEED_LIMIT)
-        )
-      );
-      this.articles.set(
-        snap.docs.map((d) => ({ id: d.id, ...d.data() }) as NewsArticle)
-      );
+      const snap = await getDocs(query(this.articlesCol(), ...this.feedConstraints(false)));
+      this.articles.set(snap.docs.map(toArticle));
+      this.lastDoc = snap.docs[snap.docs.length - 1] ?? null;
+      this.hasMore.set(snap.size === PAGE_SIZE);
       this.loadedOnce = true;
     } catch {
       this.error.set(true);
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  /** Appends the next page (infinite scroll). No-op when nothing more to load. */
+  async loadMore(): Promise<void> {
+    if (this.loadingMore() || this.loading() || !this.hasMore() || !this.lastDoc) {
+      return;
+    }
+    this.loadingMore.set(true);
+    try {
+      const snap = await getDocs(query(this.articlesCol(), ...this.feedConstraints(true)));
+      this.articles.update((a) => [...a, ...snap.docs.map(toArticle)]);
+      this.lastDoc = snap.docs[snap.docs.length - 1] ?? this.lastDoc;
+      this.hasMore.set(snap.size === PAGE_SIZE);
+    } catch {
+      this.hasMore.set(false); // stop trying on error; keep what we have
+    } finally {
+      this.loadingMore.set(false);
+    }
+  }
+
+  setWindow(w: NewsWindow): void {
+    if (w !== this.window()) {
+      this.window.set(w);
+      void this.loadLatest();
+    }
+  }
+
+  setSource(s: string | null): void {
+    if (s !== this.source()) {
+      this.source.set(s);
+      void this.loadLatest();
+    }
+  }
+
+  /** Fetches the user's saved articles by id (small set) for the Saved tab. */
+  async loadSaved(): Promise<void> {
+    const ids = [...this.stateMap().entries()]
+      .filter(([, s]) => s === 'saved')
+      .map(([id]) => id);
+    this.savedLoading.set(true);
+    try {
+      const snaps = await Promise.all(
+        ids.map((id) => getDoc(doc(this.firestore, `newsArticles/${id}`)))
+      );
+      this.savedArticles.set(
+        snaps
+          .filter((s) => s.exists())
+          .map((s) => ({ id: s.id, ...s.data() }) as NewsArticle)
+      );
+    } finally {
+      this.savedLoading.set(false);
     }
   }
 

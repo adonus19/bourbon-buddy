@@ -1,7 +1,7 @@
 # Bourbon Buddy — Iteration Plan (MVP)
 
-**Version:** 1.2
-**Last Updated:** 2026-06-29
+**Version:** 1.4
+**Last Updated:** 2026-06-30
 **Methodology:** Agile / Scrum-style iterations (2-week sprints)
 **Velocity Assumption:** ~25 story points per iteration (solo developer, part-time; adjust based on actual pace)
 **Total MVP Scope:** 152 SP across 7 iterations (not counting Iteration 0)
@@ -303,6 +303,68 @@ The order reflects both technical dependencies (auth before features, log before
 | 6 | Statistics, Search & Polish | BB-060–062, BB-070, BB-080 | 16 | 121 |
 
 > Note: Total here (121) differs from the story table total (152) because several stories (BB-011, BB-012, BB-019) are included within the scope of their iteration's Definition of Done rather than broken out as separate delivery items in the count above. All 33 stories are delivered across the 6 iterations.
+
+---
+
+## Post-MVP Iteration Roadmap (Iterations 7+)
+
+> Sequenced in dependency order. **Decision (2026-06-29):** build the social
+> experience for a **small circle** now (free tier), and treat the public launch
+> as a later, explicit gate. The cost/monetization/compliance reasoning lives in
+> "Going Public" in [bourbon-buddy-feature-spec.md](bourbon-buddy-feature-spec.md);
+> full ACs for every story below are in
+> [bourbon-buddy-user-stories.md](bourbon-buddy-user-stories.md).
+
+### Iteration 7 — Foundations & No-Regrets Wins
+**Stories:** BB-090, BB-091, BB-120, plus Firestore offline persistence, personal wishlist price alerts
+**Goal:** Infrastructure that serves both the circle and a future public launch.
+- **Offline persistence** — enable Firestore offline; genuinely valuable since the app is used in liquor stores with poor signal
+- **Notifications foundation** — BB-090 (FCM setup) + BB-091 (preferences); unlocks alerts now and social alerts later
+- **BB-120 Billing kill-switch + budget alerts** — cheap insurance, built before any public exposure
+- **Personal price alerts** on your own wishlist (uses BB-090)
+
+### Iteration 8 — Social Data Foundation (Catalog + Sightings Refactor)
+**Stories:** BB-160, BB-161, BB-162
+**Goal:** Fix the data shape that the social-sightings features depend on, *before* building them.
+- **BB-160 Catalog canonicalization** — one entry per real bottle; improves stats now and is the hard prerequisite for sighting↔wishlist matching
+- **BB-161 Decouple sightings** — move sightings to first-class, catalog-keyed `/sightings`; a Hunt List entry's sightings become a query; migrate existing data; repoint the Iteration 7 price-alert trigger
+- **BB-162 "Spotted it" capture** — log a sighting for *any* bottle, not just ones on your own list (the change that makes crowd-sourcing possible)
+- **BB-163 (creation-side) abuse guards** — per-user sighting rate limits, price/input validation, catalog-spam limits, App Check, stale-sighting cleanup. Ship *with* the decouple, since open creation is the new attack surface.
+- *Why now:* MVP sightings are welded to your own wishlist, so a spotter can't report a bottle a friend wants. Building BB-110/112 on that would be building on sand.
+
+> **AI "Find Bottles" (BB-130) moved out of this iteration.** It's independent of
+> the social refactor and can be scheduled whenever — see the standalone AI slot
+> below.
+
+### Iteration 9 — Social Graph
+**Stories:** BB-100, BB-101, BB-102, BB-103
+**Goal:** Friends. The prerequisite network for everything social.
+
+### Iteration 10 — Social Sightings & Alerts (the circle payoff)
+**Stories:** BB-110, BB-111, BB-112, BB-113
+**Goal:** The headline — get notified when a friend spots a bottle on your Hunt List. Now built on the decoupled `/sightings` foundation from Iteration 8.
+- **BB-163 (fan-out-side) abuse guards** — per-spotter/per-recipient alert caps, bulk-logging coalescing, dedup, sighting flagging/auto-hide. Essential here because this is when alerts actually fan out to friends.
+- **Contribution caveat:** crowd-sourcing only works if logging is fast and spotters see that it helps friends (the BB-162 nudge + barcode/geo). Without that, friends won't log sightings for bottles they don't want.
+- **Push caveat:** iOS PWA web-push is workable but flaky. For the *circle* it's good enough to validate; reliable push is a reason native iOS (Iteration 12) precedes a true public launch.
+
+### AI "Find Bottles" (BB-130, BB-131) — independent slot
+No dependency on the social refactor; schedule whenever there's capacity (it was
+originally bundled into Iteration 8). BB-130 is the cached, near-zero-cost
+extraction; BB-131 (guardrails/BYO key) only matters once a *per-user* AI feature
+exists.
+
+### Iteration 11 — Public-Launch Readiness (the gate)
+**Stories:** BB-121, BB-122, BB-131, BB-140, BB-141, BB-150, BB-151
+**Goal:** Everything required before opening the doors — do **not** start until the circle validates the product.
+- Abuse/cost: BB-121 App Check, BB-122 quotas, BB-131 AI guardrails/BYO key
+- Revenue: BB-140 subscription infra, BB-141 Pro gating & paywall
+- Legal: BB-150 age gate + ToS/Privacy, BB-151 account deletion & data rights
+- Business setup (non-code): LLC, ToS/Privacy authored, tax, app-store alcohol compliance
+
+### Iteration 12+ — Native iOS (Phase 3)
+Capacitor iOS build, reliable native push, barcode scanning, TestFlight, App
+Store submission. Best paired with / just ahead of the public launch so push and
+camera are first-class. Android follows after iOS is proven.
 
 ---
 

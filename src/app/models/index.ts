@@ -8,3 +8,4 @@ export * from './bourbon.model';
 export * from './news-article.model';
 export * from './user-news-preferences.model';
 export * from './article-state.model';
+export * from './notification-prefs.model';

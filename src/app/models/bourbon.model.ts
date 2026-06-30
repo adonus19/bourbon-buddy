@@ -5,7 +5,10 @@ import { BourbonCategory, BourbonSubType } from './enums';
 export interface Bourbon {
   id?: string;
   name: string;
-  nameLowercase: string; // for case-insensitive search queries
+  nameLowercase: string; // for case-insensitive prefix search (autocomplete)
+  nameNormalized?: string; // canonical dedupe key (BB-160): case/punct/diacritics folded
+  aliases?: string[]; // normalized names merged into this entry (BB-160)
+  canonicalId?: string | null; // set on a duplicate merged into another (BB-160)
   distillery?: string | null;
   bottler?: string | null;
   category?: BourbonCategory | null;

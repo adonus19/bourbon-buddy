@@ -10,3 +10,8 @@ export { fetchRssFeeds, cleanupOldArticles, cleanupReadArticles } from "./news";
 
 // Billing kill-switch (BB-120): disable billing when spend hits the budget.
 export { capBillingAtBudget } from "./billing";
+// Notifications (BB-090): callable test sender (reuses the send-helper).
+export { sendTestNotification } from "./notifications";
+
+// Wishlist price alerts (It7): sighting-at-or-below-target trigger.
+export { onSightingCreated } from "./alerts";

@@ -1,7 +1,7 @@
 # Bourbon Buddy — Firestore Data Model
 
-**Version:** 1.2
-**Last Updated:** 2026-06-29
+**Version:** 1.4
+**Last Updated:** 2026-06-30
 **Database:** Cloud Firestore (Firebase)
 
 ---
@@ -145,6 +145,7 @@ wishlistEntries/{entryId}
   category:               string | null
   subType:                string | null
   msrp:                   number | null
+  targetPrice:            number | null    // price-alert threshold (It7); null = off
 
   // Research
   externalTastingNotes:   string | null
@@ -173,7 +174,14 @@ wishlistEntries/{entryId}
 
 ## Subcollection: `/users/{userId}/wishlistEntries/{entryId}/sightings/{sightingId}`
 
-Price sightings tied to a specific wishlist entry.
+> **⚠️ Superseded in Iteration 8 (BB-161).** This is the MVP storage: sightings
+> live under a wishlist entry, so you can only log one for a bottle already on
+> your own list. That coupling blocks crowd-sourcing (you can't report a bottle
+> you spot for a *friend*). Iteration 8 moves sightings to the first-class,
+> catalog-keyed top-level [`/sightings`](#collection-sightingssightingid-iteration-8--bb-161) collection and turns a wishlist entry's
+> sightings into a query by `bourbonId`. Existing docs are migrated.
+
+Price sightings tied to a specific wishlist entry (MVP model).
 
 ```
 sightings/{sightingId}
@@ -381,30 +389,55 @@ blocks/{blockedUid}
   createdAt:  Timestamp
 ```
 
-### Collection: `/sightings/{sightingId}` *(Phase 4 — BB-110)*
+### Collection: `/sightings/{sightingId}` *(Iteration 8 — BB-161)*
 
-The **shared** mirror of a private wishlist sighting, created only when the
-owner marks a sighting "share with friends." Top-level so a Cloud Function can
-match `bourbonId` against friends' Hunt Lists. Private sightings stay under
-`/users/{uid}/wishlistEntries/{entryId}/sightings` and are never copied here.
+The **primary, first-class** store for *all* sightings — not a mirror.
+Decoupled from any wishlist: a sighting is an observation about a **catalog
+bottle** (`bourbonId`), made by any user who spots it for sale, whether or not
+it's on their own Hunt List. This is what makes crowd-sourcing possible: you can
+report a bottle you see *for a friend*. A Hunt List entry's "sightings" become a
+**query** over this collection by `bourbonId`, not a stored subcollection.
 
 ```
 sightings/{sightingId}
-  ownerUid:      string
-  bourbonId:     string        // match key against friends' wishlist entries
+  bourbonId:     string        // catalog match key (requires BB-160 canonicalization)
   bourbonName:   string        // denormalized for display
+  spotterUid:    string        // who logged it
   storeName:     string
   price:         number
   city:          string | null
   state:         string | null
   sightingDate:  Timestamp
-  visibility:    string        // "friends" (only value for now)
+  markedStaleManually: boolean
+  visibility:    string        // "private" | "friends"
   createdAt:     Timestamp
 ```
 
-**Security:** readable only by the owner's accepted, non-blocked friends;
-writable only by `ownerUid`. **Match query (in function):**
-`.where('bourbonId','==', x)` joined against each friend's active wishlist.
+**Staleness:** `isStale = markedStaleManually || (today - sightingDate > 30 days)`
+— computed on read.
+
+**Queries:**
+- A Hunt List entry's sightings: `.where('bourbonId','==', x)` filtered to those
+  the viewer may see (own + friends' `visibility: 'friends'`), `.orderBy('price','asc')`.
+- Match for alerts (BB-112): on a new `visibility: 'friends'` sighting, match
+  `bourbonId` against the spotter's friends' **active** Hunt List entries.
+
+**`bestSightingPrice`** on a wishlist entry is recomputed from the visible,
+non-stale sightings for that `bourbonId` whenever a matching sighting changes.
+
+**Security:** readable by `spotterUid` always, and by the spotter's accepted,
+non-blocked friends when `visibility == 'friends'`; writable only by
+`spotterUid`. Location is limited to store + city/state (no precise geo).
+
+**Migration:** existing `/users/{uid}/wishlistEntries/{entryId}/sightings` docs
+are copied to `/sightings` (carrying `bourbonId` from the parent entry,
+`spotterUid = uid`, `visibility = 'private'`) by a one-time script.
+
+**Abuse controls (BB-163):** a `flagCount` field (auto-hide past a threshold) and
+a per-user rate-limit counter doc (e.g. `/users/{uid}/rateLimits/sightings` with a
+rolling daily count) gate creation; a scheduled job purges sightings well past the
+staleness window so the collection stays bounded. Exact shapes decided at
+implementation (Iteration 8 creation-side, Iteration 10 fan-out-side).
 
 ### Subcollection: `/users/{userId}/notifications/{notificationId}` *(Phase 4 — BB-113)*
 
@@ -423,8 +456,82 @@ notifications/{notificationId}
 
 **Additional indexes (add to `firestore.indexes.json` when built):**
 `friendRequests` (toUid ASC, status ASC), `friendRequests` (fromUid ASC,
-status ASC), `sightings` (bourbonId ASC, createdAt DESC),
+status ASC), `sightings` (bourbonId ASC, price ASC),
+`sightings` (spotterUid ASC, createdAt DESC),
 `notifications` collection-group (read ASC, createdAt DESC).
+
+---
+
+# Post-MVP Collections — Going Public (Cost, AI, Monetization & Compliance)
+
+> Schema for the public-launch epics (BB-120–BB-160). Mostly **additive fields**
+> on existing collections plus a small amount of new state. Subscription truth
+> lives in RevenueCat; Firestore only caches the entitlement.
+
+### Additive fields on `/users/{userId}` *(Iterations 8 & 11)*
+
+```
+users/{userId}
+  // ...existing fields...
+  // Compliance (BB-150)
+  ageVerified:        boolean
+  ageVerifiedAt:      Timestamp | null
+  tosAcceptedVersion: string | null
+  tosAcceptedAt:      Timestamp | null
+  // Monetization (BB-140) — cached from RevenueCat; RevenueCat is source of truth
+  proEntitlement:     boolean
+  proExpiresAt:       Timestamp | null
+  // AI guardrails (BB-131)
+  aiCreditsUsed:      number          // resets monthly
+  aiCreditsResetAt:   Timestamp
+  byoAiKeyRef:        string | null   // reference/secret-manager handle, NEVER the raw key
+```
+
+### Additive fields on `/newsArticles/{articleId}` *(BB-130)*
+
+Bottle candidates are extracted **once per article** at ingest (cached, shared)
+so no per-user AI calls occur.
+
+```
+newsArticles/{articleId}
+  // ...existing fields...
+  bottleCandidates:  array<{ name: string, distillery: string | null, confidence: number }>
+  aiExtractedAt:     Timestamp | null
+```
+
+### Additive fields on `/bourbons/{bourbonId}` *(BB-160)*
+
+```
+bourbons/{bourbonId}
+  // ...existing fields...
+  nameLowercase:  string            // lowercase, for prefix search (autocomplete)
+  nameNormalized: string            // canonical dedupe key: case/punct/diacritics folded
+  aliases:        array<string>     // normalized names folded into this entry
+  canonicalId:    string | null     // set on a duplicate that was merged into another
+```
+
+`nameNormalized` is the dedupe key (e.g. "Blanton's Single Barrel" →
+"blantons single barrel"). `findOrCreate` matches on it (plus `aliases` and legacy
+`nameLowercase`) before creating, so cosmetic variants resolve to one entry.
+
+**Merge rule:** when two catalog docs are found to be the same bottle, keep one
+as canonical, set `canonicalId` on the loser, fold its name into `aliases`, and
+repoint references. Sighting Match (BB-112) and stats group on the canonical id.
+
+### Account deletion *(BB-151)*
+
+No new collection — a Cloud Function fan-out deletes the Auth user and every
+owned document across `/users/{uid}/**`, the user's `/sightings` (where
+`ownerUid == uid`), `/friendRequests` involving the user, reciprocal
+`/users/{friendUid}/friends/{uid}` edges, `/usernames/{username}` reservation,
+and `/fcmTokens`. Logged for compliance evidence.
+
+### Cost controls *(BB-120/121/122)*
+
+Infrastructure, not schema: GCP billing budget + a Pub/Sub-triggered
+billing-disable function (BB-120), App Check enforcement on Firestore / Functions
+/ Storage (BB-121), and `limit()`-bounded reads + server-side per-user/day action
+counters for abuse guards (BB-122).
 
 ---
 

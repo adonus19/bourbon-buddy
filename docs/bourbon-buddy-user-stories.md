@@ -1,7 +1,7 @@
 # Bourbon Buddy — User Stories
 
-**Version:** 1.2
-**Last Updated:** 2026-06-29
+**Version:** 1.4
+**Last Updated:** 2026-06-30
 **Scope:** MVP — Single User (Daniel) + Post-MVP Social stories (Phases 2 & 4)
 
 ---
@@ -639,18 +639,21 @@ Each story includes:
 
 ## Epic 11: Social Sightings & Alerts *(Phase 4)*
 
-### BB-110 — Share Sightings with Friends
-**As a** user, **I want to** optionally share a bottle sighting with my friends, **so that** they learn about relevant finds while my private sightings stay private.
+### BB-110 — Sighting Visibility & Privacy
+**As a** user, **I want to** control who can see each sighting I log, **so that** I share useful finds with friends while keeping some private.
+
+> **Depends on the decoupled model (BB-161).** Sightings are first-class
+> `/sightings` docs; this story adds the visibility dimension to them.
 
 **AC:**
-- When logging or editing a sighting, a "Share with friends" toggle (defaulting to a user-level preference) controls visibility
-- A shared sighting is written to a queryable top-level `/sightings/{sightingId}` carrying `ownerUid`, `bourbonId`, `bourbonName`, `storeName`, `price`, `city`, `state`, `sightingDate`, `visibility`, `createdAt`
-- Private sightings remain only under `/users/{uid}/wishlistEntries/{entryId}/sightings` and are never copied to the shared collection
-- Turning a shared sighting private, or deleting it, removes the top-level document
-- Security rules make a `/sightings` doc readable only by the owner's accepted, non-blocked friends and writable only by the owner
-- Location is limited to store + city/state (no precise geolocation) for privacy
+- Every sighting has a `visibility`: `private` (only me) or `friends` (my accepted, non-blocked friends)
+- A user-level default visibility, overridable per sighting at log/edit time
+- Security rules: a `/sightings` doc is readable by its `spotterUid` always, and by the spotter's friends when `visibility == 'friends'`; writable only by the spotter
+- `private` sightings never surface to others, never appear in the friends' feed (BB-111), and never trigger alerts (BB-112)
+- Changing a sighting from `friends` to `private` immediately removes it from others' views
+- Location stays limited to store + city/state (no precise geolocation)
 
-**SP:** 8
+**SP:** 5
 
 ---
 
@@ -672,8 +675,8 @@ Each story includes:
 **As a** user, **I want to** be notified when a friend spots a bottle on my Hunt List, **so that** I can chase it down before it's gone.
 
 **AC:**
-- When a shared sighting is created (BB-110), a Cloud Function finds the owner's friends who have the same `bourbonId` on their **active** Hunt List
-- Each matched friend who has the alert enabled (BB-091) and has not blocked / been blocked by the owner receives a push notification with: bottle name, store, price, city/state, and who spotted it
+- When a `visibility: 'friends'` sighting is created (BB-161/110), a Cloud Function finds the spotter's friends who have the same `bourbonId` on their **active** Hunt List
+- Each matched friend who has the alert enabled (BB-091) and has not blocked / been blocked by the spotter receives a push notification with: bottle name, store, price, city/state, and who spotted it
 - Tapping the notification deep-links to the sighting and the matching Hunt List entry
 - An inbox record (BB-113) is created alongside every push so a missed notification is recoverable
 - De-duplication: a given (sighting → recipient) alert is delivered at most once; later price edits do not re-spam beyond a meaningful price-drop threshold
@@ -707,9 +710,280 @@ Each story includes:
 | BB-101 | Find & Add Friends | Social Graph | 4 | 5 |
 | BB-102 | Respond to Friend Requests | Social Graph | 4 | 5 |
 | BB-103 | Manage Friends (List, Remove, Block) | Social Graph | 4 | 3 |
-| BB-110 | Share Sightings with Friends | Social Sightings | 4 | 8 |
+| BB-110 | Sighting Visibility & Privacy | Social Sightings | 4 | 5 |
 | BB-111 | Friends' Sightings Feed | Social Sightings | 4 | 5 |
 | BB-112 | Sighting Match Alerts | Social Sightings | 4 | 8 |
 | BB-113 | Notification Inbox | Social Sightings | 4 | 5 |
 
-**Post-MVP Total: 55 SP** (Phase 2: 11 · Phase 4: 44)
+**Post-MVP Total: 52 SP** (Phase 2: 11 · Phase 4: 41)
+
+---
+
+# Post-MVP User Stories — Going Public (Cost, AI, Monetization & Compliance)
+
+> **Why these exist:** the social features above are built for a small circle on
+> Firebase's free tier. Opening the app to the public changes the economics and
+> the legal posture. These epics make a public launch *sustainable and safe*.
+> See "Going Public: Cost, Monetization & Compliance" in
+> [bourbon-buddy-feature-spec.md](bourbon-buddy-feature-spec.md) for the full
+> reasoning and unit-economics model. Sequencing lives in the **Post-MVP
+> Iteration Roadmap** in [bourbon-buddy-iteration-plan.md](bourbon-buddy-iteration-plan.md).
+
+## Epic 12: Cost Controls & Abuse Prevention
+
+### BB-120 — Billing Budget Alerts & Kill-Switch
+**As the** owner, **I want** a hard ceiling on spend, **so that** a bug or abuse can't run up an unbounded Firebase bill.
+
+**AC:**
+- A GCP billing budget is configured with alert thresholds (e.g., 50 / 90 / 100%) emailing the owner
+- A Pub/Sub-triggered Cloud Function disables project billing at a defined cap (Google's documented "cap usage" pattern), with a written runbook to re-enable
+- The documented monthly budget and the degradation behavior when hit are recorded (app should fail to read-only/offline, not silently break)
+- Verified against a test billing trigger
+- **Built early** (cheap insurance) even though it's a public-launch concern
+
+**SP:** 3
+
+---
+
+### BB-121 — App Check Enforcement
+**As the** owner, **I want** only my genuine app to reach my backend, **so that** bots and scrapers can't drive up cost or harvest data.
+
+**AC:**
+- App Check enabled with reCAPTCHA (web/PWA) and DeviceCheck / App Attest (when native)
+- Enforcement turned on for Firestore, Cloud Functions, and Storage
+- Legitimate app traffic is unaffected; unattested requests are rejected
+- A debug provider is configured for local dev and CI
+
+**SP:** 5
+
+---
+
+### BB-122 — Read/Write Quotas & Abuse Guards
+**As the** owner, **I want** per-user bounds on expensive actions, **so that** one account can't hammer the database or AI.
+
+**AC:**
+- Security rules cap unbounded list reads (require `limit()` where feasible)
+- Per-user/day soft limits on expensive actions (AI calls, sighting creation) are tracked and enforced server-side
+- Abusive patterns are logged and alertable
+- Limits are configurable without a redeploy where practical
+
+**SP:** 3
+
+---
+
+## Epic 13: AI Features
+
+### BB-130 — AI "Find Bottles" from Articles
+**As a** user, **I want** bottles mentioned in a news article surfaced as one-tap wishlist adds, **so that** I can act on releases I read about.
+
+**AC:**
+- Extraction runs server-side **once per article** inside `fetchRssFeeds` (shared + cached), using a low-cost model (Claude Haiku); results are stored on the `/newsArticles` doc as `bottleCandidates` (name, optional distillery, confidence)
+- **No per-user AI calls** — every user reads the cached candidates, so cost is O(articles), not O(users × articles)
+- On an article, detected bottles render as chips with one-tap "Add to Hunt List" that pre-fills the wishlist form via catalog autocomplete / canonical match (BB-160)
+- Extraction failures are non-fatal (the article still ingests); token-limited, Batch API used where latency allows
+- Low-confidence candidates are de-emphasized or hidden; candidates dedupe against the catalog
+
+**SP:** 8
+
+---
+
+### BB-131 — AI Usage Guardrails & Bring-Your-Own-Key
+**As the** owner, **I want** any *per-user* AI bounded, **so that** users (including friends) can't run up my AI bill.
+
+**AC:**
+- Per-user monthly AI credit (free tier N, Pro tier higher) tracked server-side; over-limit prompts an upgrade or BYO key
+- Cheapest viable model used, with prompt caching and Batch API where applicable
+- Optional "bring your own Claude API key," stored server-side (never plaintext on the client), grants unlimited personal use
+- AI spend is logged per feature for the owner
+- *Only required once a per-user AI feature exists — BB-130 does not need it*
+
+**SP:** 5
+
+---
+
+## Epic 14: Monetization
+
+### BB-140 — Subscription Infrastructure
+**As the** owner, **I want to** sell a Pro subscription, **so that** revenue covers infrastructure at public scale.
+
+**AC:**
+- RevenueCat integrated (web now, native-ready); monthly + annual products and a `pro` entitlement defined
+- The Pro entitlement is exposed as a signal the app reads to gate features
+- Purchases, restores, and cancellations are handled; entitlement state syncs to the user
+- Sandbox/test purchases verified end-to-end
+- Store fees (Apple/Google 15–30%) and RevenueCat's 1% (over $2.5k MTR) are documented in the revenue model
+
+**SP:** 8
+
+---
+
+### BB-141 — Pro Gating & Paywall
+**As a** user, **I want** a clear sense of free vs Pro value, **so that** I understand what I'm paying for.
+
+**AC:**
+- A free-vs-Pro matrix is enforced (e.g., free: 10 AI finds/mo, basic stats, limited sighting history; Pro: unlimited AI, price & sighting alerts, advanced stats, full history)
+- A paywall screen presents the value prop and a trial (17–32 days, per conversion benchmarks)
+- Gated features show an upgrade prompt, never a dead end
+- **Core tracking (log, wishlist, sightings) stays free forever**
+
+**SP:** 5
+
+---
+
+## Epic 15: Compliance & Public Launch
+
+### BB-150 — Age Gate & Legal Acceptance
+**As the** owner, **I want** age verification and ToS / Privacy acceptance, **so that** the app meets alcohol-app and app-store requirements.
+
+**AC:**
+- An age gate (of-age by region, 21+ in the US) appears on first run; the result is recorded on the user doc
+- Terms of Service and Privacy Policy are presented; acceptance is recorded with version + timestamp
+- App-store alcohol category metadata and content rating are set
+- Re-acceptance is prompted when the ToS/Privacy version changes
+
+**SP:** 3
+
+---
+
+### BB-151 — Account Deletion & Data Rights
+**As a** user, **I want to** delete my account and export my data, **so that** I control my information (and the app meets store and privacy-law requirements).
+
+**AC:**
+- In-app "Delete my account" removes the Auth user and all owned Firestore + Storage data via a Cloud Function fan-out
+- Deletion cascades social edges (friends, friend requests, shared sightings) and revokes FCM tokens
+- Data export is available on request (reuses the CSV export)
+- A confirmation flow prevents accidental deletion
+- Completion is logged for compliance evidence
+
+**SP:** 5
+
+---
+
+## Epic 16: Data Quality
+
+### BB-160 — Bourbon Catalog Canonicalization
+**As the** owner, **I want** one canonical catalog entry per real bottle, **so that** social matching and statistics are accurate.
+
+**AC:**
+- Catalog writes normalize the name (trim/case/punctuation) and store `nameLowercase` + optional `aliases`
+- New-entry creation matches against existing canonical names/aliases to avoid duplicates
+- An admin/maintenance path merges duplicate catalog docs and repoints references
+- Sighting Match (BB-112) and stats group on the canonical `bourbonId`
+- Improves stats grouping immediately, independent of social
+- **Hard prerequisite for BB-161** — sighting↔wishlist matching by `bourbonId` is meaningless if one bottle has duplicate catalog docs
+
+**SP:** 5
+
+---
+
+## Epic 17: Sightings Decoupling *(Iteration 8 — prerequisite for social sightings)*
+
+> **Why:** MVP sightings live *under a wishlist entry*, so you can only log one
+> for a bottle already on your own list. That blocks crowd-sourcing — you can't
+> report a bottle you spot *for a friend*. These stories make sightings
+> first-class, catalog-keyed records, decoupled from the wishlist. They must land
+> **before** the social-sightings iteration (BB-110/111/112), which assumed the
+> old coupled model.
+
+### BB-161 — Decouple Sightings to First-Class, Catalog-Keyed Records
+**As a** user, **I want** sightings stored as standalone observations about a catalog bottle (not buried under my wishlist), **so that** any spotter can report any bottle and any hunter sees the relevant sightings.
+
+**AC:**
+- Sightings move to a top-level `/sightings/{id}` keyed by `bourbonId`, with `spotterUid`, store, price, city/state, date, `markedStaleManually`, `visibility`, `createdAt`
+- A wishlist entry's sightings become a **query** by `bourbonId` (own + permitted others'), not a stored subcollection
+- `bestSightingPrice` recomputes from the viewer-visible, non-stale sightings for that `bourbonId` when a matching sighting changes
+- Staleness unchanged (`markedStaleManually || date > 30 days`), computed on read
+- The price-alert trigger (Iteration 7) is repointed from the old subcollection path to `/sightings`
+- Existing `/users/{uid}/wishlistEntries/{entryId}/sightings` docs are migrated (one-time): `spotterUid = uid`, `visibility = 'private'`, `bourbonId` from the parent entry
+- Requires canonical `bourbonId` (BB-160)
+
+**SP:** 8
+
+### BB-162 — "Spotted It" Standalone Capture
+**As a** user, **I want to** log a sighting for any bottle I see — even one not on my Hunt List — **so that** I can report finds for myself or my friends.
+
+**AC:**
+- A global "Spotted it" action (FAB / quick-add) opens a sighting form: search the shared catalog (or add a new bottle), then store, price, city/state, date
+- The sighting saves to `/sightings` under the chosen `bourbonId`, regardless of whether it's on the spotter's Hunt List
+- If it *is* on the spotter's Hunt List, it reflects there immediately
+- At log time, surface "🎯 \<friend\> is hunting this" when a connected friend wants it (contribution nudge) — *active once the social graph exists*
+- Designed for minimal friction; barcode scan + geolocation (Phase 2) make capture near-instant
+- Honest dependency: crowd-sourcing only pays off if logging is fast and people see that it helps friends
+
+**SP:** 5
+
+### BB-163 — Sighting Abuse & Fan-out Controls
+**As the** owner, **I want** sighting creation and the alerts it triggers to be rate-limited, validated, and dedup'd, **so that** one careless or malicious user can't spam friends, poison prices, bloat the DB, or run up cost.
+
+> **The threat:** decoupled sightings let anyone log anything. Worst cases: a user
+> logs every bottle in a store (notification storm + DB writes + function fan-out
+> cost); a troll posts fake low prices to grief friends; a bot mass-creates fake
+> sightings/catalog bottles. Protect the **app, DB, users, and the bill**. Splits
+> across two iterations — creation guards ship with the decouple (It8), fan-out
+> guards ship with social sightings (It10).
+
+**AC — creation-side (Iteration 8, with BB-161/162):**
+- Per-user sighting rate limit (e.g. ≤ N/day + a short cooldown), enforced server-side via a counter; over-limit writes are rejected
+- Input validation in security rules + function: price within sane bounds (> 0, below an absurd ceiling), store/city/state length caps, required fields
+- Creating a **new catalog bottle** from "Spotted it" is rate-limited and dedup'd against the canonical catalog (BB-160) to block catalog spam
+- App Check (BB-121) required on sighting/catalog writes so bots can't hit the endpoint directly
+- A scheduled cleanup purges sightings well past the staleness window so the `/sightings` collection stays bounded
+
+**AC — fan-out-side (Iteration 10, with BB-110/112):**
+- Per-spotter cap on alerts generated per day; per-recipient cap on alerts from one spotter per window (anti-harassment)
+- Bulk logging **coalesces**: several sightings to the same recipient in a short window batch into one push ("Daniel spotted 3 bottles on your list at Total Wine") instead of N pushes
+- (sighting → recipient) dedup; price edits don't re-alert beyond a meaningful drop
+- Users can **flag** a sighting as inaccurate; auto-hide after K flags; repeat-offender spotters are throttled/suppressed
+- Friends-only visibility bounds blast radius to your circle; the billing kill-switch (BB-120) is the hard backstop
+
+**SP:** 8
+
+---
+
+## Post-MVP Story Summary — Going Public
+
+| Story ID | Title | Epic | SP |
+|---|---|---|---|
+| BB-120 | Billing Budget Alerts & Kill-Switch | Cost Controls | 3 |
+| BB-121 | App Check Enforcement | Cost Controls | 5 |
+| BB-122 | Read/Write Quotas & Abuse Guards | Cost Controls | 3 |
+| BB-130 | AI "Find Bottles" from Articles | AI Features | 8 |
+| BB-131 | AI Usage Guardrails & BYO Key | AI Features | 5 |
+| BB-140 | Subscription Infrastructure | Monetization | 8 |
+| BB-141 | Pro Gating & Paywall | Monetization | 5 |
+| BB-150 | Age Gate & Legal Acceptance | Compliance | 3 |
+| BB-151 | Account Deletion & Data Rights | Compliance | 5 |
+| BB-160 | Bourbon Catalog Canonicalization | Data Quality | 5 |
+| BB-161 | Decouple Sightings (First-Class, Catalog-Keyed) | Sightings Decoupling | 8 |
+| BB-162 | "Spotted It" Standalone Capture | Sightings Decoupling | 5 |
+| BB-163 | Sighting Abuse & Fan-out Controls | Sightings Decoupling | 8 |
+
+**Going-Public + Foundations Total: 71 SP** · **Grand Post-MVP Total: 123 SP**
+(BB-110 reduced 8→5 with the decoupled model; +18 net for the sightings
+foundation incl. abuse controls.)
+
+---
+
+# Backlog (Not Yet Iteration-Scoped)
+
+### BB-170 — News Full-Text Search (Algolia)
+**As a** user, **I want to** search the entire news archive, **so that** I can find any article, not just the pages I've already scrolled.
+
+**Context:** the Dispatch feed has cursor pagination + client-side search over
+loaded articles (good for browsing). True "find that one article from weeks ago"
+needs a hosted full-text index. Chosen direction: **Algolia** (best DX, the
+official Firebase "Search with Algolia" extension auto-syncs a collection, and
+the rolling ~90-day shared `newsArticles` corpus should fit the free tier).
+Typesense is the cheaper-at-scale alternative if Algolia costs grow.
+
+**AC:**
+- `newsArticles` is synced to an Algolia index on add (`fetchRssFeeds`) and on
+  delete (cleanup functions) — via the Firebase extension or a small Cloud Function
+- Dispatch search queries the index for full-text matches (headline, source,
+  excerpt) across **all** stored articles, not just loaded pages
+- Results respect article-state filtering (read/saved/dismissed) and open like
+  feed articles
+- Stays within Algolia's free tier for the shared corpus; usage monitored
+- Falls back to the current client-side search if the index is unavailable
+
+**SP:** 5
