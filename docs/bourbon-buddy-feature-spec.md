@@ -1,7 +1,7 @@
 # Bourbon Buddy — Product Feature Specification
 
-**Version:** 1.2
-**Last Updated:** 2026-06-29
+**Version:** 1.3
+**Last Updated:** 2026-06-30
 **Scope:** MVP — Single User (+ Post-MVP social features scoped in the backlog)
 
 ---
@@ -158,7 +158,16 @@ The best (lowest) price from all non-stale sightings is surfaced on the wishlist
 
 ### 4. Bottle Sightings
 
-Records of where the user found a specific bottle and at what price. In MVP this is self-sourced. In future social versions this becomes crowd-sourced.
+Records of where the user found a specific bottle and at what price.
+
+> **Architecture note (Iteration 8 — BB-161/162).** In the MVP, a sighting is
+> stored *under a wishlist entry*, so you can only log one for a bottle already on
+> your own Hunt List. That blocks crowd-sourcing — you can't report a bottle you
+> spot *for a friend*. Iteration 8 decouples sightings into first-class,
+> catalog-keyed `/sightings` records that **any** user can create for **any**
+> catalog bottle via a global "Spotted it" action; a Hunt List entry's sightings
+> become a query by `bourbonId`. This is the foundation the social-sightings
+> features (BB-110/111/112) require.
 
 Sightings can be created from:
 - A wishlist entry detail screen
@@ -309,29 +318,36 @@ Tapping a chart bar shows the contributing log entries for that data point.
 
 ### Planned: Social, Sightings & Notifications (Phases 2 & 4)
 
-Now fully scoped with acceptance criteria — see stories **BB-090–BB-113** in
+Now fully scoped with acceptance criteria — see stories **BB-090–BB-162** in
 [bourbon-buddy-user-stories.md](bourbon-buddy-user-stories.md) and the supporting
 schemas in [bourbon-buddy-data-model.md](bourbon-buddy-data-model.md).
 
 **Headline feature — Sighting Match Alerts (BB-112):** When a connected friend
-logs a sighting of a bottle and chooses to share it, any friend who has that
-exact bottle on their **active Hunt List** is pushed a notification with the
-store, price, and city/state — so they can chase the bottle before it's gone.
-This is the moment the wishlist and the sightings system pay off socially: the
-self-sourced sighting of MVP (see *Bottle Sightings*, above) becomes
-crowd-sourced.
+logs a sighting of a bottle (visibility = friends), any friend who has that exact
+bottle on their **active Hunt List** is pushed a notification with the store,
+price, and city/state — so they can chase the bottle before it's gone. This is
+the moment the wishlist and the sightings system pay off socially.
+
+**Critical foundation (Iteration 8, do first):** the MVP welds sightings to the
+spotter's *own* wishlist, so they can't report a bottle a friend wants. The
+**sightings decoupling (BB-161/162)** and **catalog canonicalization (BB-160)**
+fix that — sightings become first-class, catalog-keyed records anyone can log for
+any bottle. Without this, the social-sightings features have no usable data shape.
 
 Supporting features it depends on, each its own scoped story:
 
+- **Social-data foundation (Iteration 8):** catalog canonicalization (BB-160),
+  decoupled first-class sightings (BB-161), and a standalone "Spotted it" capture
+  for any bottle (BB-162).
 - **Notification foundation (Phase 2):** FCM setup (BB-090) and per-type
   notification preferences, default off (BB-091). Also powers wishlist price
   alerts and the news digest.
 - **Social graph (Phase 4):** opt-in public profile + unique username (BB-100),
   find & add friends (BB-101), accept/decline requests (BB-102), and manage /
   remove / block (BB-103).
-- **Shareable sightings (Phase 4):** per-sighting "share with friends" privacy
-  toggle writing to a queryable shared collection (BB-110), a friends' sightings
-  feed with Hunt-List matches highlighted (BB-111), and an in-app notification
+- **Sighting visibility (Phase 4):** per-sighting private/friends visibility on
+  the decoupled `/sightings` records (BB-110), a friends' sightings feed with
+  Hunt-List matches highlighted (BB-111), and an in-app notification
   inbox so alerts are recoverable (BB-113).
 
 **Privacy posture:** sightings are private by default and only shared on an

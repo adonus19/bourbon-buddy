@@ -1,7 +1,7 @@
 # Bourbon Buddy — Firestore Data Model
 
-**Version:** 1.2
-**Last Updated:** 2026-06-29
+**Version:** 1.3
+**Last Updated:** 2026-06-30
 **Database:** Cloud Firestore (Firebase)
 
 ---
@@ -174,7 +174,14 @@ wishlistEntries/{entryId}
 
 ## Subcollection: `/users/{userId}/wishlistEntries/{entryId}/sightings/{sightingId}`
 
-Price sightings tied to a specific wishlist entry.
+> **⚠️ Superseded in Iteration 8 (BB-161).** This is the MVP storage: sightings
+> live under a wishlist entry, so you can only log one for a bottle already on
+> your own list. That coupling blocks crowd-sourcing (you can't report a bottle
+> you spot for a *friend*). Iteration 8 moves sightings to the first-class,
+> catalog-keyed top-level [`/sightings`](#collection-sightingssightingid-iteration-8--bb-161) collection and turns a wishlist entry's
+> sightings into a query by `bourbonId`. Existing docs are migrated.
+
+Price sightings tied to a specific wishlist entry (MVP model).
 
 ```
 sightings/{sightingId}
@@ -382,30 +389,49 @@ blocks/{blockedUid}
   createdAt:  Timestamp
 ```
 
-### Collection: `/sightings/{sightingId}` *(Phase 4 — BB-110)*
+### Collection: `/sightings/{sightingId}` *(Iteration 8 — BB-161)*
 
-The **shared** mirror of a private wishlist sighting, created only when the
-owner marks a sighting "share with friends." Top-level so a Cloud Function can
-match `bourbonId` against friends' Hunt Lists. Private sightings stay under
-`/users/{uid}/wishlistEntries/{entryId}/sightings` and are never copied here.
+The **primary, first-class** store for *all* sightings — not a mirror.
+Decoupled from any wishlist: a sighting is an observation about a **catalog
+bottle** (`bourbonId`), made by any user who spots it for sale, whether or not
+it's on their own Hunt List. This is what makes crowd-sourcing possible: you can
+report a bottle you see *for a friend*. A Hunt List entry's "sightings" become a
+**query** over this collection by `bourbonId`, not a stored subcollection.
 
 ```
 sightings/{sightingId}
-  ownerUid:      string
-  bourbonId:     string        // match key against friends' wishlist entries
+  bourbonId:     string        // catalog match key (requires BB-160 canonicalization)
   bourbonName:   string        // denormalized for display
+  spotterUid:    string        // who logged it
   storeName:     string
   price:         number
   city:          string | null
   state:         string | null
   sightingDate:  Timestamp
-  visibility:    string        // "friends" (only value for now)
+  markedStaleManually: boolean
+  visibility:    string        // "private" | "friends"
   createdAt:     Timestamp
 ```
 
-**Security:** readable only by the owner's accepted, non-blocked friends;
-writable only by `ownerUid`. **Match query (in function):**
-`.where('bourbonId','==', x)` joined against each friend's active wishlist.
+**Staleness:** `isStale = markedStaleManually || (today - sightingDate > 30 days)`
+— computed on read.
+
+**Queries:**
+- A Hunt List entry's sightings: `.where('bourbonId','==', x)` filtered to those
+  the viewer may see (own + friends' `visibility: 'friends'`), `.orderBy('price','asc')`.
+- Match for alerts (BB-112): on a new `visibility: 'friends'` sighting, match
+  `bourbonId` against the spotter's friends' **active** Hunt List entries.
+
+**`bestSightingPrice`** on a wishlist entry is recomputed from the visible,
+non-stale sightings for that `bourbonId` whenever a matching sighting changes.
+
+**Security:** readable by `spotterUid` always, and by the spotter's accepted,
+non-blocked friends when `visibility == 'friends'`; writable only by
+`spotterUid`. Location is limited to store + city/state (no precise geo).
+
+**Migration:** existing `/users/{uid}/wishlistEntries/{entryId}/sightings` docs
+are copied to `/sightings` (carrying `bourbonId` from the parent entry,
+`spotterUid = uid`, `visibility = 'private'`) by a one-time script.
 
 ### Subcollection: `/users/{userId}/notifications/{notificationId}` *(Phase 4 — BB-113)*
 
@@ -424,7 +450,8 @@ notifications/{notificationId}
 
 **Additional indexes (add to `firestore.indexes.json` when built):**
 `friendRequests` (toUid ASC, status ASC), `friendRequests` (fromUid ASC,
-status ASC), `sightings` (bourbonId ASC, createdAt DESC),
+status ASC), `sightings` (bourbonId ASC, price ASC),
+`sightings` (spotterUid ASC, createdAt DESC),
 `notifications` collection-group (read ASC, createdAt DESC).
 
 ---
