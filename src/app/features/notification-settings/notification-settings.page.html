@@ -23,6 +23,15 @@
         <ion-button
           expand="block"
           fill="outline"
+          [disabled]="busy"
+          (click)="sendTest()"
+        >
+          <ion-icon name="paper-plane-outline" slot="start"></ion-icon>
+          Send a test notification
+        </ion-button>
+        <ion-button
+          expand="block"
+          fill="clear"
           color="medium"
           [disabled]="busy"
           (click)="disable()"
@@ -63,5 +72,36 @@
         </ion-button>
       }
     }
+
+    <!-- Preferences (BB-091) -->
+    <p class="eyebrow nsettings__section">What to notify me about</p>
+    <p class="nsettings__hint">
+      Choose which alerts you want. Some arrive as their features roll out.
+    </p>
+
+    <ion-list class="nsettings__list" lines="none">
+      <ion-item class="nsettings__item">
+        <ion-toggle
+          [checked]="prefs().pausedAll"
+          (ionChange)="onPauseToggle($any($event.detail.checked))"
+        >
+          <strong>Pause all notifications</strong>
+          <p class="nsettings__desc">A master switch — overrides the choices below.</p>
+        </ion-toggle>
+      </ion-item>
+
+      @for (t of types; track t.key) {
+        <ion-item class="nsettings__item">
+          <ion-toggle
+            [checked]="prefs()[t.key]"
+            [disabled]="prefs().pausedAll"
+            (ionChange)="onToggle(t.key, $any($event.detail.checked))"
+          >
+            {{ t.label }}
+            <p class="nsettings__desc">{{ t.desc }}</p>
+          </ion-toggle>
+        </ion-item>
+      }
+    </ion-list>
   </div>
 </ion-content>
