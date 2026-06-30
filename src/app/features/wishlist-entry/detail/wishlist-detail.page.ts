@@ -18,6 +18,7 @@ import {
   STATUS_DISPLAY,
 } from '../../../shared/constants/wishlist-display';
 import { isSightingStale } from '../../../shared/utils/sighting';
+import { sightingErrorMessage } from '../../../shared/utils/sighting-error';
 import { SightingFormComponent } from '../../../shared/components/sighting-form/sighting-form.component';
 
 @Component({
@@ -120,8 +121,8 @@ export class WishlistDetailPage {
     try {
       await this.sightingService.add(e.bourbonId, e.bourbonName, input);
       await this.presentToast('Sighting logged. People are going to believe you.');
-    } catch {
-      await this.presentToast("Couldn't save the sighting. Try again.");
+    } catch (err) {
+      await this.presentToast(sightingErrorMessage(err));
     }
   }
 

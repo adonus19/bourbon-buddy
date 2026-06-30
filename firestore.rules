@@ -25,23 +25,36 @@ service cloud.firestore {
     // only the original creator may update their addition. No deletes.
     match /bourbons/{bourbonId} {
       allow read: if isSignedIn();
+      // Basic anti-spam validation (BB-163): a non-empty, bounded name.
       allow create: if isSignedIn()
-                    && request.resource.data.createdByUserId == request.auth.uid;
+                    && request.resource.data.createdByUserId == request.auth.uid
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() > 0
+                    && request.resource.data.name.size() <= 120;
       allow update: if isSignedIn()
                     && resource.data.createdByUserId == request.auth.uid;
       allow delete: if false;
     }
 
     // First-class sightings (BB-161). Keyed by bourbonId, owned by spotterUid.
-    // For now a sighting is readable only by its spotter; friend-visibility
-    // (visibility == 'friends') is added in BB-110. Price-alert / match
-    // functions use the Admin SDK and bypass these rules.
+    // Readable only by its spotter for now; friend-visibility is added in BB-110.
+    //
+    // CREATE is denied here on purpose (BB-163): all creation goes through the
+    // `logSighting` callable, which validates input and enforces a per-user
+    // daily rate limit via the Admin SDK (which bypasses these rules). The owner
+    // may still mark-stale / delete their own sighting, but cannot alter the
+    // price, bottle, or createdAt after the fact.
     match /sightings/{sightingId} {
       allow read: if isSignedIn()
                   && resource.data.spotterUid == request.auth.uid;
-      allow create: if isSignedIn()
-                    && request.resource.data.spotterUid == request.auth.uid;
-      allow update, delete: if isSignedIn()
+      allow create: if false;
+      allow update: if isSignedIn()
+                    && resource.data.spotterUid == request.auth.uid
+                    && request.resource.data.spotterUid == resource.data.spotterUid
+                    && request.resource.data.bourbonId == resource.data.bourbonId
+                    && request.resource.data.price == resource.data.price
+                    && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isSignedIn()
                     && resource.data.spotterUid == request.auth.uid;
     }
 

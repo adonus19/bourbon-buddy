@@ -7,6 +7,7 @@ import { Timestamp } from '@angular/fire/firestore';
 import { Bourbon } from '../../models';
 import { BourbonCatalogService } from '../../core/services/bourbon-catalog.service';
 import { SightingService } from '../../core/services/sighting.service';
+import { sightingErrorMessage } from '../../shared/utils/sighting-error';
 
 /**
  * "Spotted it" — log a price sighting for ANY catalog bottle, whether or not
@@ -91,8 +92,8 @@ export class SpottedItPage {
 
       await this.presentToast('Spotted it. Sighting logged.');
       await this.router.navigateByUrl('/tabs/hunt-list', { replaceUrl: true });
-    } catch {
-      await this.presentToast("Couldn't log the sighting. Try again.");
+    } catch (err) {
+      await this.presentToast(sightingErrorMessage(err));
     } finally {
       this.saving = false;
     }

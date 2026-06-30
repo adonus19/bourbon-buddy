@@ -1,7 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import {
   Firestore,
-  addDoc,
   collection,
   collectionData,
   deleteDoc,
@@ -13,6 +12,7 @@ import {
   updateDoc,
   where,
 } from '@angular/fire/firestore';
+import { Functions, httpsCallable } from '@angular/fire/functions';
 import { Observable, of } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 
@@ -36,6 +36,7 @@ export type SightingInput = Pick<
 @Injectable({ providedIn: 'root' })
 export class SightingService {
   private readonly firestore = inject(Firestore);
+  private readonly functions = inject(Functions);
   private readonly auth = inject(AuthService);
 
   /** The current user's own sightings for a bottle, lowest price first. */
@@ -57,6 +58,11 @@ export class SightingService {
     );
   }
 
+  /**
+   * Creates a sighting via the `logSighting` callable (BB-163) — server-side
+   * validation + per-user daily rate limit; direct client writes to /sightings
+   * are denied by the rules. Then recomputes the user's cached best price.
+   */
   async add(
     bourbonId: string,
     bourbonName: string | null,
@@ -64,14 +70,20 @@ export class SightingService {
     visibility: SightingVisibility = 'private'
   ): Promise<void> {
     const uid = this.requireUid();
-    await addDoc(this.col(), {
-      ...input,
+    const callable = httpsCallable<unknown, { id: string }>(
+      this.functions,
+      'logSighting'
+    );
+    await callable({
       bourbonId,
       bourbonName: bourbonName ?? null,
-      spotterUid: uid,
-      markedStaleManually: false,
+      storeName: input.storeName,
+      price: input.price,
+      sightingDateMillis: input.sightingDate.toMillis(),
+      city: input.city ?? null,
+      state: input.state ?? null,
+      notes: input.notes ?? null,
       visibility,
-      createdAt: serverTimestamp(),
     });
     await this.recomputeBestPrice(uid, bourbonId);
   }
