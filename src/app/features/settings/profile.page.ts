@@ -9,9 +9,14 @@ import {
 import { Auth, updateProfile } from '@angular/fire/auth';
 
 import { AuthService } from '../../core/auth/auth.service';
-import { UserService } from '../../core/services/user.service';
+import { USERNAME_TAKEN, UserService } from '../../core/services/user.service';
 import { ExportKind, ExportService } from '../../core/services/export.service';
 import { NotificationService } from '../../core/services/notification.service';
+import {
+  USERNAME_MAX,
+  USERNAME_MIN,
+  validateUsername,
+} from '../../shared/utils/username';
 
 @Component({
   selector: 'app-profile',
@@ -47,7 +52,26 @@ export class ProfilePage {
     homeRegion: ['', [Validators.maxLength(80)]],
   });
 
+  // Public handle is edited separately so claiming it doesn't entangle the
+  // main profile form's dirty/pristine state.
+  readonly usernameForm = this.fb.group({
+    username: [
+      '',
+      [
+        Validators.minLength(USERNAME_MIN),
+        Validators.maxLength(USERNAME_MAX),
+        Validators.pattern(/^[a-zA-Z0-9_]+$/),
+      ],
+    ],
+  });
+
+  readonly currentUsername = computed(() => this.profile()?.username ?? null);
+  readonly isDiscoverable = computed(
+    () => this.profile()?.isDiscoverable ?? false
+  );
+
   saving = false;
+  claimingUsername = false;
 
   constructor() {
     // Sync the loaded profile into the form, but never clobber in-progress edits.
@@ -65,6 +89,55 @@ export class ProfilePage {
         );
       }
     });
+
+    effect(() => {
+      const p = this.profile();
+      if (p && this.usernameForm.pristine) {
+        this.usernameForm.patchValue(
+          { username: p.username ?? '' },
+          { emitEvent: false }
+        );
+      }
+    });
+  }
+
+  async claimUsername(): Promise<void> {
+    const uid = this.user()?.uid;
+    const desired = (this.usernameForm.value.username ?? '').trim();
+    if (!uid || this.claimingUsername) {
+      return;
+    }
+    const problem = validateUsername(desired);
+    if (problem) {
+      await this.presentToast(problem);
+      return;
+    }
+    this.claimingUsername = true;
+    try {
+      await this.userService.claimUsername(uid, desired, this.currentUsername());
+      this.usernameForm.markAsPristine();
+      await this.presentToast(`Handle claimed: @${desired}`);
+    } catch (err) {
+      const msg =
+        err instanceof Error && err.message === USERNAME_TAKEN
+          ? 'That handle is taken. Try another.'
+          : "Couldn't claim that handle. Try again.";
+      await this.presentToast(msg);
+    } finally {
+      this.claimingUsername = false;
+    }
+  }
+
+  async toggleDiscoverable(value: boolean): Promise<void> {
+    const uid = this.user()?.uid;
+    if (!uid || value === this.isDiscoverable()) {
+      return;
+    }
+    try {
+      await this.userService.setDiscoverable(uid, value);
+    } catch {
+      await this.presentToast("Couldn't update discoverability. Try again.");
+    }
   }
 
   async save(): Promise<void> {
