@@ -1,8 +1,10 @@
 import { Component, computed, inject } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AlertController, ModalController, ToastController } from '@ionic/angular';
 import { Timestamp } from '@angular/fire/firestore';
+import { of } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
 
 import { Sighting } from '../../../models';
 import { WishlistService } from '../../../core/services/wishlist.service';
@@ -40,9 +42,16 @@ export class WishlistDetailPage {
 
   readonly entry = this.wishlist.selectById(this.entryId);
 
-  // One sightings listener for the viewed entry.
+  // Sightings are keyed by the bottle (bourbonId), not the wishlist entry, so
+  // the listener swaps once the entry (hence its bourbonId) has loaded.
   private readonly sightings = toSignal(
-    this.sightingService.sightingsFor(this.entryId),
+    toObservable(this.entry).pipe(
+      switchMap((e) =>
+        e?.bourbonId
+          ? this.sightingService.sightingsForBottle(e.bourbonId)
+          : of<Sighting[]>([])
+      )
+    ),
     { initialValue: [] as Sighting[] }
   );
   readonly sortedSightings = computed(() =>
@@ -96,6 +105,10 @@ export class WishlistDetailPage {
     if (role !== 'save' || !data) {
       return;
     }
+    const e = this.entry();
+    if (!e?.bourbonId) {
+      return;
+    }
     const input: SightingInput = {
       storeName: (data.storeName ?? '').trim(),
       price: Number(data.price),
@@ -105,7 +118,7 @@ export class WishlistDetailPage {
       notes: (data.notes ?? '').trim() || null,
     };
     try {
-      await this.sightingService.add(this.entryId, input);
+      await this.sightingService.add(e.bourbonId, e.bourbonName, input);
       await this.presentToast('Sighting logged. People are going to believe you.');
     } catch {
       await this.presentToast("Couldn't save the sighting. Try again.");
@@ -113,21 +126,19 @@ export class WishlistDetailPage {
   }
 
   async toggleStale(s: Sighting): Promise<void> {
-    if (!s.id) {
+    const bourbonId = this.entry()?.bourbonId;
+    if (!s.id || !bourbonId) {
       return;
     }
-    await this.sightingService.setStale(
-      this.entryId,
-      s.id,
-      !s.markedStaleManually
-    );
+    await this.sightingService.setStale(s.id, bourbonId, !s.markedStaleManually);
   }
 
   async removeSighting(s: Sighting): Promise<void> {
-    if (!s.id) {
+    const bourbonId = this.entry()?.bourbonId;
+    if (!s.id || !bourbonId) {
       return;
     }
-    await this.sightingService.remove(this.entryId, s.id);
+    await this.sightingService.remove(s.id, bourbonId);
   }
 
   /** Pre-fills the Add-Log form from this entry and archives it on save. */

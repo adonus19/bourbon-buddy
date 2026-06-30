@@ -32,6 +32,19 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // First-class sightings (BB-161). Keyed by bourbonId, owned by spotterUid.
+    // For now a sighting is readable only by its spotter; friend-visibility
+    // (visibility == 'friends') is added in BB-110. Price-alert / match
+    // functions use the Admin SDK and bypass these rules.
+    match /sightings/{sightingId} {
+      allow read: if isSignedIn()
+                  && resource.data.spotterUid == request.auth.uid;
+      allow create: if isSignedIn()
+                    && request.resource.data.spotterUid == request.auth.uid;
+      allow update, delete: if isSignedIn()
+                    && resource.data.spotterUid == request.auth.uid;
+    }
+
     // News articles: read-only for users. Writes come from Cloud Functions
     // via the Admin SDK, which bypasses these rules entirely.
     match /newsArticles/{articleId} {
