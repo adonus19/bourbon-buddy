@@ -14,7 +14,7 @@ module.exports = {
     "plugin:@typescript-eslint/recommended",
   ],
   plugins: ["@typescript-eslint"],
-  ignorePatterns: ["lib/", "node_modules/"],
+  ignorePatterns: ["lib/", "node_modules/", "scripts/"],
   rules: {
     quotes: ["warn", "double", { allowTemplateLiterals: true }],
   },
