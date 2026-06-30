@@ -1,7 +1,7 @@
 # Bourbon Buddy — Iteration Plan (MVP)
 
-**Version:** 1.2
-**Last Updated:** 2026-06-29
+**Version:** 1.3
+**Last Updated:** 2026-06-30
 **Methodology:** Agile / Scrum-style iterations (2-week sprints)
 **Velocity Assumption:** ~25 story points per iteration (solo developer, part-time; adjust based on actual pace)
 **Total MVP Scope:** 152 SP across 7 iterations (not counting Iteration 0)
@@ -323,11 +323,17 @@ The order reflects both technical dependencies (auth before features, log before
 - **BB-120 Billing kill-switch + budget alerts** — cheap insurance, built before any public exposure
 - **Personal price alerts** on your own wishlist (uses BB-090)
 
-### Iteration 8 — AI Find Bottles & Catalog Quality
-**Stories:** BB-130, BB-160
-**Goal:** High-delight AI at near-zero cost, plus the data hygiene social matching depends on.
-- **BB-130 AI "Find Bottles"** — extraction cached **once per shared article**, so cost is independent of user count
-- **BB-160 Catalog canonicalization** — one entry per real bottle; improves stats now and is a prerequisite for accurate sighting matching
+### Iteration 8 — Social Data Foundation (Catalog + Sightings Refactor)
+**Stories:** BB-160, BB-161, BB-162
+**Goal:** Fix the data shape that the social-sightings features depend on, *before* building them.
+- **BB-160 Catalog canonicalization** — one entry per real bottle; improves stats now and is the hard prerequisite for sighting↔wishlist matching
+- **BB-161 Decouple sightings** — move sightings to first-class, catalog-keyed `/sightings`; a Hunt List entry's sightings become a query; migrate existing data; repoint the Iteration 7 price-alert trigger
+- **BB-162 "Spotted it" capture** — log a sighting for *any* bottle, not just ones on your own list (the change that makes crowd-sourcing possible)
+- *Why now:* MVP sightings are welded to your own wishlist, so a spotter can't report a bottle a friend wants. Building BB-110/112 on that would be building on sand.
+
+> **AI "Find Bottles" (BB-130) moved out of this iteration.** It's independent of
+> the social refactor and can be scheduled whenever — see the standalone AI slot
+> below.
 
 ### Iteration 9 — Social Graph
 **Stories:** BB-100, BB-101, BB-102, BB-103
@@ -335,8 +341,15 @@ The order reflects both technical dependencies (auth before features, log before
 
 ### Iteration 10 — Social Sightings & Alerts (the circle payoff)
 **Stories:** BB-110, BB-111, BB-112, BB-113
-**Goal:** The headline — get notified when a friend spots a bottle on your Hunt List.
+**Goal:** The headline — get notified when a friend spots a bottle on your Hunt List. Now built on the decoupled `/sightings` foundation from Iteration 8.
+- **Contribution caveat:** crowd-sourcing only works if logging is fast and spotters see that it helps friends (the BB-162 nudge + barcode/geo). Without that, friends won't log sightings for bottles they don't want.
 - **Push caveat:** iOS PWA web-push is workable but flaky. For the *circle* it's good enough to validate; reliable push is a reason native iOS (Iteration 12) precedes a true public launch.
+
+### AI "Find Bottles" (BB-130, BB-131) — independent slot
+No dependency on the social refactor; schedule whenever there's capacity (it was
+originally bundled into Iteration 8). BB-130 is the cached, near-zero-cost
+extraction; BB-131 (guardrails/BYO key) only matters once a *per-user* AI feature
+exists.
 
 ### Iteration 11 — Public-Launch Readiness (the gate)
 **Stories:** BB-121, BB-122, BB-131, BB-140, BB-141, BB-150, BB-151

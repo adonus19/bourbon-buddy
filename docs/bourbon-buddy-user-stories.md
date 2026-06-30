@@ -1,7 +1,7 @@
 # Bourbon Buddy — User Stories
 
-**Version:** 1.2
-**Last Updated:** 2026-06-29
+**Version:** 1.3
+**Last Updated:** 2026-06-30
 **Scope:** MVP — Single User (Daniel) + Post-MVP Social stories (Phases 2 & 4)
 
 ---
@@ -639,18 +639,21 @@ Each story includes:
 
 ## Epic 11: Social Sightings & Alerts *(Phase 4)*
 
-### BB-110 — Share Sightings with Friends
-**As a** user, **I want to** optionally share a bottle sighting with my friends, **so that** they learn about relevant finds while my private sightings stay private.
+### BB-110 — Sighting Visibility & Privacy
+**As a** user, **I want to** control who can see each sighting I log, **so that** I share useful finds with friends while keeping some private.
+
+> **Depends on the decoupled model (BB-161).** Sightings are first-class
+> `/sightings` docs; this story adds the visibility dimension to them.
 
 **AC:**
-- When logging or editing a sighting, a "Share with friends" toggle (defaulting to a user-level preference) controls visibility
-- A shared sighting is written to a queryable top-level `/sightings/{sightingId}` carrying `ownerUid`, `bourbonId`, `bourbonName`, `storeName`, `price`, `city`, `state`, `sightingDate`, `visibility`, `createdAt`
-- Private sightings remain only under `/users/{uid}/wishlistEntries/{entryId}/sightings` and are never copied to the shared collection
-- Turning a shared sighting private, or deleting it, removes the top-level document
-- Security rules make a `/sightings` doc readable only by the owner's accepted, non-blocked friends and writable only by the owner
-- Location is limited to store + city/state (no precise geolocation) for privacy
+- Every sighting has a `visibility`: `private` (only me) or `friends` (my accepted, non-blocked friends)
+- A user-level default visibility, overridable per sighting at log/edit time
+- Security rules: a `/sightings` doc is readable by its `spotterUid` always, and by the spotter's friends when `visibility == 'friends'`; writable only by the spotter
+- `private` sightings never surface to others, never appear in the friends' feed (BB-111), and never trigger alerts (BB-112)
+- Changing a sighting from `friends` to `private` immediately removes it from others' views
+- Location stays limited to store + city/state (no precise geolocation)
 
-**SP:** 8
+**SP:** 5
 
 ---
 
@@ -672,8 +675,8 @@ Each story includes:
 **As a** user, **I want to** be notified when a friend spots a bottle on my Hunt List, **so that** I can chase it down before it's gone.
 
 **AC:**
-- When a shared sighting is created (BB-110), a Cloud Function finds the owner's friends who have the same `bourbonId` on their **active** Hunt List
-- Each matched friend who has the alert enabled (BB-091) and has not blocked / been blocked by the owner receives a push notification with: bottle name, store, price, city/state, and who spotted it
+- When a `visibility: 'friends'` sighting is created (BB-161/110), a Cloud Function finds the spotter's friends who have the same `bourbonId` on their **active** Hunt List
+- Each matched friend who has the alert enabled (BB-091) and has not blocked / been blocked by the spotter receives a push notification with: bottle name, store, price, city/state, and who spotted it
 - Tapping the notification deep-links to the sighting and the matching Hunt List entry
 - An inbox record (BB-113) is created alongside every push so a missed notification is recoverable
 - De-duplication: a given (sighting → recipient) alert is delivered at most once; later price edits do not re-spam beyond a meaningful price-drop threshold
@@ -707,12 +710,12 @@ Each story includes:
 | BB-101 | Find & Add Friends | Social Graph | 4 | 5 |
 | BB-102 | Respond to Friend Requests | Social Graph | 4 | 5 |
 | BB-103 | Manage Friends (List, Remove, Block) | Social Graph | 4 | 3 |
-| BB-110 | Share Sightings with Friends | Social Sightings | 4 | 8 |
+| BB-110 | Sighting Visibility & Privacy | Social Sightings | 4 | 5 |
 | BB-111 | Friends' Sightings Feed | Social Sightings | 4 | 5 |
 | BB-112 | Sighting Match Alerts | Social Sightings | 4 | 8 |
 | BB-113 | Notification Inbox | Social Sightings | 4 | 5 |
 
-**Post-MVP Total: 55 SP** (Phase 2: 11 · Phase 4: 44)
+**Post-MVP Total: 52 SP** (Phase 2: 11 · Phase 4: 41)
 
 ---
 
@@ -867,6 +870,45 @@ Each story includes:
 - An admin/maintenance path merges duplicate catalog docs and repoints references
 - Sighting Match (BB-112) and stats group on the canonical `bourbonId`
 - Improves stats grouping immediately, independent of social
+- **Hard prerequisite for BB-161** — sighting↔wishlist matching by `bourbonId` is meaningless if one bottle has duplicate catalog docs
+
+**SP:** 5
+
+---
+
+## Epic 17: Sightings Decoupling *(Iteration 8 — prerequisite for social sightings)*
+
+> **Why:** MVP sightings live *under a wishlist entry*, so you can only log one
+> for a bottle already on your own list. That blocks crowd-sourcing — you can't
+> report a bottle you spot *for a friend*. These stories make sightings
+> first-class, catalog-keyed records, decoupled from the wishlist. They must land
+> **before** the social-sightings iteration (BB-110/111/112), which assumed the
+> old coupled model.
+
+### BB-161 — Decouple Sightings to First-Class, Catalog-Keyed Records
+**As a** user, **I want** sightings stored as standalone observations about a catalog bottle (not buried under my wishlist), **so that** any spotter can report any bottle and any hunter sees the relevant sightings.
+
+**AC:**
+- Sightings move to a top-level `/sightings/{id}` keyed by `bourbonId`, with `spotterUid`, store, price, city/state, date, `markedStaleManually`, `visibility`, `createdAt`
+- A wishlist entry's sightings become a **query** by `bourbonId` (own + permitted others'), not a stored subcollection
+- `bestSightingPrice` recomputes from the viewer-visible, non-stale sightings for that `bourbonId` when a matching sighting changes
+- Staleness unchanged (`markedStaleManually || date > 30 days`), computed on read
+- The price-alert trigger (Iteration 7) is repointed from the old subcollection path to `/sightings`
+- Existing `/users/{uid}/wishlistEntries/{entryId}/sightings` docs are migrated (one-time): `spotterUid = uid`, `visibility = 'private'`, `bourbonId` from the parent entry
+- Requires canonical `bourbonId` (BB-160)
+
+**SP:** 8
+
+### BB-162 — "Spotted It" Standalone Capture
+**As a** user, **I want to** log a sighting for any bottle I see — even one not on my Hunt List — **so that** I can report finds for myself or my friends.
+
+**AC:**
+- A global "Spotted it" action (FAB / quick-add) opens a sighting form: search the shared catalog (or add a new bottle), then store, price, city/state, date
+- The sighting saves to `/sightings` under the chosen `bourbonId`, regardless of whether it's on the spotter's Hunt List
+- If it *is* on the spotter's Hunt List, it reflects there immediately
+- At log time, surface "🎯 \<friend\> is hunting this" when a connected friend wants it (contribution nudge) — *active once the social graph exists*
+- Designed for minimal friction; barcode scan + geolocation (Phase 2) make capture near-instant
+- Honest dependency: crowd-sourcing only pays off if logging is fast and people see that it helps friends
 
 **SP:** 5
 
@@ -886,8 +928,11 @@ Each story includes:
 | BB-150 | Age Gate & Legal Acceptance | Compliance | 3 |
 | BB-151 | Account Deletion & Data Rights | Compliance | 5 |
 | BB-160 | Bourbon Catalog Canonicalization | Data Quality | 5 |
+| BB-161 | Decouple Sightings (First-Class, Catalog-Keyed) | Sightings Decoupling | 8 |
+| BB-162 | "Spotted It" Standalone Capture | Sightings Decoupling | 5 |
 
-**Going-Public Total: 50 SP** · **Grand Post-MVP Total: 105 SP**
+**Going-Public + Foundations Total: 63 SP** · **Grand Post-MVP Total: 115 SP**
+(BB-110 reduced 8→5 with the decoupled model, so net new is +10.)
 
 ---
 
