@@ -1,0 +1,95 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/tabs/hunt-list" text=""></ion-back-button>
+    </ion-buttons>
+    <ion-title>Spotted It</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <form class="spot" [formGroup]="form" (ngSubmit)="save()">
+    <p class="spot__lead">
+      Saw a bottle on a shelf? Log it for anyone hunting it — it doesn't have to
+      be on your own list.
+    </p>
+
+    <p class="eyebrow spot__section">The bottle</p>
+    <app-bourbon-autocomplete
+      [value]="form.controls.bourbonName.value || ''"
+      (valueChange)="onNameInput($event)"
+      (selected)="onBottleSelected($event)"
+    ></app-bourbon-autocomplete>
+
+    <p class="eyebrow spot__section">Where & how much</p>
+    <ion-input
+      class="spot__field"
+      fill="solid"
+      label="Store / venue"
+      labelPlacement="stacked"
+      type="text"
+      formControlName="storeName"
+    ></ion-input>
+
+    <ion-input
+      class="spot__field"
+      fill="solid"
+      label="Price"
+      labelPlacement="stacked"
+      type="number"
+      inputmode="decimal"
+      formControlName="price"
+    ></ion-input>
+
+    <ion-input
+      class="spot__field"
+      fill="solid"
+      label="Date spotted"
+      labelPlacement="stacked"
+      type="date"
+      formControlName="sightingDate"
+    ></ion-input>
+
+    <div class="spot__row">
+      <ion-input
+        class="spot__field"
+        fill="solid"
+        label="City"
+        labelPlacement="stacked"
+        type="text"
+        formControlName="city"
+      ></ion-input>
+      <ion-input
+        class="spot__field"
+        fill="solid"
+        label="State"
+        labelPlacement="stacked"
+        type="text"
+        formControlName="state"
+      ></ion-input>
+    </div>
+
+    <ion-textarea
+      class="spot__field"
+      fill="solid"
+      label="Notes"
+      labelPlacement="stacked"
+      [autoGrow]="true"
+      formControlName="notes"
+      placeholder="Last one on the shelf, limit 1, etc."
+    ></ion-textarea>
+
+    <ion-button
+      class="spot__save"
+      expand="block"
+      type="submit"
+      [disabled]="saving"
+    >
+      @if (saving) {
+        <ion-spinner name="crescent"></ion-spinner>
+      } @else {
+        <span>Log sighting</span>
+      }
+    </ion-button>
+  </form>
+</ion-content>

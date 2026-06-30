@@ -72,6 +72,14 @@ const routes: Routes = [
       ),
   },
   {
+    path: 'spotted/new',
+    canActivate: [authGuard],
+    loadChildren: () =>
+      import('./features/spotted-it/spotted-it.module').then(
+        (m) => m.SpottedItPageModule
+      ),
+  },
+  {
     path: 'wishlist/:id/edit',
     canActivate: [authGuard],
     loadChildren: () =>

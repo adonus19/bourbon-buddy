@@ -2,6 +2,9 @@
   <ion-toolbar>
     <ion-title>Hunt List</ion-title>
     <ion-buttons slot="end">
+      <ion-button routerLink="/spotted/new" aria-label="Spotted a bottle">
+        <ion-icon slot="icon-only" name="pricetag-outline"></ion-icon>
+      </ion-button>
       @if (entries().length) {
         <ion-button (click)="openFilter()" aria-label="Filter">
           <ion-icon
