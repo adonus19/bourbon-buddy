@@ -10,10 +10,15 @@ import {
   where,
 } from '@angular/fire/firestore';
 import { Functions, httpsCallable } from '@angular/fire/functions';
-import { Observable, of } from 'rxjs';
+import { Observable, from, of } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 
-import { FriendRequest, PublicProfile } from '../../models';
+import {
+  BlockedUser,
+  FriendRequest,
+  FriendView,
+  PublicProfile,
+} from '../../models';
 import { AuthService } from '../auth/auth.service';
 import { usernameKey, validateUsername } from '../../shared/utils/username';
 
@@ -132,6 +137,96 @@ export class FriendService {
           : of<FriendRequest[]>([])
       )
     );
+  }
+
+  /** My friends, hydrated from each edge's public profile. Page-scoped. */
+  friends$(): Observable<FriendView[]> {
+    return this.auth.currentUser$.pipe(
+      switchMap((user) => {
+        if (!user) {
+          return of<FriendView[]>([]);
+        }
+        const edges$ = collectionData(
+          collection(this.firestore, `users/${user.uid}/friends`),
+          { idField: 'id' }
+        ) as Observable<{ id: string }[]>;
+        return edges$.pipe(
+          switchMap((edges) =>
+            edges.length
+              ? from(this.hydrateFriends(edges))
+              : of<FriendView[]>([])
+          )
+        );
+      })
+    );
+  }
+
+  /** Users I've blocked (denormalized display, no extra reads). Page-scoped. */
+  blocked$(): Observable<BlockedUser[]> {
+    return this.auth.currentUser$.pipe(
+      switchMap((user) =>
+        user
+          ? (collectionData(
+              collection(this.firestore, `users/${user.uid}/blocks`),
+              { idField: 'id' }
+            ) as Observable<BlockedUser[]>)
+          : of<BlockedUser[]>([])
+      )
+    );
+  }
+
+  /** Removes a friendship (both edges + counts) via the guarded callable. */
+  async removeFriend(friendUid: string): Promise<void> {
+    const callable = httpsCallable<{ friendUid: string }, { ok: boolean }>(
+      this.functions,
+      'removeFriend'
+    );
+    await callable({ friendUid });
+  }
+
+  /** Blocks a user (severs friendship, clears pending) via the callable. */
+  async blockUser(blockedUid: string): Promise<void> {
+    const callable = httpsCallable<{ blockedUid: string }, { ok: boolean }>(
+      this.functions,
+      'blockUser'
+    );
+    await callable({ blockedUid });
+  }
+
+  /** Unblocks a user — a plain owner-side delete, no callable needed. */
+  async unblockUser(blockedUid: string): Promise<void> {
+    const uid = this.auth.snapshotUser?.uid;
+    if (!uid) {
+      return;
+    }
+    await deleteDoc(doc(this.firestore, `users/${uid}/blocks/${blockedUid}`));
+  }
+
+  /** One-shot read of a public profile (for the tap-through profile view). */
+  async getPublicProfile(uid: string): Promise<PublicProfile | null> {
+    const snap = await getDoc(doc(this.firestore, `publicProfiles/${uid}`));
+    return snap.exists()
+      ? ({ id: snap.id, ...snap.data() } as PublicProfile)
+      : null;
+  }
+
+  private async hydrateFriends(edges: { id: string }[]): Promise<FriendView[]> {
+    const views = await Promise.all(
+      edges.map(async (e) => {
+        const snap = await getDoc(
+          doc(this.firestore, `publicProfiles/${e.id}`)
+        );
+        const p = snap.data() as PublicProfile | undefined;
+        return {
+          uid: e.id,
+          displayName: p?.displayName ?? 'Bourbon Buddy',
+          username: p?.username ?? null,
+          avatarUrl: p?.avatarUrl ?? null,
+          homeRegion: p?.homeRegion ?? null,
+        } as FriendView;
+      })
+    );
+    return views.sort((a, b) => a.displayName.localeCompare(b.displayName));
   }
 
   private requests() {

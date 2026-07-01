@@ -133,6 +133,24 @@ interface RespondData {
   action?: "accept" | "decline";
 }
 
+/** Decrements a user's denormalized friendCount on both profile docs. */
+function decrementFriendCount(
+  tx: FirebaseFirestore.Transaction,
+  db: FirebaseFirestore.Firestore,
+  uid: string
+): void {
+  tx.set(
+    db.doc(`users/${uid}`),
+    { friendCount: FieldValue.increment(-1) },
+    { merge: true }
+  );
+  tx.set(
+    db.doc(`publicProfiles/${uid}`),
+    { friendCount: FieldValue.increment(-1) },
+    { merge: true }
+  );
+}
+
 /**
  * Recipient accepts or declines a pending request (BB-102). Accept writes both
  * reciprocal /friends edges, bumps both friendCounts, and marks the request —
@@ -206,6 +224,112 @@ export const respondToFriendRequest = onCall(
     return { ok: true };
   }
 );
+
+interface RemoveFriendData {
+  friendUid?: string;
+}
+
+/**
+ * Removes a friendship (BB-103): deletes both reciprocal edges and decrements
+ * both friendCounts in one transaction. Only edges that actually exist are
+ * touched, so it's idempotent and can't drive a count negative on a re-run.
+ * Removing the edges also revokes each side's access to the other's
+ * friends-only shared content.
+ */
+export const removeFriend = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    const uid = request.auth?.uid;
+    if (!uid) {
+      throw new HttpsError("unauthenticated", "Sign in to manage friends.");
+    }
+    const friendUid = (request.data as RemoveFriendData)?.friendUid;
+    if (!friendUid || typeof friendUid !== "string" || friendUid === uid) {
+      throw new HttpsError("invalid-argument", "Who do you want to remove?");
+    }
+
+    const db = getFirestore();
+    await db.runTransaction(async (tx) => {
+      const myRef = db.doc(`users/${uid}/friends/${friendUid}`);
+      const theirRef = db.doc(`users/${friendUid}/friends/${uid}`);
+      const [mine, theirs] = await Promise.all([tx.get(myRef), tx.get(theirRef)]);
+      if (mine.exists) {
+        tx.delete(myRef);
+        decrementFriendCount(tx, db, uid);
+      }
+      if (theirs.exists) {
+        tx.delete(theirRef);
+        decrementFriendCount(tx, db, friendUid);
+      }
+    });
+    return { ok: true };
+  }
+);
+
+interface BlockUserData {
+  blockedUid?: string;
+}
+
+/**
+ * Blocks a user (BB-103): writes /users/{uid}/blocks/{blockedUid} (with
+ * denormalized display), severs any existing friendship (both edges + counts),
+ * and clears any pending request in either direction — all atomically. A block
+ * also stops future search/friending via the checks in searchByUsername and
+ * sendFriendRequest. Unblock is a plain owner-side delete (no callable needed).
+ */
+export const blockUser = onCall({ region: "us-central1" }, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) {
+    throw new HttpsError("unauthenticated", "Sign in to manage friends.");
+  }
+  const blockedUid = (request.data as BlockUserData)?.blockedUid;
+  if (!blockedUid || typeof blockedUid !== "string" || blockedUid === uid) {
+    throw new HttpsError("invalid-argument", "Who do you want to block?");
+  }
+
+  const db = getFirestore();
+  const pub = (await db.doc(`publicProfiles/${blockedUid}`).get()).data() ?? {};
+
+  // Pending requests between the two (queried outside the tx, deleted inside).
+  const [outPending, inPending] = await Promise.all([
+    db
+      .collection("friendRequests")
+      .where("fromUid", "==", uid)
+      .where("toUid", "==", blockedUid)
+      .where("status", "==", "pending")
+      .get(),
+    db
+      .collection("friendRequests")
+      .where("fromUid", "==", blockedUid)
+      .where("toUid", "==", uid)
+      .where("status", "==", "pending")
+      .get(),
+  ]);
+
+  await db.runTransaction(async (tx) => {
+    const myRef = db.doc(`users/${uid}/friends/${blockedUid}`);
+    const theirRef = db.doc(`users/${blockedUid}/friends/${uid}`);
+    const [mine, theirs] = await Promise.all([tx.get(myRef), tx.get(theirRef)]);
+    if (mine.exists) {
+      tx.delete(myRef);
+      decrementFriendCount(tx, db, uid);
+    }
+    if (theirs.exists) {
+      tx.delete(theirRef);
+      decrementFriendCount(tx, db, blockedUid);
+    }
+    for (const snap of [outPending, inPending]) {
+      snap.docs.forEach((d) => tx.delete(d.ref));
+    }
+    tx.set(db.doc(`users/${uid}/blocks/${blockedUid}`), {
+      displayName: pub.displayName ?? null,
+      username: pub.username ?? null,
+      avatarUrl: pub.avatarUrl ?? null,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+  });
+  return { ok: true };
+});
 
 /** Pushes a "new friend request" notification to the recipient (respects prefs). */
 export const onFriendRequestCreated = onDocumentCreated(

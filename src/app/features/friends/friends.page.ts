@@ -1,8 +1,18 @@
 import { Component, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { ToastController } from '@ionic/angular';
+import { Router } from '@angular/router';
+import {
+  ActionSheetController,
+  AlertController,
+  ToastController,
+} from '@ionic/angular';
 
-import { FriendRequest, PublicProfile } from '../../models';
+import {
+  BlockedUser,
+  FriendRequest,
+  FriendView,
+  PublicProfile,
+} from '../../models';
 import { FriendService } from '../../core/services/friend.service';
 import { friendErrorMessage } from '../../shared/utils/friend-error';
 
@@ -21,7 +31,16 @@ import { friendErrorMessage } from '../../shared/utils/friend-error';
 export class FriendsPage {
   private readonly friends = inject(FriendService);
   private readonly toast = inject(ToastController);
+  private readonly actionSheet = inject(ActionSheetController);
+  private readonly alertCtrl = inject(AlertController);
+  private readonly router = inject(Router);
 
+  readonly friendList = toSignal(this.friends.friends$(), {
+    initialValue: [] as FriendView[],
+  });
+  readonly blocked = toSignal(this.friends.blocked$(), {
+    initialValue: [] as BlockedUser[],
+  });
   readonly incoming = toSignal(this.friends.incomingRequests$(), {
     initialValue: [] as FriendRequest[],
   });
@@ -122,6 +141,92 @@ export class FriendsPage {
       await this.presentToast('Request canceled.');
     } catch {
       await this.presentToast("Couldn't cancel. Try again.");
+    }
+  }
+
+  openProfile(uid: string): void {
+    void this.router.navigate(['/u', uid]);
+  }
+
+  async openFriendMenu(friend: FriendView): Promise<void> {
+    const sheet = await this.actionSheet.create({
+      header: friend.displayName,
+      buttons: [
+        {
+          text: 'Remove friend',
+          role: 'destructive',
+          handler: () => void this.confirmRemove(friend),
+        },
+        {
+          text: 'Block',
+          role: 'destructive',
+          handler: () => void this.confirmBlock(friend),
+        },
+        { text: 'Cancel', role: 'cancel' },
+      ],
+    });
+    await sheet.present();
+  }
+
+  private async confirmRemove(friend: FriendView): Promise<void> {
+    const alert = await this.alertCtrl.create({
+      header: 'Remove friend?',
+      message: `Remove ${friend.displayName} from your friends?`,
+      buttons: [
+        { text: 'Cancel', role: 'cancel' },
+        {
+          text: 'Remove',
+          role: 'destructive',
+          handler: () => void this.doRemove(friend.uid),
+        },
+      ],
+    });
+    await alert.present();
+  }
+
+  private async doRemove(uid: string): Promise<void> {
+    try {
+      await this.friends.removeFriend(uid);
+      await this.presentToast('Friend removed.');
+    } catch (err) {
+      await this.presentToast(friendErrorMessage(err));
+    }
+  }
+
+  private async confirmBlock(friend: FriendView): Promise<void> {
+    const alert = await this.alertCtrl.create({
+      header: 'Block this person?',
+      message: `${friend.displayName} won't be able to find you, send requests, or see what you share. Any current friendship ends.`,
+      buttons: [
+        { text: 'Cancel', role: 'cancel' },
+        {
+          text: 'Block',
+          role: 'destructive',
+          handler: () => void this.doBlock(friend.uid),
+        },
+      ],
+    });
+    await alert.present();
+  }
+
+  private async doBlock(uid: string): Promise<void> {
+    try {
+      await this.friends.blockUser(uid);
+      await this.presentToast('Blocked.');
+    } catch (err) {
+      await this.presentToast(friendErrorMessage(err));
+    }
+  }
+
+  async unblock(b: BlockedUser): Promise<void> {
+    if (!b.id) {
+      return;
+    }
+    try {
+      await this.friends.unblockUser(b.id);
+      await this.presentToast('Unblocked.');
+    } catch {
+      await this.presentToast("Couldn't unblock. Try again.");
     }
   }
 

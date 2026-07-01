@@ -1,0 +1,47 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/friends" text=""></ion-back-button>
+    </ion-buttons>
+    <ion-title>Profile</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true" class="pub-content">
+  @if (loading()) {
+    <div class="pub__state">
+      <ion-spinner name="crescent"></ion-spinner>
+    </div>
+  } @else if (profile(); as p) {
+    <div class="pub">
+      <ion-avatar class="pub__avatar">
+        @if (p.avatarUrl) {
+          <img [src]="p.avatarUrl" [alt]="p.displayName" />
+        } @else {
+          <div class="pub__avatar-fallback">
+            {{ (p.displayName || '?').charAt(0) }}
+          </div>
+        }
+      </ion-avatar>
+
+      <h1 class="pub__name">{{ p.displayName }}</h1>
+      @if (p.username) {
+        <p class="pub__handle">&commat;{{ p.username }}</p>
+      }
+      @if (p.homeRegion) {
+        <p class="pub__region">{{ p.homeRegion }}</p>
+      }
+
+      <div class="pub__stat">
+        <span class="pub__stat-num">{{ p.friendCount }}</span>
+        <span class="pub__stat-label">
+          {{ p.friendCount === 1 ? 'friend' : 'friends' }}
+        </span>
+      </div>
+    </div>
+  } @else {
+    <div class="pub__state">
+      <p class="pub__empty">This profile isn't available.</p>
+    </div>
+  }
+</ion-content>

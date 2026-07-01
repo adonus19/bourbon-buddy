@@ -19,9 +19,11 @@ export { onSightingCreated } from "./alerts";
 // Sighting guards (BB-163): rate-limited create callable + stale cleanup.
 export { logSighting, cleanupStaleSightings } from "./sightings";
 
-// Social graph (BB-101/102): guarded request create, accept/decline, push.
+// Social graph (BB-101/102/103): request create, accept/decline, remove, block.
 export {
   sendFriendRequest,
   respondToFriendRequest,
+  removeFriend,
+  blockUser,
   onFriendRequestCreated,
 } from "./social";

@@ -336,9 +336,27 @@ The order reflects both technical dependencies (auth before features, log before
 > the social refactor and can be scheduled whenever — see the standalone AI slot
 > below.
 
-### Iteration 9 — Social Graph
+### Iteration 9 — Social Graph ✅ *(complete)*
 **Stories:** BB-100, BB-101, BB-102, BB-103
 **Goal:** Friends. The prerequisite network for everything social.
+- **BB-100** — opt-in `username` + `/usernames` reservation (transactional,
+  case-insensitive uniqueness); `/publicProfiles/{uid}` as the only
+  cross-user-readable view (public fields only, since rules can't field-filter);
+  "discoverable by username" toggle (default off).
+- **BB-101** — exact-handle search (keyed getDocs, no query); `sendFriendRequest`
+  callable (self/block/duplicate guards + daily rate limit); outgoing pending +
+  cancel; `onFriendRequestCreated` recipient push.
+- **BB-102** — `respondToFriendRequest` callable: one transaction writes both
+  reciprocal `/friends` edges + both `friendCount`s + request status; idempotent.
+- **BB-103** — friends list (hydrated from public profiles), `removeFriend` +
+  `blockUser` callables (block also severs friendship & clears pending),
+  client-side unblock, read-only public-profile tap-through at `/u/:id`.
+- **Deploy:** rules (+`/publicProfiles`, `/usernames`, `/friendRequests`),
+  2 `friendRequests` indexes, functions (`sendFriendRequest`,
+  `respondToFriendRequest`, `removeFriend`, `blockUser`, `onFriendRequestCreated`).
+- **Cost posture:** no new app-wide listeners — every social listener is
+  page-scoped to the Friends page; all cross-user writes go through Admin
+  callables (a client can't write another user's docs).
 
 ### Iteration 10 — Social Sightings & Alerts (the circle payoff)
 **Stories:** BB-110, BB-111, BB-112, BB-113

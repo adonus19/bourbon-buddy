@@ -42,6 +42,20 @@
     border-radius: var(--radius-card, 14px);
   }
 
+  &__tap {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    text-align: left;
+    cursor: pointer;
+    color: inherit;
+  }
+
   &__avatar {
     width: 44px;
     height: 44px;
