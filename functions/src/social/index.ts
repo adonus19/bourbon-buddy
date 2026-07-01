@@ -128,6 +128,85 @@ export const sendFriendRequest = onCall(
   }
 );
 
+interface RespondData {
+  requestId?: string;
+  action?: "accept" | "decline";
+}
+
+/**
+ * Recipient accepts or declines a pending request (BB-102). Accept writes both
+ * reciprocal /friends edges, bumps both friendCounts, and marks the request —
+ * all in ONE transaction, so it's all-or-nothing and re-accepting is idempotent
+ * (an already-accepted request no-ops instead of double-counting).
+ */
+export const respondToFriendRequest = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    const uid = request.auth?.uid;
+    if (!uid) {
+      throw new HttpsError("unauthenticated", "Sign in to respond.");
+    }
+    const { requestId, action } = (request.data as RespondData) ?? {};
+    if (!requestId || (action !== "accept" && action !== "decline")) {
+      throw new HttpsError("invalid-argument", "Missing request or action.");
+    }
+
+    const db = getFirestore();
+    const reqRef = db.doc(`friendRequests/${requestId}`);
+
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(reqRef);
+      if (!snap.exists) {
+        throw new HttpsError("not-found", "That request no longer exists.");
+      }
+      const data = snap.data() ?? {};
+      if (data.toUid !== uid) {
+        throw new HttpsError(
+          "permission-denied",
+          "That request isn't yours to answer."
+        );
+      }
+      if (data.status === "accepted") {
+        return; // idempotent — already friends
+      }
+      if (data.status !== "pending") {
+        throw new HttpsError(
+          "failed-precondition",
+          "That request is no longer pending."
+        );
+      }
+
+      const fromUid = data.fromUid as string;
+      const toUid = data.toUid as string;
+      const now = FieldValue.serverTimestamp();
+
+      if (action === "decline") {
+        tx.update(reqRef, { status: "declined", updatedAt: now });
+        return;
+      }
+
+      // Accept: reciprocal edges + counts + status, together or not at all.
+      tx.set(db.doc(`users/${fromUid}/friends/${toUid}`), { since: now });
+      tx.set(db.doc(`users/${toUid}/friends/${fromUid}`), { since: now });
+      tx.update(reqRef, { status: "accepted", updatedAt: now });
+      for (const u of [fromUid, toUid]) {
+        tx.set(
+          db.doc(`users/${u}`),
+          { friendCount: FieldValue.increment(1) },
+          { merge: true }
+        );
+        tx.set(
+          db.doc(`publicProfiles/${u}`),
+          { friendCount: FieldValue.increment(1) },
+          { merge: true }
+        );
+      }
+    });
+
+    return { ok: true };
+  }
+);
+
 /** Pushes a "new friend request" notification to the recipient (respects prefs). */
 export const onFriendRequestCreated = onDocumentCreated(
   "friendRequests/{requestId}",
