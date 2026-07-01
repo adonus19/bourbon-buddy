@@ -48,6 +48,48 @@
       }
     }
 
+    @if (friendList().length) {
+      <p class="eyebrow friends__section">
+        Your friends ({{ friendList().length }})
+      </p>
+      @for (friend of friendList(); track friend.uid) {
+        <div class="friends__card">
+          <button
+            class="friends__tap"
+            type="button"
+            (click)="openProfile(friend.uid)"
+          >
+            <ion-avatar class="friends__avatar">
+              @if (friend.avatarUrl) {
+                <img [src]="friend.avatarUrl" [alt]="friend.displayName" />
+              } @else {
+                <div class="friends__avatar-fallback">
+                  {{ (friend.displayName || '?').charAt(0) }}
+                </div>
+              }
+            </ion-avatar>
+            <div class="friends__meta">
+              <p class="friends__name">{{ friend.displayName }}</p>
+              @if (friend.username) {
+                <p class="friends__handle">&commat;{{ friend.username }}</p>
+              }
+              @if (friend.homeRegion) {
+                <p class="friends__region">{{ friend.homeRegion }}</p>
+              }
+            </div>
+          </button>
+          <ion-button
+            fill="clear"
+            color="medium"
+            (click)="openFriendMenu(friend)"
+            aria-label="Manage friend"
+          >
+            <ion-icon slot="icon-only" name="ellipsis-horizontal"></ion-icon>
+          </ion-button>
+        </div>
+      }
+    }
+
     <p class="eyebrow friends__section">Find people</p>
 
     <ion-searchbar
@@ -129,6 +171,32 @@
           </div>
           <ion-button fill="clear" color="medium" (click)="cancel(req)">
             Cancel
+          </ion-button>
+        </div>
+      }
+    }
+
+    @if (blocked().length) {
+      <p class="eyebrow friends__section">Blocked</p>
+      @for (b of blocked(); track b.id) {
+        <div class="friends__card">
+          <ion-avatar class="friends__avatar">
+            @if (b.avatarUrl) {
+              <img [src]="b.avatarUrl" [alt]="b.displayName ?? ''" />
+            } @else {
+              <div class="friends__avatar-fallback">
+                {{ (b.displayName || '?').charAt(0) }}
+              </div>
+            }
+          </ion-avatar>
+          <div class="friends__meta">
+            <p class="friends__name">{{ b.displayName || 'Blocked user' }}</p>
+            @if (b.username) {
+              <p class="friends__handle">&commat;{{ b.username }}</p>
+            }
+          </div>
+          <ion-button fill="outline" color="medium" (click)="unblock(b)">
+            Unblock
           </ion-button>
         </div>
       }

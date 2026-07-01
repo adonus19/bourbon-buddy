@@ -104,6 +104,14 @@ const routes: Routes = [
       ),
   },
   {
+    path: 'u/:id',
+    canActivate: [authGuard],
+    loadChildren: () =>
+      import('./features/public-profile/public-profile.module').then(
+        (m) => m.PublicProfilePageModule
+      ),
+  },
+  {
     path: 'feed-settings',
     canActivate: [authGuard],
     loadChildren: () =>
