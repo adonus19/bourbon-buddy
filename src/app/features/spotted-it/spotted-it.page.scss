@@ -24,6 +24,17 @@
   gap: 10px;
 }
 
+.spot__visibility {
+  margin-top: 4px;
+}
+
+.spot__vis-hint {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin: 8px 2px 0;
+  line-height: 1.4;
+}
+
 .spot__save {
   --background: var(--color-amber);
   --color: var(--color-bg-primary);

@@ -12,7 +12,7 @@ import {
 import { User } from '@angular/fire/auth';
 import { Observable } from 'rxjs';
 
-import { UserProfile } from '../../models';
+import { SightingVisibility, UserProfile } from '../../models';
 import { usernameKey } from '../../shared/utils/username';
 
 /** Thrown by `claimUsername` when the desired handle is already reserved. */
@@ -151,6 +151,17 @@ export class UserService {
         { username: handle, usernameLower: lower, updatedAt: serverTimestamp() },
         { merge: true }
       );
+    });
+  }
+
+  /** Sets the user's default visibility for newly logged sightings (BB-110). */
+  async setDefaultSightingVisibility(
+    uid: string,
+    value: SightingVisibility
+  ): Promise<void> {
+    await updateDoc(this.userDocRef(uid), {
+      defaultSightingVisibility: value,
+      updatedAt: serverTimestamp(),
     });
   }
 

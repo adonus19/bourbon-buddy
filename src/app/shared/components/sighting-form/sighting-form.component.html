@@ -68,6 +68,18 @@
       [autoGrow]="true"
       formControlName="notes"
     ></ion-textarea>
+
+    <div class="sform__visibility">
+      <p class="sform__vis-label">Who can see this?</p>
+      <ion-segment formControlName="visibility">
+        <ion-segment-button value="private">
+          <ion-label>Only me</ion-label>
+        </ion-segment-button>
+        <ion-segment-button value="friends">
+          <ion-label>Friends</ion-label>
+        </ion-segment-button>
+      </ion-segment>
+    </div>
   </form>
 </ion-content>
 

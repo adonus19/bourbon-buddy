@@ -123,6 +123,24 @@
       </ion-toggle>
     </ion-item>
 
+    <p class="eyebrow profile__section">Sightings</p>
+    <p class="profile__hint">
+      Default visibility for sightings you log. You can still change it on each
+      one.
+    </p>
+    <ion-segment
+      class="profile__visibility"
+      [value]="defaultVisibility()"
+      (ionChange)="setDefaultVisibility($any($event.detail.value))"
+    >
+      <ion-segment-button value="private">
+        <ion-label>Only me</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="friends">
+        <ion-label>Friends</ion-label>
+      </ion-segment-button>
+    </ion-segment>
+
     <p class="eyebrow profile__section">Friends</p>
 
     <ion-button

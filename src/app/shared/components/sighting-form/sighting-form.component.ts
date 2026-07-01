@@ -2,10 +2,13 @@ import { Component, inject } from '@angular/core';
 import { FormBuilder, Validators } from '@angular/forms';
 import { ModalController } from '@ionic/angular';
 
+import { SightingVisibility } from '../../../models';
+import { AuthService } from '../../../core/auth/auth.service';
+
 /**
  * Bottom-sheet form for reporting a price sighting. Presentational: it collects
- * and validates input, then dismisses with the raw values; the opener converts
- * the date and writes via SightingService.
+ * and validates input, then dismisses with the raw values (including who may
+ * see it); the opener converts the date and writes via SightingService.
  */
 @Component({
   selector: 'app-sighting-form',
@@ -16,6 +19,7 @@ import { ModalController } from '@ionic/angular';
 export class SightingFormComponent {
   private readonly fb = inject(FormBuilder);
   private readonly modalCtrl = inject(ModalController);
+  private readonly auth = inject(AuthService);
 
   readonly form = this.fb.group({
     storeName: ['', [Validators.required, Validators.maxLength(120)]],
@@ -24,6 +28,10 @@ export class SightingFormComponent {
     city: [''],
     state: [''],
     notes: [''],
+    visibility: [
+      (this.auth.profile()?.defaultSightingVisibility ??
+        'private') as SightingVisibility,
+    ],
   });
 
   save(): void {

@@ -8,6 +8,7 @@ import {
 } from '@ionic/angular';
 import { Auth, updateProfile } from '@angular/fire/auth';
 
+import { SightingVisibility } from '../../models';
 import { AuthService } from '../../core/auth/auth.service';
 import { USERNAME_TAKEN, UserService } from '../../core/services/user.service';
 import { ExportKind, ExportService } from '../../core/services/export.service';
@@ -69,6 +70,9 @@ export class ProfilePage {
   readonly isDiscoverable = computed(
     () => this.profile()?.isDiscoverable ?? false
   );
+  readonly defaultVisibility = computed<SightingVisibility>(
+    () => this.profile()?.defaultSightingVisibility ?? 'private'
+  );
 
   saving = false;
   claimingUsername = false;
@@ -125,6 +129,18 @@ export class ProfilePage {
       await this.presentToast(msg);
     } finally {
       this.claimingUsername = false;
+    }
+  }
+
+  async setDefaultVisibility(value: SightingVisibility): Promise<void> {
+    const uid = this.user()?.uid;
+    if (!uid || value === this.defaultVisibility()) {
+      return;
+    }
+    try {
+      await this.userService.setDefaultSightingVisibility(uid, value);
+    } catch {
+      await this.presentToast("Couldn't update. Try again.");
     }
   }
 

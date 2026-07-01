@@ -4,7 +4,8 @@ import { Router } from '@angular/router';
 import { ToastController } from '@ionic/angular';
 import { Timestamp } from '@angular/fire/firestore';
 
-import { Bourbon } from '../../models';
+import { Bourbon, SightingVisibility } from '../../models';
+import { AuthService } from '../../core/auth/auth.service';
 import { BourbonCatalogService } from '../../core/services/bourbon-catalog.service';
 import { SightingService } from '../../core/services/sighting.service';
 import { sightingErrorMessage } from '../../shared/utils/sighting-error';
@@ -25,6 +26,7 @@ export class SpottedItPage {
   private readonly fb = inject(FormBuilder);
   private readonly catalog = inject(BourbonCatalogService);
   private readonly sightings = inject(SightingService);
+  private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastController);
 
@@ -40,6 +42,10 @@ export class SpottedItPage {
     city: [''],
     state: [''],
     notes: [''],
+    visibility: [
+      (this.auth.profile()?.defaultSightingVisibility ??
+        'private') as SightingVisibility,
+    ],
   });
 
   onNameInput(value: string): void {
@@ -81,14 +87,19 @@ export class SpottedItPage {
           series: null,
         }));
 
-      await this.sightings.add(bourbonId, name, {
-        storeName: (v.storeName ?? '').trim(),
-        price: Number(v.price),
-        sightingDate: Timestamp.fromDate(new Date(v.sightingDate as string)),
-        city: this.strOrNull(v.city),
-        state: this.strOrNull(v.state),
-        notes: this.strOrNull(v.notes),
-      });
+      await this.sightings.add(
+        bourbonId,
+        name,
+        {
+          storeName: (v.storeName ?? '').trim(),
+          price: Number(v.price),
+          sightingDate: Timestamp.fromDate(new Date(v.sightingDate as string)),
+          city: this.strOrNull(v.city),
+          state: this.strOrNull(v.state),
+          notes: this.strOrNull(v.notes),
+        },
+        v.visibility === 'friends' ? 'friends' : 'private'
+      );
 
       await this.presentToast('Spotted it. Sighting logged.');
       await this.router.navigateByUrl('/tabs/hunt-list', { replaceUrl: true });

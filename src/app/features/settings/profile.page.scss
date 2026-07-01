@@ -52,6 +52,10 @@
     margin-inline-end: 2px;
   }
 
+  &__visibility {
+    margin-bottom: 12px;
+  }
+
   &__toggle {
     --background: var(--color-bg-elevated);
     --border-radius: var(--radius-input);
