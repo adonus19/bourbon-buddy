@@ -22,6 +22,9 @@ export class FriendsPage {
   private readonly friends = inject(FriendService);
   private readonly toast = inject(ToastController);
 
+  readonly incoming = toSignal(this.friends.incomingRequests$(), {
+    initialValue: [] as FriendRequest[],
+  });
   readonly outgoing = toSignal(this.friends.outgoingRequests$(), {
     initialValue: [] as FriendRequest[],
   });
@@ -31,6 +34,7 @@ export class FriendsPage {
   searched = false;
   searchResult: PublicProfile | null = null;
   sending = false;
+  respondingId: string | null = null;
 
   onTermChange(): void {
     // Hide a stale result the moment the query changes.
@@ -78,6 +82,34 @@ export class FriendsPage {
       await this.presentToast(friendErrorMessage(err));
     } finally {
       this.sending = false;
+    }
+  }
+
+  async accept(req: FriendRequest): Promise<void> {
+    await this.respond(req, 'accept');
+  }
+
+  async decline(req: FriendRequest): Promise<void> {
+    await this.respond(req, 'decline');
+  }
+
+  private async respond(
+    req: FriendRequest,
+    action: 'accept' | 'decline'
+  ): Promise<void> {
+    if (!req.id || this.respondingId) {
+      return;
+    }
+    this.respondingId = req.id;
+    try {
+      await this.friends.respondToRequest(req.id, action);
+      await this.presentToast(
+        action === 'accept' ? 'Friend added.' : 'Request declined.'
+      );
+    } catch (err) {
+      await this.presentToast(friendErrorMessage(err));
+    } finally {
+      this.respondingId = null;
     }
   }
 

@@ -81,6 +81,18 @@ export class FriendService {
     await callable({ toUid });
   }
 
+  /** Recipient accepts or declines a pending request via the guarded callable. */
+  async respondToRequest(
+    requestId: string,
+    action: 'accept' | 'decline'
+  ): Promise<void> {
+    const callable = httpsCallable<
+      { requestId: string; action: 'accept' | 'decline' },
+      { ok: boolean }
+    >(this.functions, 'respondToFriendRequest');
+    await callable({ requestId, action });
+  }
+
   /** Sender cancels their own pending outgoing request (rules-permitted delete). */
   async cancelRequest(requestId: string): Promise<void> {
     await deleteDoc(doc(this.firestore, `friendRequests/${requestId}`));

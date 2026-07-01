@@ -9,7 +9,46 @@
 
 <ion-content [fullscreen]="true" class="friends-content">
   <div class="friends">
-    <p class="eyebrow">Find people</p>
+    @if (incoming().length) {
+      <p class="eyebrow">Friend requests</p>
+      @for (req of incoming(); track req.id) {
+        <div class="friends__card">
+          <ion-avatar class="friends__avatar">
+            @if (req.fromAvatarUrl) {
+              <img [src]="req.fromAvatarUrl" [alt]="req.fromDisplayName ?? ''" />
+            } @else {
+              <div class="friends__avatar-fallback">
+                {{ (req.fromDisplayName || '?').charAt(0) }}
+              </div>
+            }
+          </ion-avatar>
+          <div class="friends__meta">
+            <p class="friends__name">{{ req.fromDisplayName }}</p>
+            <p class="friends__handle">&commat;{{ req.fromUsername }}</p>
+          </div>
+          <div class="friends__actions">
+            <ion-button
+              size="small"
+              (click)="accept(req)"
+              [disabled]="respondingId === req.id"
+            >
+              Accept
+            </ion-button>
+            <ion-button
+              size="small"
+              fill="clear"
+              color="medium"
+              (click)="decline(req)"
+              [disabled]="respondingId === req.id"
+            >
+              Decline
+            </ion-button>
+          </div>
+        </div>
+      }
+    }
+
+    <p class="eyebrow friends__section">Find people</p>
 
     <ion-searchbar
       class="friends__searchbar"
