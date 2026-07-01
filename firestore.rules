@@ -81,6 +81,22 @@ service cloud.firestore {
                     && resource.data.spotterUid == request.auth.uid;
     }
 
+    // Friend requests (BB-101/102). Visible to the two parties only. CREATE is
+    // denied: all creation goes through the `sendFriendRequest` callable, which
+    // enforces the self/block/duplicate checks and a per-user daily rate limit.
+    // UPDATE is denied too: accept/decline run through `respondToFriendRequest`
+    // (Admin SDK). The sender may DELETE their own still-pending request (cancel).
+    match /friendRequests/{requestId} {
+      allow read: if isSignedIn()
+                  && (resource.data.fromUid == request.auth.uid
+                      || resource.data.toUid == request.auth.uid);
+      allow create: if false;
+      allow update: if false;
+      allow delete: if isSignedIn()
+                    && resource.data.fromUid == request.auth.uid
+                    && resource.data.status == 'pending';
+    }
+
     // News articles: read-only for users. Writes come from Cloud Functions
     // via the Admin SDK, which bypasses these rules entirely.
     match /newsArticles/{articleId} {

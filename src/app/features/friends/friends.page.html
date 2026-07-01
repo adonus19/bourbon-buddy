@@ -1,0 +1,98 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/settings" text=""></ion-back-button>
+    </ion-buttons>
+    <ion-title>Friends</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true" class="friends-content">
+  <div class="friends">
+    <p class="eyebrow">Find people</p>
+
+    <ion-searchbar
+      class="friends__searchbar"
+      [(ngModel)]="searchTerm"
+      (ionInput)="onTermChange()"
+      (ionClear)="clearSearch()"
+      (keyup.enter)="search()"
+      placeholder="Exact @username"
+      autocapitalize="off"
+      [spellcheck]="false"
+      searchIcon="at-outline"
+    ></ion-searchbar>
+
+    <ion-button
+      class="friends__search-btn"
+      expand="block"
+      (click)="search()"
+      [disabled]="searching || !searchTerm.trim()"
+    >
+      @if (searching) {
+        <ion-spinner name="crescent"></ion-spinner>
+      } @else {
+        <span>Search</span>
+      }
+    </ion-button>
+
+    @if (searched && !searching) {
+      @if (searchResult; as p) {
+        <div class="friends__card">
+          <ion-avatar class="friends__avatar">
+            @if (p.avatarUrl) {
+              <img [src]="p.avatarUrl" [alt]="p.displayName" />
+            } @else {
+              <div class="friends__avatar-fallback">
+                {{ (p.displayName || '?').charAt(0) }}
+              </div>
+            }
+          </ion-avatar>
+          <div class="friends__meta">
+            <p class="friends__name">{{ p.displayName }}</p>
+            <p class="friends__handle">&commat;{{ p.username }}</p>
+            @if (p.homeRegion) {
+              <p class="friends__region">{{ p.homeRegion }}</p>
+            }
+          </div>
+          @if (hasPendingTo(p.id ?? '')) {
+            <ion-button fill="outline" disabled>Pending</ion-button>
+          } @else {
+            <ion-button (click)="add(p.id ?? '')" [disabled]="sending">
+              Add
+            </ion-button>
+          }
+        </div>
+      } @else {
+        <p class="friends__empty">
+          No one found with that handle. Handles are exact, and a person must
+          turn on discoverability to be found.
+        </p>
+      }
+    }
+
+    @if (outgoing().length) {
+      <p class="eyebrow friends__section">Pending sent</p>
+      @for (req of outgoing(); track req.id) {
+        <div class="friends__card">
+          <ion-avatar class="friends__avatar">
+            @if (req.toAvatarUrl) {
+              <img [src]="req.toAvatarUrl" [alt]="req.toDisplayName ?? ''" />
+            } @else {
+              <div class="friends__avatar-fallback">
+                {{ (req.toDisplayName || '?').charAt(0) }}
+              </div>
+            }
+          </ion-avatar>
+          <div class="friends__meta">
+            <p class="friends__name">{{ req.toDisplayName }}</p>
+            <p class="friends__handle">&commat;{{ req.toUsername }}</p>
+          </div>
+          <ion-button fill="clear" color="medium" (click)="cancel(req)">
+            Cancel
+          </ion-button>
+        </div>
+      }
+    }
+  </div>
+</ion-content>
