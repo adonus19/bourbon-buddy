@@ -1,0 +1,90 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/friends" text=""></ion-back-button>
+    </ion-buttons>
+    <ion-title>Friends' Sightings</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="toggleStale()" aria-label="Toggle stale sightings">
+        <ion-icon
+          slot="icon-only"
+          [name]="hideStale() ? 'eye-off-outline' : 'eye-outline'"
+        ></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true" class="ffeed-content">
+  <ion-refresher slot="fixed" (ionRefresh)="doRefresh($any($event))">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  @if (loading()) {
+    <div class="ffeed__state">
+      <ion-spinner name="crescent"></ion-spinner>
+    </div>
+  } @else if (loadingError()) {
+    <div class="ffeed__state">
+      <p class="ffeed__empty-title">Couldn't load the feed.</p>
+      <ion-button fill="outline" (click)="retry()">Try again</ion-button>
+    </div>
+  } @else if (!visible().length) {
+    <div class="ffeed__state">
+      <ion-icon name="pint-outline" class="ffeed__empty-icon"></ion-icon>
+      <p class="ffeed__empty-title">No shared sightings yet.</p>
+      <p class="ffeed__empty-sub">
+        When friends share a sighting, it shows up here. Bottles on your hunt
+        list get flagged.
+      </p>
+    </div>
+  } @else {
+    <div class="ffeed">
+      @for (s of visible(); track s.id) {
+        <div class="ffeed__card" [class.ffeed__card--stale]="isStale(s)">
+          <div class="ffeed__head">
+            <span class="ffeed__bottle">{{ s.bourbonName || 'A bottle' }}</span>
+            <span class="ffeed__price">${{ s.price }}</span>
+          </div>
+
+          @if (matchEntryId(s)) {
+            <button class="ffeed__match" type="button" (click)="openMatch(s)">
+              <ion-icon name="bookmark"></ion-icon>
+              On your hunt list — view
+            </button>
+          }
+
+          <p class="ffeed__store">
+            {{ s.storeName }}@if (s.city || s.state) {
+              <span class="ffeed__loc">
+                · {{ s.city }}{{ s.city && s.state ? ', ' : '' }}{{ s.state }}
+              </span>
+            }
+          </p>
+
+          @if (s.notes) {
+            <p class="ffeed__notes">{{ s.notes }}</p>
+          }
+
+          <div class="ffeed__meta">
+            <span>{{ spotterName(s.spotterUid) }}</span>
+            <span class="ffeed__dot">·</span>
+            <span>{{ when(s) }}</span>
+            @if (isStale(s)) {
+              <span class="ffeed__stale-tag">stale</span>
+            }
+          </div>
+        </div>
+      }
+    </div>
+
+    <ion-infinite-scroll
+      [disabled]="!hasMore()"
+      (ionInfinite)="loadMore($any($event))"
+    >
+      <ion-infinite-scroll-content
+        loadingSpinner="crescent"
+      ></ion-infinite-scroll-content>
+    </ion-infinite-scroll>
+  }
+</ion-content>

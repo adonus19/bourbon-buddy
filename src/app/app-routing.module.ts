@@ -104,6 +104,14 @@ const routes: Routes = [
       ),
   },
   {
+    path: 'friends-feed',
+    canActivate: [authGuard],
+    loadChildren: () =>
+      import('./features/friends-feed/friends-feed.module').then(
+        (m) => m.FriendsFeedPageModule
+      ),
+  },
+  {
     path: 'u/:id',
     canActivate: [authGuard],
     loadChildren: () =>

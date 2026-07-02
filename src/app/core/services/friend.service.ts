@@ -6,6 +6,7 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
   query,
   where,
 } from '@angular/fire/firestore';
@@ -208,6 +209,25 @@ export class FriendService {
     return snap.exists()
       ? ({ id: snap.id, ...snap.data() } as PublicProfile)
       : null;
+  }
+
+  /**
+   * One-shot hydrated friends list (BB-111 feed): reads the friends edges once
+   * and resolves their public profiles. Used by pull surfaces that want a
+   * snapshot (UIDs + display) without opening a listener.
+   */
+  async friendsOnce(): Promise<FriendView[]> {
+    const uid = this.auth.snapshotUser?.uid;
+    if (!uid) {
+      return [];
+    }
+    const snap = await getDocs(
+      collection(this.firestore, `users/${uid}/friends`)
+    );
+    if (snap.empty) {
+      return [];
+    }
+    return this.hydrateFriends(snap.docs.map((d) => ({ id: d.id })));
   }
 
   private async hydrateFriends(edges: { id: string }[]): Promise<FriendView[]> {
