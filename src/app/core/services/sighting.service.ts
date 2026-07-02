@@ -1,14 +1,19 @@
 import { Injectable, inject } from '@angular/core';
 import {
+  DocumentData,
   Firestore,
+  QueryConstraint,
+  QueryDocumentSnapshot,
   collection,
   collectionData,
   deleteDoc,
   doc,
   getDocs,
+  limit,
   orderBy,
   query,
   serverTimestamp,
+  startAfter,
   updateDoc,
   where,
 } from '@angular/fire/firestore';
@@ -86,6 +91,45 @@ export class SightingService {
       visibility,
     });
     await this.recomputeBestPrice(uid, bourbonId);
+  }
+
+  /** Max friends we fan a single feed query across (Firestore `in` cap). */
+  static readonly FEED_UID_CAP = 30;
+
+  /**
+   * One page of friends' shared sightings, newest-first (BB-111). A one-shot
+   * paginated read (not a listener) — the feed is a pull surface, so this avoids
+   * an always-open listener re-reading on every friend's sighting change. Bounded
+   * by `pageSize` and by at most 30 spotter UIDs (the `in` limit). Pass the last
+   * doc of the previous page as `after` to page forward.
+   */
+  async friendsFeedPage(
+    spotterUids: string[],
+    pageSize: number,
+    after?: QueryDocumentSnapshot<DocumentData> | null
+  ): Promise<{
+    items: Sighting[];
+    last: QueryDocumentSnapshot<DocumentData> | null;
+  }> {
+    const uids = spotterUids.slice(0, SightingService.FEED_UID_CAP);
+    if (!uids.length) {
+      return { items: [], last: null };
+    }
+    const constraints: QueryConstraint[] = [
+      where('visibility', '==', 'friends'),
+      where('spotterUid', 'in', uids),
+      orderBy('createdAt', 'desc'),
+    ];
+    if (after) {
+      constraints.push(startAfter(after));
+    }
+    constraints.push(limit(pageSize));
+
+    const snap = await getDocs(query(this.col(), ...constraints));
+    const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Sighting);
+    const last =
+      snap.docs.length === pageSize ? snap.docs[snap.docs.length - 1] : null;
+    return { items, last };
   }
 
   async setStale(
