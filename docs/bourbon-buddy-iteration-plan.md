@@ -358,12 +358,31 @@ The order reflects both technical dependencies (auth before features, log before
   page-scoped to the Friends page; all cross-user writes go through Admin
   callables (a client can't write another user's docs).
 
-### Iteration 10 — Social Sightings & Alerts (the circle payoff)
+### Iteration 10 — Social Sightings & Alerts (the circle payoff) ✅ *(complete)*
 **Stories:** BB-110, BB-111, BB-112, BB-113
-**Goal:** The headline — get notified when a friend spots a bottle on your Hunt List. Now built on the decoupled `/sightings` foundation from Iteration 8.
-- **BB-163 (fan-out-side) abuse guards** — per-spotter/per-recipient alert caps, bulk-logging coalescing, dedup, sighting flagging/auto-hide. Essential here because this is when alerts actually fan out to friends.
-- **Contribution caveat:** crowd-sourcing only works if logging is fast and spotters see that it helps friends (the BB-162 nudge + barcode/geo). Without that, friends won't log sightings for bottles they don't want.
-- **Push caveat:** iOS PWA web-push is workable but flaky. For the *circle* it's good enough to validate; reliable push is a reason native iOS (Iteration 12) precedes a true public launch.
+**Goal:** The headline — get notified when a friend spots a bottle on your Hunt List. Built on the decoupled `/sightings` foundation from Iteration 8.
+- **BB-110** — per-sighting visibility (Only me / Friends) + user-level default;
+  rules let a spotter's friends read `visibility:'friends'` sightings via a
+  `/friends` edge `exists()` check (private stays private, revoked on unfriend).
+- **BB-111** — friends' sightings feed: paginated one-shot reads (no live
+  listener), hunt-list matches highlighted from the already-open wishlist signal
+  (zero extra reads), stale de-emphasis + hide toggle. Index
+  `sightings(visibility, spotterUid, createdAt)`.
+- **BB-112 ★** — sightings trigger (now `onDocumentWritten`) fans a
+  `sightingMatch` push out to the spotter's friends with the bottle on their
+  active hunt list; pref-gated, block-safe (blocking severs the edge), with a
+  per-recipient marker at `/sightings/{id}/alertRecipients/{uid}` for
+  at-most-once + a ≥5% price-drop re-alert threshold.
+- **BB-113** — inbox record written alongside every push (recoverable if the
+  push is missed); `/inbox` page with unread badge + mark-read + deep-link;
+  daily `cleanupOldNotifications` purges records older than 30 days.
+- **Also:** iOS home-screen splash screens generated from the logo.
+- **Partially deferred — BB-163 (fan-out-side):** per-recipient dedup + the
+  price-drop threshold ship here; broader per-spotter fan-out caps / bulk-logging
+  coalescing / sighting flagging remain backlog for the public-launch gate.
+- **Push caveat:** iOS PWA web-push is workable but flaky. For the *circle* it's
+  good enough to validate; reliable push is a reason native iOS (Iteration 12)
+  precedes a true public launch.
 
 ### AI "Find Bottles" (BB-130, BB-131) — independent slot
 No dependency on the social refactor; schedule whenever there's capacity (it was

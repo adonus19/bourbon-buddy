@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { FormBuilder, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import {
@@ -13,6 +13,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { USERNAME_TAKEN, UserService } from '../../core/services/user.service';
 import { ExportKind, ExportService } from '../../core/services/export.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { InboxService } from '../../core/services/inbox.service';
 import {
   USERNAME_MAX,
   USERNAME_MIN,
@@ -36,6 +37,10 @@ export class ProfilePage {
   private readonly actionSheet = inject(ActionSheetController);
   private readonly exportService = inject(ExportService);
   private readonly notifications = inject(NotificationService);
+  private readonly inbox = inject(InboxService);
+
+  /** Unread inbox count for the badge; refreshed on entering the page. */
+  readonly inboxUnread = signal(0);
 
   // Already-loaded signals from the session state holder — no new Firebase reads.
   readonly user = this.auth.currentUser;
@@ -103,6 +108,10 @@ export class ProfilePage {
         );
       }
     });
+  }
+
+  async ionViewWillEnter(): Promise<void> {
+    this.inboxUnread.set(await this.inbox.unreadCount());
   }
 
   async claimUsername(): Promise<void> {

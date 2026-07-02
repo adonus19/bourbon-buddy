@@ -1,0 +1,48 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/settings" text=""></ion-back-button>
+    </ion-buttons>
+    <ion-title>Inbox</ion-title>
+    <ion-buttons slot="end">
+      @if (hasUnread()) {
+        <ion-button (click)="markAllRead()">Mark all read</ion-button>
+      }
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true" class="inbox-content">
+  @if (!items().length) {
+    <div class="inbox__state">
+      <ion-icon name="notifications-off-outline" class="inbox__empty-icon"></ion-icon>
+      <p class="inbox__empty-title">No notifications yet.</p>
+      <p class="inbox__empty-sub">
+        Friend requests and sighting alerts will show up here.
+      </p>
+    </div>
+  } @else {
+    <div class="inbox">
+      @for (n of items(); track n.id) {
+        <button
+          class="inbox__item"
+          [class.inbox__item--unread]="!n.read"
+          type="button"
+          (click)="open(n)"
+        >
+          <div class="inbox__icon">
+            <ion-icon [name]="icon(n.type)"></ion-icon>
+          </div>
+          <div class="inbox__body">
+            <p class="inbox__title">{{ n.title }}</p>
+            <p class="inbox__text">{{ n.body }}</p>
+            <p class="inbox__time">{{ when(n) }}</p>
+          </div>
+          @if (!n.read) {
+            <span class="inbox__dot" aria-label="Unread"></span>
+          }
+        </button>
+      }
+    </div>
+  }
+</ion-content>

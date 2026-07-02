@@ -104,6 +104,12 @@ const routes: Routes = [
       ),
   },
   {
+    path: 'inbox',
+    canActivate: [authGuard],
+    loadChildren: () =>
+      import('./features/inbox/inbox.module').then((m) => m.InboxPageModule),
+  },
+  {
     path: 'friends-feed',
     canActivate: [authGuard],
     loadChildren: () =>

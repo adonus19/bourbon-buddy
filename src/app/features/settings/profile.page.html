@@ -159,10 +159,25 @@
       class="profile__account-btn"
       expand="block"
       fill="outline"
+      routerLink="/inbox"
+    >
+      <ion-icon name="mail-outline" slot="start"></ion-icon>
+      Inbox
+      @if (inboxUnread() > 0) {
+        <ion-badge class="profile__badge" color="warning" slot="end">
+          {{ inboxUnread() }}
+        </ion-badge>
+      }
+    </ion-button>
+
+    <ion-button
+      class="profile__account-btn"
+      expand="block"
+      fill="outline"
       routerLink="/notification-settings"
     >
       <ion-icon name="notifications-outline" slot="start"></ion-icon>
-      Notifications
+      Notification settings
     </ion-button>
 
     <p class="eyebrow profile__section">Your data</p>
