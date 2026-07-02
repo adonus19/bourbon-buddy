@@ -7,10 +7,11 @@
  *
  * `sendTestNotification` is a callable the app uses to verify the whole loop.
  */
-import { getFirestore } from "firebase-admin/firestore";
+import { FieldValue, getFirestore, Timestamp } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
 import { logger } from "firebase-functions/v2";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 
 export type NotificationType =
   | "sightingMatch"
@@ -51,6 +52,16 @@ export async function sendNotificationToUser(
       logger.info(`Skip ${type} for ${uid}: paused or not enabled.`);
       return 0;
     }
+    // Inbox record (BB-113): written whether or not a device is reachable, so a
+    // missed push is still recoverable in-app. The untyped test send is skipped.
+    await db.collection(`users/${uid}/notifications`).add({
+      type,
+      title: payload.title,
+      body: payload.body,
+      link: payload.link ?? null,
+      read: false,
+      createdAt: FieldValue.serverTimestamp(),
+    });
   }
 
   const tokensSnap = await db.collection(`users/${uid}/fcmTokens`).get();
@@ -87,9 +98,42 @@ export async function sendNotificationToUser(
     `Sent to ${uid}: ${response.successCount}/${tokens.length} ok, ` +
       `${deadIds.length} dead tokens pruned.`
   );
-  // TODO(BB-113): also write an inbox record so missed pushes are recoverable.
   return response.successCount;
 }
+
+const NOTIFICATION_TTL_DAYS = 30;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Purges inbox notifications older than 30 days (BB-113), keeping it bounded. */
+export const cleanupOldNotifications = onSchedule(
+  { schedule: "0 3 * * *", timeoutSeconds: 300 }, // daily, 03:00
+  async () => {
+    const db = getFirestore();
+    const cutoff = Timestamp.fromMillis(
+      Date.now() - NOTIFICATION_TTL_DAYS * DAY_MS
+    );
+    let deleted = 0;
+
+    for (;;) {
+      const snap = await db
+        .collectionGroup("notifications")
+        .where("createdAt", "<", cutoff)
+        .limit(400)
+        .get();
+      if (snap.empty) {
+        break;
+      }
+      const batch = db.batch();
+      snap.docs.forEach((doc) => batch.delete(doc.ref));
+      await batch.commit();
+      deleted += snap.size;
+      if (snap.size < 400) {
+        break;
+      }
+    }
+    logger.info(`cleanupOldNotifications removed ${deleted} notifications.`);
+  }
+);
 
 export const sendTestNotification = onCall(
   { region: "us-central1" },
