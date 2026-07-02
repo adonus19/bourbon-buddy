@@ -79,6 +79,20 @@
       placeholder="Last one on the shelf, limit 1, etc."
     ></ion-textarea>
 
+    <p class="eyebrow spot__section">Who can see this?</p>
+    <ion-segment class="spot__visibility" formControlName="visibility">
+      <ion-segment-button value="private">
+        <ion-label>Only me</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="friends">
+        <ion-label>Friends</ion-label>
+      </ion-segment-button>
+    </ion-segment>
+    <p class="spot__vis-hint">
+      Sharing with friends lets them get a match alert if it's on their hunt
+      list.
+    </p>
+
     <ion-button
       class="spot__save"
       expand="block"

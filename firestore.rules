@@ -68,8 +68,15 @@ service cloud.firestore {
     // may still mark-stale / delete their own sighting, but cannot alter the
     // price, bottle, or createdAt after the fact.
     match /sightings/{sightingId} {
+      // Readable by the spotter always, and by the spotter's friends when the
+      // sighting is shared with friends (BB-110). Friendship is a reciprocal
+      // edge, so the spotter having the reader in their /friends means the two
+      // are mutually connected; removing/blocking deletes that edge and revokes
+      // access immediately. Private sightings never surface to anyone else.
       allow read: if isSignedIn()
-                  && resource.data.spotterUid == request.auth.uid;
+                  && (resource.data.spotterUid == request.auth.uid
+                      || (resource.data.visibility == 'friends'
+                          && exists(/databases/$(database)/documents/users/$(resource.data.spotterUid)/friends/$(request.auth.uid))));
       allow create: if false;
       allow update: if isSignedIn()
                     && resource.data.spotterUid == request.auth.uid

@@ -28,6 +28,17 @@
   margin: -8px 2px 14px;
 }
 
+.sform__visibility {
+  margin-top: 8px;
+  padding: 0 2px;
+}
+
+.sform__vis-label {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin: 0 0 8px;
+}
+
 .sform__save {
   --background: var(--color-amber);
   --color: var(--color-bg-primary);
