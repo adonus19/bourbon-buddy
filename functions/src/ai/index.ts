@@ -2,8 +2,8 @@
  * AI "Find Bottles" (BB-130).
  *
  * When a news article is written, extract the whiskey/bourbon product names it
- * mentions (via an LLM), match them to the shared catalog, and cache the result
- * ON THE ARTICLE. This runs ONCE per article, ever — never per user, per view,
+ * mentions (via an LLM), match them to the shared catalog (creating the entry
+ * from the AI-sourced fields when it's new), and cache the result ON THE ARTICLE. This runs ONCE per article, ever — never per user, per view,
  * or per refresh — so the cost is flat and tiny no matter how many people read
  * it. The client reads the cached `mentionedBottles` field; no per-user AI cost.
  *
@@ -238,10 +238,11 @@ async function processArticle(
     seen.add(key);
     const category =
       raw.category && VALID_CATEGORIES.has(raw.category) ? raw.category : null;
+    const distillery = raw.distillery?.trim() || null;
     bottles.push({
       name,
-      bourbonId: await matchCatalog(db, key),
-      distillery: raw.distillery?.trim() || null,
+      bourbonId: await matchOrCreateCatalog(db, key, name, distillery, category),
+      distillery,
       category,
     });
     if (bottles.length >= MAX_BOTTLES) {
@@ -257,10 +258,14 @@ async function processArticle(
 }
 
 /** Finds an existing catalog bottleId for a normalized name, or null. */
-async function matchCatalog(
+async function matchOrCreateCatalog(
   db: FirebaseFirestore.Firestore,
-  key: string
-): Promise<string | null> {
+  key: string,
+  name: string,
+  distillery: string | null,
+  category: string | null
+): Promise<string> {
+  // Match an existing catalog entry (same order the client findOrCreate uses).
   const byName = await db
     .collection("bourbons")
     .where("nameNormalized", "==", key)
@@ -274,7 +279,41 @@ async function matchCatalog(
     .where("aliases", "array-contains", key)
     .limit(1)
     .get();
-  return byAlias.empty ? null : byAlias.docs[0].id;
+  if (!byAlias.empty) {
+    return byAlias.docs[0].id;
+  }
+  const nameLowercase = name.toLowerCase();
+  const byLower = await db
+    .collection("bourbons")
+    .where("nameLowercase", "==", nameLowercase)
+    .limit(1)
+    .get();
+  if (!byLower.empty) {
+    return byLower.docs[0].id;
+  }
+
+  // No match — create the shared catalog entry from the AI-sourced fields so the
+  // bottle has a bourbonId usable in autocomplete and cellar/hunt-list entries.
+  const created = db.collection("bourbons").doc();
+  await created.set({
+    name,
+    nameLowercase,
+    nameNormalized: key,
+    aliases: [],
+    canonicalId: null,
+    distillery: distillery ?? null,
+    bottler: null,
+    category: category ?? null,
+    subType: null,
+    ageStatement: null,
+    isNas: false,
+    proof: null,
+    msrp: null,
+    series: null,
+    createdAt: FieldValue.serverTimestamp(),
+    createdByUserId: "system:ai",
+  });
+  return created.id;
 }
 
 /**

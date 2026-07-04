@@ -19,7 +19,8 @@ export type BourbonSubType =
   | 'cask_strength'
   | 'nas'
   | 'straight'
-  | 'bottled_in_bond';
+  | 'bottled_in_bond'
+  | 'wheated';
 
 export type EntryType =
   | 'drink'
