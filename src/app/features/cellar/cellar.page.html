@@ -13,6 +13,18 @@
           <ion-icon slot="icon-only" name="swap-vertical-outline"></ion-icon>
         </ion-button>
       }
+      <ion-button
+        class="cellar-bell"
+        routerLink="/inbox"
+        aria-label="Notifications"
+      >
+        <ion-icon slot="icon-only" name="notifications-outline"></ion-icon>
+        @if (inboxUnread() > 0) {
+          <ion-badge class="cellar-bell__badge" color="warning">
+            {{ inboxUnread() > 9 ? '9+' : inboxUnread() }}
+          </ion-badge>
+        }
+      </ion-button>
       <ion-button routerLink="/settings" aria-label="Settings">
         <ion-icon slot="icon-only" name="person-circle-outline"></ion-icon>
       </ion-button>

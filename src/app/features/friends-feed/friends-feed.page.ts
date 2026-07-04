@@ -2,6 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import {
   InfiniteScrollCustomEvent,
+  NavController,
   RefresherCustomEvent,
 } from '@ionic/angular';
 import { DocumentData, QueryDocumentSnapshot } from '@angular/fire/firestore';
@@ -36,6 +37,7 @@ export class FriendsFeedPage {
   private readonly friends = inject(FriendService);
   private readonly wishlist = inject(WishlistService);
   private readonly router = inject(Router);
+  private readonly nav = inject(NavController);
 
   private readonly PAGE = 20;
 
@@ -75,6 +77,13 @@ export class FriendsFeedPage {
     // First entry loads; re-entry keeps what's there (pull-to-refresh to update).
     if (this.loading()) {
       void this.load();
+    }
+  }
+
+  /** Segment: switch to the Friends view within the Social tab. */
+  onSegment(value: string): void {
+    if (value === 'friends') {
+      void this.nav.navigateRoot(['/tabs/social/friends'], { animated: false });
     }
   }
 

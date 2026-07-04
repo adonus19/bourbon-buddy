@@ -13,6 +13,7 @@ import {
 
 import { LogEntry } from '../../models';
 import { LogEntryService } from '../../core/services/log-entry.service';
+import { InboxService } from '../../core/services/inbox.service';
 import {
   EMPTY_LOG_FILTER,
   LogFilter,
@@ -44,6 +45,10 @@ export class CellarPage implements ViewWillEnter {
   private readonly actionSheet = inject(ActionSheetController);
   private readonly modalCtrl = inject(ModalController);
   private readonly cdr = inject(ChangeDetectorRef);
+  private readonly inbox = inject(InboxService);
+
+  /** Unread inbox count for the header bell; refreshed on entering this tab. */
+  readonly inboxUnread = signal(0);
 
   readonly entries = this.logService.entries;
   readonly loaded = this.logService.loaded;
@@ -90,6 +95,8 @@ export class CellarPage implements ViewWillEnter {
     // on the add/detail screens. The entries() signal already reflects anything
     // added meanwhile, so force a re-check to render it on return.
     this.cdr.detectChanges();
+    // Refresh the notification badge on focus (no always-on listener).
+    void this.inbox.unreadCount().then((n) => this.inboxUnread.set(n));
   }
 
   async openSort(): Promise<void> {
