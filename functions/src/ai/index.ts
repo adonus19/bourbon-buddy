@@ -2,14 +2,16 @@
  * AI "Find Bottles" (BB-130).
  *
  * When a news article is written, extract the whiskey/bourbon product names it
- * mentions (via Gemini), match them to the shared catalog, and cache the result
+ * mentions (via an LLM), match them to the shared catalog, and cache the result
  * ON THE ARTICLE. This runs ONCE per article, ever — never per user, per view,
  * or per refresh — so the cost is flat and tiny no matter how many people read
  * it. The client reads the cached `mentionedBottles` field; no per-user AI cost.
  *
- * The Gemini key is a Secret Manager secret (GEMINI_API_KEY), never in code.
- * Provider is intentionally isolated to `extractBottleNames` so switching models
- * or vendors later (BB-131) is a one-function change.
+ * Provider: Groq (free tier, OpenAI-compatible). Chosen over Gemini free tier
+ * for its far higher daily request cap (~14.4k RPD on llama-3.1-8b-instant vs
+ * ~200) and no region/billing-project free-tier traps. The key is a Secret
+ * Manager secret (GROQ_API_KEY), never in code. All model-specific code lives in
+ * `extractBottleNames`, so swapping providers again is a one-function change.
  */
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
@@ -19,10 +21,10 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 
 import { normalizeBottleName } from "../shared/normalize";
 
-const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
+const GROQ_API_KEY = defineSecret("GROQ_API_KEY");
 
-// Free-tier-eligible, fast, cheap. Swap here if the free tier changes.
-const GEMINI_MODEL = "gemini-2.0-flash";
+// Free-tier: 30 RPM, 14.4k RPD, fast. Swap here if limits/models change.
+const GROQ_MODEL = "llama-3.1-8b-instant";
 const MAX_BOTTLES = 8;
 const MAX_TEXT_CHARS = 1500;
 const BACKFILL_DEFAULT = 15;
@@ -35,10 +37,10 @@ interface MentionedBottle {
   bourbonId: string | null;
 }
 
-/** Thrown when Gemini returns 429 so callers can back off / stop early. */
+/** Thrown when the model returns 429 so callers can back off / stop early. */
 class RateLimitError extends Error {
   constructor() {
-    super("gemini_rate_limited");
+    super("model_rate_limited");
   }
 }
 
@@ -50,7 +52,7 @@ export const extractBottlesFromArticle = onDocumentCreated(
   {
     document: "newsArticles/{articleId}",
     region: "us-central1",
-    secrets: [GEMINI_API_KEY],
+    secrets: [GROQ_API_KEY],
     // Cap concurrency so a bulk RSS fetch (dozens of new docs at once) doesn't
     // fire dozens of simultaneous model calls and blow the free-tier RPM.
     maxInstances: 2,
@@ -63,7 +65,7 @@ export const extractBottlesFromArticle = onDocumentCreated(
       getFirestore(),
       event.data.ref,
       event.data.data(),
-      GEMINI_API_KEY.value()
+      GROQ_API_KEY.value()
     );
     if (n >= 0) {
       logger.info(`Extracted ${n} bottle(s) for ${event.params.articleId}.`);
@@ -77,10 +79,10 @@ export const extractBottlesFromArticle = onDocumentCreated(
 /**
  * Bounded backfill / test tool: extract bottles for the most recent articles
  * that haven't been processed yet. Signed-in only and capped at 50 per call so
- * it can't run away on cost. (Lock down or remove before a public launch.)
+ * it can't run away. (Lock down or remove before a public launch.)
  */
 export const backfillArticleBottles = onCall(
-  { region: "us-central1", secrets: [GEMINI_API_KEY], timeoutSeconds: 300 },
+  { region: "us-central1", secrets: [GROQ_API_KEY], timeoutSeconds: 300 },
   async (request) => {
     if (!request.auth?.uid) {
       throw new HttpsError("unauthenticated", "Sign in to run the backfill.");
@@ -98,7 +100,7 @@ export const backfillArticleBottles = onCall(
       .limit(limit)
       .get();
 
-    const key = GEMINI_API_KEY.value();
+    const key = GROQ_API_KEY.value();
     let processed = 0;
     let skipped = 0;
     let rateLimited = false;
@@ -130,8 +132,8 @@ export const backfillArticleBottles = onCall(
 
 /**
  * Extracts, catalog-matches, and caches bottles for one article. Returns the
- * number written (>= 0), or -1 when the model call failed (best-effort: the
- * caller treats a failure as skipped, never throws — no retry storms / cost).
+ * number written (>= 0), RATE_LIMITED when throttled (left for a later retry),
+ * or -1 on other failure (best-effort: never throws — no retry storms / cost).
  */
 async function processArticle(
   db: FirebaseFirestore.Firestore,
@@ -204,56 +206,53 @@ async function matchCatalog(
 }
 
 /**
- * The ONLY model-specific code. Calls Gemini and returns a list of bottle
- * product names. Uses structured output (JSON array of strings) for robust
- * parsing, temperature 0, and a hard output cap.
+ * The ONLY model-specific code. Calls Groq (OpenAI-compatible) and returns the
+ * bottle product names it found. JSON object output for robust parsing, temp 0,
+ * hard output cap. Throws RateLimitError on 429.
  */
 async function extractBottleNames(
   text: string,
   apiKey: string
 ): Promise<string[]> {
-  const prompt =
-    "Extract distinct whiskey/bourbon PRODUCT names actually mentioned as " +
-    "products (specific releases, expressions, or bottlings) in the text below. " +
-    "Include specific product names like \"Weller 12 Year\" or " +
+  const system =
+    "You extract whiskey/bourbon PRODUCT names from a news snippet. Reply ONLY " +
+    "with JSON of the form {\"bottles\": [\"name\", ...]}. Include specific " +
+    "products (releases, expressions, bottlings) like \"Weller 12 Year\" or " +
     "\"E.H. Taylor Small Batch\". Exclude bare distillery/brand names not tied " +
     "to a product, generic terms (bourbon, rye), people, places, and events. " +
-    "Use the name as written, trimmed, no duplicates.\n\n" +
-    `TEXT:\n${text}`;
+    "Use names as written, trimmed, no duplicates. If none, use an empty array.";
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0,
-          maxOutputTokens: 512,
-          responseMimeType: "application/json",
-          responseSchema: { type: "ARRAY", items: { type: "STRING" } },
-        },
-      }),
-    }
-  );
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      temperature: 0,
+      max_tokens: 512,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: `TEXT:\n${text}` },
+      ],
+    }),
+  });
 
   if (res.status === 429) {
     throw new RateLimitError();
   }
   if (!res.ok) {
-    throw new Error(`Gemini ${res.status}: ${await res.text()}`);
+    throw new Error(`Groq ${res.status}: ${await res.text()}`);
   }
   const body = (await res.json()) as {
-    candidates?: { content?: { parts?: { text?: string }[] } }[];
+    choices?: { message?: { content?: string } }[];
   };
-  const raw = body.candidates?.[0]?.content?.parts?.[0]?.text ?? "[]";
-  const parsed: unknown = JSON.parse(raw);
-  if (!Array.isArray(parsed)) {
+  const content = body.choices?.[0]?.message?.content ?? "{}";
+  const parsed = JSON.parse(content) as { bottles?: unknown };
+  if (!Array.isArray(parsed.bottles)) {
     return [];
   }
-  return parsed.filter((v): v is string => typeof v === "string");
+  return parsed.bottles.filter((v): v is string => typeof v === "string");
 }
