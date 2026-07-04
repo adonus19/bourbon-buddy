@@ -126,11 +126,19 @@ export class ProfilePage {
     try {
       const call = httpsCallable<
         { limit: number },
-        { scanned: number; processed: number; skipped: number }
+        {
+          scanned: number;
+          processed: number;
+          skipped: number;
+          rateLimited?: boolean;
+        }
       >(this.functions, 'backfillArticleBottles');
       const res = await call({ limit: 25 });
+      const { scanned, processed, rateLimited } = res.data;
       await this.presentToast(
-        `Scanned ${res.data.scanned}, processed ${res.data.processed}.`
+        rateLimited
+          ? `Processed ${processed}, then hit the AI rate limit. Try again in a minute.`
+          : `Scanned ${scanned}, processed ${processed}.`
       );
     } catch {
       await this.presentToast('Backfill failed — check the function logs.');

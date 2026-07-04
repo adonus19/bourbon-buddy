@@ -25,13 +25,25 @@ const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 const GEMINI_MODEL = "gemini-2.0-flash";
 const MAX_BOTTLES = 8;
 const MAX_TEXT_CHARS = 1500;
-const BACKFILL_DEFAULT = 20;
+const BACKFILL_DEFAULT = 15;
 const BACKFILL_MAX = 50;
+const BACKFILL_SPACING_MS = 1200; // gentle pacing to respect free-tier RPM
+const RATE_LIMITED = -2; // processArticle sentinel: hit the model rate limit
 
 interface MentionedBottle {
   name: string;
   bourbonId: string | null;
 }
+
+/** Thrown when Gemini returns 429 so callers can back off / stop early. */
+class RateLimitError extends Error {
+  constructor() {
+    super("gemini_rate_limited");
+  }
+}
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Runs once per new article: extract → match → cache on the article doc. */
 export const extractBottlesFromArticle = onDocumentCreated(
@@ -39,6 +51,9 @@ export const extractBottlesFromArticle = onDocumentCreated(
     document: "newsArticles/{articleId}",
     region: "us-central1",
     secrets: [GEMINI_API_KEY],
+    // Cap concurrency so a bulk RSS fetch (dozens of new docs at once) doesn't
+    // fire dozens of simultaneous model calls and blow the free-tier RPM.
+    maxInstances: 2,
   },
   async (event) => {
     if (!event.data) {
@@ -52,6 +67,9 @@ export const extractBottlesFromArticle = onDocumentCreated(
     );
     if (n >= 0) {
       logger.info(`Extracted ${n} bottle(s) for ${event.params.articleId}.`);
+    } else if (n === RATE_LIMITED) {
+      // Left unprocessed on purpose — a later fetch/backfill will pick it up.
+      logger.warn(`Rate limited on ${event.params.articleId}; will retry later.`);
     }
   }
 );
@@ -62,7 +80,7 @@ export const extractBottlesFromArticle = onDocumentCreated(
  * it can't run away on cost. (Lock down or remove before a public launch.)
  */
 export const backfillArticleBottles = onCall(
-  { region: "us-central1", secrets: [GEMINI_API_KEY] },
+  { region: "us-central1", secrets: [GEMINI_API_KEY], timeoutSeconds: 300 },
   async (request) => {
     if (!request.auth?.uid) {
       throw new HttpsError("unauthenticated", "Sign in to run the backfill.");
@@ -83,6 +101,7 @@ export const backfillArticleBottles = onCall(
     const key = GEMINI_API_KEY.value();
     let processed = 0;
     let skipped = 0;
+    let rateLimited = false;
     for (const doc of snap.docs) {
       const data = doc.data();
       if (data.bottlesExtractedAt) {
@@ -90,14 +109,22 @@ export const backfillArticleBottles = onCall(
         continue; // already extracted
       }
       const n = await processArticle(db, doc.ref, data, key);
+      if (n === RATE_LIMITED) {
+        rateLimited = true;
+        break; // stop hammering a limited quota; unprocessed docs stay for later
+      }
       if (n >= 0) {
         processed++;
       } else {
         skipped++;
       }
+      await sleep(BACKFILL_SPACING_MS);
     }
-    logger.info(`Backfill: scanned ${snap.size}, processed ${processed}.`);
-    return { scanned: snap.size, processed, skipped };
+    logger.info(
+      `Backfill: scanned ${snap.size}, processed ${processed}` +
+        (rateLimited ? " (stopped: rate limited)." : ".")
+    );
+    return { scanned: snap.size, processed, skipped, rateLimited };
   }
 );
 
@@ -126,6 +153,9 @@ async function processArticle(
   try {
     names = await extractBottleNames(text, apiKey);
   } catch (err) {
+    if (err instanceof RateLimitError) {
+      return RATE_LIMITED; // caller decides whether to stop / retry later
+    }
     logger.warn(`Bottle extraction failed for ${ref.id}`, err);
     return -1;
   }
@@ -211,6 +241,9 @@ async function extractBottleNames(
     }
   );
 
+  if (res.status === 429) {
+    throw new RateLimitError();
+  }
   if (!res.ok) {
     throw new Error(`Gemini ${res.status}: ${await res.text()}`);
   }
