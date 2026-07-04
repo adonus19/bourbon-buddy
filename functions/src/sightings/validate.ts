@@ -1,0 +1,74 @@
+/**
+ * Pure input validation for the logSighting callable (BB-163). Extracted so the
+ * rules can be unit-tested without the Firestore/callable machinery. Throws
+ * HttpsError('invalid-argument') on the first problem.
+ */
+import { HttpsError } from "firebase-functions/v2/https";
+
+export const STORE_MAX = 120;
+export const TEXT_MAX = 80;
+export const NOTES_MAX = 500;
+export const PRICE_CEILING = 100000;
+export const DAY_MS = 24 * 60 * 60 * 1000;
+
+export interface LogSightingData {
+  bourbonId?: string;
+  bourbonName?: string | null;
+  storeName?: string;
+  price?: number;
+  sightingDateMillis?: number;
+  city?: string | null;
+  state?: string | null;
+  notes?: string | null;
+  visibility?: string;
+}
+
+export interface ValidatedSighting {
+  bourbonId: string;
+  storeName: string;
+  price: number;
+  sightingDateMillis: number;
+  visibility: string;
+}
+
+function bad(message: string): never {
+  throw new HttpsError("invalid-argument", message);
+}
+
+export function validate(d: LogSightingData): ValidatedSighting {
+  if (!d.bourbonId || typeof d.bourbonId !== "string") {
+    bad("A bottle is required.");
+  }
+  if (
+    !d.storeName ||
+    typeof d.storeName !== "string" ||
+    d.storeName.length > STORE_MAX
+  ) {
+    bad("Store name is required and must be under 120 characters.");
+  }
+  if (typeof d.price !== "number" || !(d.price > 0) || d.price > PRICE_CEILING) {
+    bad("Price must be a positive number under 100,000.");
+  }
+  const when =
+    typeof d.sightingDateMillis === "number" ? d.sightingDateMillis : Date.now();
+  if (when > Date.now() + DAY_MS) {
+    bad("Sighting date can't be in the future.");
+  }
+  for (const [field, max] of [
+    [d.city, TEXT_MAX],
+    [d.state, TEXT_MAX],
+    [d.notes, NOTES_MAX],
+  ] as const) {
+    if (field != null && (typeof field !== "string" || field.length > max)) {
+      bad("A field is too long.");
+    }
+  }
+  const visibility = d.visibility === "friends" ? "friends" : "private";
+  return {
+    bourbonId: d.bourbonId as string,
+    storeName: d.storeName as string,
+    price: d.price as number,
+    sightingDateMillis: when,
+    visibility,
+  };
+}

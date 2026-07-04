@@ -6,13 +6,18 @@
  *   cleanupReadArticles — hourly: delete read articleStates older than 24h and
  *                         their /newsArticles docs (Read tab is transient).
  */
-import { createHash } from "crypto";
 import { logger } from "firebase-functions/v2";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import Parser from "rss-parser";
 
 import { RSS_SOURCES } from "./sources";
+import {
+  categorize,
+  publishedAt,
+  thumbnailFrom,
+  urlHash,
+} from "./parse";
 
 const MAX_AGE_DAYS = 90;
 const MAX_AGE_MS = MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
@@ -27,42 +32,6 @@ const parser: Parser<unknown, FeedItem> = new Parser({
   timeout: 15000,
   customFields: { item: [["media:content", "media:content"]] },
 });
-
-function urlHash(url: string): string {
-  return createHash("sha1").update(url).digest("hex");
-}
-
-/** Lightweight category tagging from the headline + excerpt text. */
-function categorize(text: string): string[] {
-  const t = text.toLowerCase();
-  const cats = new Set<string>(["general"]); // catch-all (on by default)
-  if (/\b(release|launch|unveil|debut|new bourbon|new release)\b/.test(t)) {
-    cats.add("release");
-  }
-  if (/\b(award|winner|medal|gold|competition|best of)\b/.test(t)) {
-    cats.add("award");
-  }
-  if (/\b(festival|convention|fest|expo)\b/.test(t)) {
-    cats.add("event");
-  }
-  if (/\bdistiller(y|ies)\b/.test(t)) {
-    cats.add("distillery");
-  }
-  return [...cats];
-}
-
-function thumbnailFrom(item: FeedItem): string | null {
-  return item.enclosure?.url ?? item["media:content"]?.$?.url ?? null;
-}
-
-function publishedAt(item: FeedItem): Date | null {
-  const raw = item.isoDate ?? item.pubDate;
-  if (!raw) {
-    return null;
-  }
-  const d = new Date(raw);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
 
 async function ingestSource(
   db: FirebaseFirestore.Firestore,
