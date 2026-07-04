@@ -102,7 +102,7 @@ users/{userId}/logEntries/{entryId}
 
 **Category Values:** `bourbon` | `rye` | `wheat_whiskey` | `tennessee` | `american_other` | `scotch` | `irish` | `japanese` | `world_other`
 
-**Sub-type Values:** `single_barrel` | `small_batch` | `blended` | `cask_strength` | `nas` | `straight` | `bottled_in_bond`
+**Sub-type Values:** `single_barrel` | `small_batch` | `blended` | `cask_strength` | `nas` | `straight` | `bottled_in_bond` | `wheated`
 
 **Entry Type Values:** `drink` | `bottle_purchased` | `gift_received` | `sample_split` | `virtual_tasting`
 
@@ -692,7 +692,7 @@ export type BourbonCategory =
 
 export type BourbonSubType =
   'single_barrel' | 'small_batch' | 'blended' | 'cask_strength' |
-  'nas' | 'straight' | 'bottled_in_bond';
+  'nas' | 'straight' | 'bottled_in_bond' | 'wheated';
 
 export type EntryType =
   'drink' | 'bottle_purchased' | 'gift_received' | 'sample_split' | 'virtual_tasting';

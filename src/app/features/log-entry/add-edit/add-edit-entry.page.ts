@@ -82,6 +82,7 @@ export class AddEditEntryPage {
     { value: 'nas', label: 'NAS' },
     { value: 'straight', label: 'Straight' },
     { value: 'bottled_in_bond', label: 'Bottled-in-Bond' },
+    { value: 'wheated', label: 'Wheated' },
   ];
 
   readonly entryTypes = [
