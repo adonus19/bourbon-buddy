@@ -192,23 +192,6 @@
       Export to CSV
     </ion-button>
 
-    <p class="eyebrow profile__section">Developer</p>
-
-    <ion-button
-      class="profile__account-btn"
-      expand="block"
-      fill="outline"
-      [disabled]="backfilling()"
-      (click)="backfillBottles()"
-    >
-      @if (backfilling()) {
-        <ion-spinner name="crescent"></ion-spinner>
-      } @else {
-        <ion-icon name="sparkles-outline" slot="start"></ion-icon>
-        Find bottles in recent articles
-      }
-    </ion-button>
-
     <p class="eyebrow profile__section">Account</p>
 
     @if (hasPasswordProvider()) {
