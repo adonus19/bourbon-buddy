@@ -13,7 +13,7 @@ const DROP_PUNCT = /['’`".]/g; // apostrophes (straight + curly), backtick, qu
 const NON_ALNUM = /[^a-z0-9]+/g;
 
 export function normalizeBottleName(name: string): string {
-  return name
+  return String(name ?? '')
     .normalize('NFKD') // separate diacritics from base letters
     .replace(DIACRITICS, '') // strip the diacritic marks
     .toLowerCase()
