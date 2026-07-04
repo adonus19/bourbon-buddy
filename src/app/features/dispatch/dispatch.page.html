@@ -122,6 +122,26 @@
                 @if (a.excerpt) {
                   <p class="article__excerpt">{{ a.excerpt }}</p>
                 }
+                @if (a.mentionedBottles?.length) {
+                  <div
+                    class="article__bottles"
+                    (click)="$event.stopPropagation()"
+                  >
+                    <span class="article__bottles-label">Bottles mentioned</span>
+                    <div class="article__chips">
+                      @for (b of a.mentionedBottles; track b.name) {
+                        <button
+                          class="article__chip"
+                          type="button"
+                          (click)="addBottle(b, $event)"
+                        >
+                          <ion-icon name="add" aria-hidden="true"></ion-icon>
+                          {{ b.name }}
+                        </button>
+                      }
+                    </div>
+                  </div>
+                }
               </div>
               @if (a.thumbnailUrl) {
                 <img class="article__thumb" [src]="a.thumbnailUrl" alt="" />

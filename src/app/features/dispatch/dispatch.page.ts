@@ -12,8 +12,15 @@ import {
   ViewWillEnter,
 } from '@ionic/angular';
 
-import { ArticleState, NewsArticle } from '../../models';
+import {
+  ACTIVE_WISHLIST_STATUSES,
+  ArticleState,
+  MentionedBottle,
+  NewsArticle,
+} from '../../models';
 import { NewsService } from '../../core/services/news.service';
+import { WishlistService } from '../../core/services/wishlist.service';
+import { BourbonCatalogService } from '../../core/services/bourbon-catalog.service';
 import { relativeTime } from '../../shared/utils/relative-time';
 import { isWatched, passesPrefs } from '../../shared/utils/news-filter';
 import {
@@ -32,8 +39,12 @@ type Segment = 'feed' | 'read' | 'saved';
 })
 export class DispatchPage implements ViewWillEnter {
   private readonly news = inject(NewsService);
+  private readonly wishlist = inject(WishlistService);
+  private readonly catalog = inject(BourbonCatalogService);
   private readonly toast = inject(ToastController);
   private readonly cdr = inject(ChangeDetectorRef);
+
+  private addingBottle = false;
 
   readonly loading = this.news.loading;
   readonly loadingMore = this.news.loadingMore;
@@ -125,6 +136,60 @@ export class DispatchPage implements ViewWillEnter {
       if (st !== 'saved' && st !== 'read') {
         void this.news.setState(a.id, 'read');
       }
+    }
+  }
+
+  /**
+   * Adds an AI-found bottle to the Hunt List from an article chip (BB-130).
+   * Stops the tap from opening the article. Resolves the catalog id (creating
+   * the entry only if the AI didn't already match one), skips duplicates.
+   */
+  async addBottle(b: MentionedBottle, ev: Event): Promise<void> {
+    ev.stopPropagation();
+    if (this.addingBottle) {
+      return;
+    }
+    this.addingBottle = true;
+    try {
+      const bourbonId =
+        b.bourbonId ||
+        (await this.catalog.findOrCreate({
+          name: b.name,
+          distillery: null,
+          bottler: null,
+          category: null,
+          subType: null,
+          ageStatement: null,
+          isNas: false,
+          proof: null,
+          series: null,
+        }));
+
+      const already = this.wishlist
+        .entries()
+        .some(
+          (e) =>
+            e.bourbonId === bourbonId &&
+            ACTIVE_WISHLIST_STATUSES.includes(e.status)
+        );
+      if (already) {
+        await this.presentToast(`${b.name} is already on your hunt list.`);
+        return;
+      }
+
+      await this.wishlist.add({
+        bourbonId,
+        bourbonName: b.name,
+        reviewLinks: [],
+        priority: 'normal',
+        status: 'actively_looking',
+        discoverySource: 'Dispatch',
+      });
+      await this.presentToast(`Added ${b.name} to your hunt list.`);
+    } catch {
+      await this.presentToast("Couldn't add that bottle. Try again.");
+    } finally {
+      this.addingBottle = false;
     }
   }
 
