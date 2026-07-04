@@ -18,6 +18,7 @@ import { logger } from "firebase-functions/v2";
 import { defineSecret } from "firebase-functions/params";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 
 import { normalizeBottleName } from "../shared/normalize";
 
@@ -30,6 +31,7 @@ const MAX_TEXT_CHARS = 1500;
 const BACKFILL_DEFAULT = 15;
 const BACKFILL_MAX = 50;
 const BACKFILL_SPACING_MS = 1200; // gentle pacing to respect free-tier RPM
+const SWEEP_LIMIT = 100; // recent articles scanned per scheduled sweep
 const RATE_LIMITED = -2; // processArticle sentinel: hit the model rate limit
 
 // Category values must match the app's BourbonCategory enum; anything else the
@@ -114,43 +116,84 @@ export const backfillArticleBottles = onCall(
       Math.max(Number.isFinite(requested) ? requested : BACKFILL_DEFAULT, 1),
       BACKFILL_MAX
     );
-
-    const db = getFirestore();
-    const snap = await db
-      .collection("newsArticles")
-      .orderBy("fetchedAt", "desc")
-      .limit(limit)
-      .get();
-
-    const key = GROQ_API_KEY.value();
-    let processed = 0;
-    let skipped = 0;
-    let rateLimited = false;
-    for (const doc of snap.docs) {
-      const data = doc.data();
-      if (data.bottlesExtractedAt) {
-        skipped++;
-        continue; // already extracted
-      }
-      const n = await processArticle(db, doc.ref, data, key);
-      if (n === RATE_LIMITED) {
-        rateLimited = true;
-        break; // stop hammering a limited quota; unprocessed docs stay for later
-      }
-      if (n >= 0) {
-        processed++;
-      } else {
-        skipped++;
-      }
-      await sleep(BACKFILL_SPACING_MS);
-    }
+    const res = await sweepUnprocessed(getFirestore(), GROQ_API_KEY.value(), limit);
     logger.info(
-      `Backfill: scanned ${snap.size}, processed ${processed}` +
-        (rateLimited ? " (stopped: rate limited)." : ".")
+      `Backfill: scanned ${res.scanned}, processed ${res.processed}` +
+        (res.rateLimited ? " (stopped: rate limited)." : ".")
     );
-    return { scanned: snap.size, processed, skipped, rateLimited };
+    return res;
   }
 );
+
+/**
+ * Scheduled safety net (BB-130): the onCreate trigger only fires for brand-new
+ * article URLs, so pre-existing articles and re-fetched ones (updates) never get
+ * extracted. This sweep periodically extracts any recent article still missing
+ * bottlesExtractedAt, rate-paced and self-healing (stops on 429, resumes next run).
+ */
+export const sweepArticleBottles = onSchedule(
+  {
+    schedule: "every 2 hours",
+    region: "us-central1",
+    secrets: [GROQ_API_KEY],
+    timeoutSeconds: 300,
+  },
+  async () => {
+    const res = await sweepUnprocessed(
+      getFirestore(),
+      GROQ_API_KEY.value(),
+      SWEEP_LIMIT
+    );
+    logger.info(
+      `Sweep: scanned ${res.scanned}, processed ${res.processed}` +
+        (res.rateLimited ? " (stopped: rate limited)." : ".")
+    );
+  }
+);
+
+/**
+ * Scans the most-recently-fetched articles and extracts bottles for any that
+ * lack `bottlesExtractedAt`, pacing calls and stopping early on a rate limit.
+ */
+async function sweepUnprocessed(
+  db: FirebaseFirestore.Firestore,
+  apiKey: string,
+  limit: number
+): Promise<{
+  scanned: number;
+  processed: number;
+  skipped: number;
+  rateLimited: boolean;
+}> {
+  const snap = await db
+    .collection("newsArticles")
+    .orderBy("fetchedAt", "desc")
+    .limit(limit)
+    .get();
+
+  let processed = 0;
+  let skipped = 0;
+  let rateLimited = false;
+  for (const doc of snap.docs) {
+    const data = doc.data();
+    if (data.bottlesExtractedAt) {
+      skipped++;
+      continue; // already extracted
+    }
+    const n = await processArticle(db, doc.ref, data, apiKey);
+    if (n === RATE_LIMITED) {
+      rateLimited = true;
+      break; // stop hammering a limited quota; unprocessed docs stay for later
+    }
+    if (n >= 0) {
+      processed++;
+    } else {
+      skipped++;
+    }
+    await sleep(BACKFILL_SPACING_MS);
+  }
+  return { scanned: snap.size, processed, skipped, rateLimited };
+}
 
 /**
  * Extracts, catalog-matches, and caches bottles for one article. Returns the
