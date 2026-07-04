@@ -15,6 +15,7 @@ import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { defineSecret } from "firebase-functions/params";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { HttpsError, onCall } from "firebase-functions/v2/https";
 
 import { normalizeBottleName } from "../shared/normalize";
 
@@ -24,12 +25,15 @@ const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 const GEMINI_MODEL = "gemini-2.0-flash";
 const MAX_BOTTLES = 8;
 const MAX_TEXT_CHARS = 1500;
+const BACKFILL_DEFAULT = 20;
+const BACKFILL_MAX = 50;
 
 interface MentionedBottle {
   name: string;
   bourbonId: string | null;
 }
 
+/** Runs once per new article: extract → match → cache on the article doc. */
 export const extractBottlesFromArticle = onDocumentCreated(
   {
     document: "newsArticles/{articleId}",
@@ -37,55 +41,116 @@ export const extractBottlesFromArticle = onDocumentCreated(
     secrets: [GEMINI_API_KEY],
   },
   async (event) => {
-    const article = event.data?.data();
-    if (!article) {
+    if (!event.data) {
       return;
     }
-    const headline = (article.headline as string) ?? "";
-    const excerpt = (article.excerpt as string) ?? "";
-    const text = `${headline}\n${excerpt}`.trim().slice(0, MAX_TEXT_CHARS);
-    if (text.length < 12) {
-      return; // nothing worth a model call
-    }
-
-    let names: string[];
-    try {
-      names = await extractBottleNames(text, GEMINI_API_KEY.value());
-    } catch (err) {
-      // Extraction is best-effort: on failure the article just shows without
-      // bottle chips. We don't throw (no retry storms / runaway cost).
-      logger.warn(`Bottle extraction failed for ${event.params.articleId}`, err);
-      return;
-    }
-    if (!names.length) {
-      return;
-    }
-
-    const db = getFirestore();
-    const seen = new Set<string>();
-    const bottles: MentionedBottle[] = [];
-    for (const raw of names) {
-      const name = raw.trim();
-      const key = normalizeBottleName(name);
-      if (!key || seen.has(key)) {
-        continue;
-      }
-      seen.add(key);
-      bottles.push({ name, bourbonId: await matchCatalog(db, key) });
-      if (bottles.length >= MAX_BOTTLES) {
-        break;
-      }
-    }
-
-    await event.data!.ref.update({
-      mentionedBottles: bottles,
-      bottlesExtractedAt: FieldValue.serverTimestamp(),
-    });
-    logger.info(
-      `Extracted ${bottles.length} bottle(s) for ${event.params.articleId}.`
+    const n = await processArticle(
+      getFirestore(),
+      event.data.ref,
+      event.data.data(),
+      GEMINI_API_KEY.value()
     );
+    if (n >= 0) {
+      logger.info(`Extracted ${n} bottle(s) for ${event.params.articleId}.`);
+    }
   }
 );
+
+/**
+ * Bounded backfill / test tool: extract bottles for the most recent articles
+ * that haven't been processed yet. Signed-in only and capped at 50 per call so
+ * it can't run away on cost. (Lock down or remove before a public launch.)
+ */
+export const backfillArticleBottles = onCall(
+  { region: "us-central1", secrets: [GEMINI_API_KEY] },
+  async (request) => {
+    if (!request.auth?.uid) {
+      throw new HttpsError("unauthenticated", "Sign in to run the backfill.");
+    }
+    const requested = Number((request.data as { limit?: number })?.limit);
+    const limit = Math.min(
+      Math.max(Number.isFinite(requested) ? requested : BACKFILL_DEFAULT, 1),
+      BACKFILL_MAX
+    );
+
+    const db = getFirestore();
+    const snap = await db
+      .collection("newsArticles")
+      .orderBy("fetchedAt", "desc")
+      .limit(limit)
+      .get();
+
+    const key = GEMINI_API_KEY.value();
+    let processed = 0;
+    let skipped = 0;
+    for (const doc of snap.docs) {
+      const data = doc.data();
+      if (data.bottlesExtractedAt) {
+        skipped++;
+        continue; // already extracted
+      }
+      const n = await processArticle(db, doc.ref, data, key);
+      if (n >= 0) {
+        processed++;
+      } else {
+        skipped++;
+      }
+    }
+    logger.info(`Backfill: scanned ${snap.size}, processed ${processed}.`);
+    return { scanned: snap.size, processed, skipped };
+  }
+);
+
+/**
+ * Extracts, catalog-matches, and caches bottles for one article. Returns the
+ * number written (>= 0), or -1 when the model call failed (best-effort: the
+ * caller treats a failure as skipped, never throws — no retry storms / cost).
+ */
+async function processArticle(
+  db: FirebaseFirestore.Firestore,
+  ref: FirebaseFirestore.DocumentReference,
+  article: FirebaseFirestore.DocumentData | undefined,
+  apiKey: string
+): Promise<number> {
+  if (!article) {
+    return -1;
+  }
+  const headline = (article.headline as string) ?? "";
+  const excerpt = (article.excerpt as string) ?? "";
+  const text = `${headline}\n${excerpt}`.trim().slice(0, MAX_TEXT_CHARS);
+  if (text.length < 12) {
+    return 0;
+  }
+
+  let names: string[];
+  try {
+    names = await extractBottleNames(text, apiKey);
+  } catch (err) {
+    logger.warn(`Bottle extraction failed for ${ref.id}`, err);
+    return -1;
+  }
+
+  const seen = new Set<string>();
+  const bottles: MentionedBottle[] = [];
+  for (const raw of names) {
+    const name = raw.trim();
+    const key = normalizeBottleName(name);
+    if (!key || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    bottles.push({ name, bourbonId: await matchCatalog(db, key) });
+    if (bottles.length >= MAX_BOTTLES) {
+      break;
+    }
+  }
+
+  await ref.update({
+    mentionedBottles: bottles,
+    bottlesExtractedAt: FieldValue.serverTimestamp(),
+  });
+  return bottles.length;
+}
 
 /** Finds an existing catalog bottleId for a normalized name, or null. */
 async function matchCatalog(
