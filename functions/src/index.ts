@@ -20,6 +20,9 @@ export { onSightingCreated } from "./alerts";
 // Sighting guards (BB-163): rate-limited create callable + stale cleanup.
 export { logSighting, cleanupStaleSightings } from "./sightings";
 
+// AI Find Bottles (BB-130): extract bottle mentions from new articles (cached).
+export { extractBottlesFromArticle } from "./ai";
+
 // Social graph (BB-101/102/103): request create, accept/decline, remove, block.
 export {
   sendFriendRequest,
