@@ -95,27 +95,15 @@ const routes: Routes = [
         (m) => m.WishlistDetailPageModule
       ),
   },
-  {
-    path: 'friends',
-    canActivate: [authGuard],
-    loadChildren: () =>
-      import('./features/friends/friends.module').then(
-        (m) => m.FriendsPageModule
-      ),
-  },
+  // Friends & feed now live under the Social tab; keep these paths as redirects
+  // so notification deep-links (e.g. "/friends") still resolve.
+  { path: 'friends', redirectTo: 'tabs/social/friends', pathMatch: 'full' },
+  { path: 'friends-feed', redirectTo: 'tabs/social/feed', pathMatch: 'full' },
   {
     path: 'inbox',
     canActivate: [authGuard],
     loadChildren: () =>
       import('./features/inbox/inbox.module').then((m) => m.InboxPageModule),
-  },
-  {
-    path: 'friends-feed',
-    canActivate: [authGuard],
-    loadChildren: () =>
-      import('./features/friends-feed/friends-feed.module').then(
-        (m) => m.FriendsFeedPageModule
-      ),
   },
   {
     path: 'u/:id',

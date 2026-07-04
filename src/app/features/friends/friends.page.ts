@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import {
   ActionSheetController,
   AlertController,
+  NavController,
   ToastController,
 } from '@ionic/angular';
 
@@ -34,6 +35,7 @@ export class FriendsPage {
   private readonly actionSheet = inject(ActionSheetController);
   private readonly alertCtrl = inject(AlertController);
   private readonly router = inject(Router);
+  private readonly nav = inject(NavController);
 
   readonly friendList = toSignal(this.friends.friends$(), {
     initialValue: [] as FriendView[],
@@ -141,6 +143,13 @@ export class FriendsPage {
       await this.presentToast('Request canceled.');
     } catch {
       await this.presentToast("Couldn't cancel. Try again.");
+    }
+  }
+
+  /** Segment: switch to the Feed view within the Social tab. */
+  onSegment(value: string): void {
+    if (value === 'feed') {
+      void this.nav.navigateRoot(['/tabs/social/feed'], { animated: false });
     }
   }
 

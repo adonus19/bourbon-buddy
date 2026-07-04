@@ -155,9 +155,9 @@ export class DispatchPage implements ViewWillEnter {
         b.bourbonId ||
         (await this.catalog.findOrCreate({
           name: b.name,
-          distillery: null,
+          distillery: b.distillery ?? null,
           bottler: null,
-          category: null,
+          category: b.category ?? null,
           subType: null,
           ageStatement: null,
           isNas: false,
@@ -180,6 +180,8 @@ export class DispatchPage implements ViewWillEnter {
       await this.wishlist.add({
         bourbonId,
         bourbonName: b.name,
+        distillery: b.distillery ?? null,
+        category: b.category ?? null,
         reviewLinks: [],
         priority: 'normal',
         status: 'actively_looking',

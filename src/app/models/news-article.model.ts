@@ -1,9 +1,12 @@
 import { Timestamp } from '@angular/fire/firestore';
+import { BourbonCategory } from './enums';
 
 /** A bottle the AI found mentioned in an article (BB-130), matched to catalog. */
 export interface MentionedBottle {
   name: string; // as written in the article
   bourbonId?: string | null; // catalog match, or null if not yet in /bourbons
+  distillery?: string | null; // AI-inferred, to pre-fill the hunt-list entry
+  category?: BourbonCategory | null; // AI-inferred (validated against the enum)
 }
 
 // Collection: /newsArticles/{articleId}  (document ID = URL-derived hash)

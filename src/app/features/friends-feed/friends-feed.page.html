@@ -1,9 +1,6 @@
 <ion-header [translucent]="true">
   <ion-toolbar>
-    <ion-buttons slot="start">
-      <ion-back-button defaultHref="/friends" text=""></ion-back-button>
-    </ion-buttons>
-    <ion-title>Friends' Sightings</ion-title>
+    <ion-title>Friends</ion-title>
     <ion-buttons slot="end">
       <ion-button (click)="toggleStale()" aria-label="Toggle stale sightings">
         <ion-icon
@@ -12,6 +9,14 @@
         ></ion-icon>
       </ion-button>
     </ion-buttons>
+  </ion-toolbar>
+  <ion-toolbar>
+    <ion-segment value="feed" (ionChange)="onSegment($any($event.detail.value))">
+      <ion-segment-button value="feed"><ion-label>Feed</ion-label></ion-segment-button>
+      <ion-segment-button value="friends">
+        <ion-label>Friends</ion-label>
+      </ion-segment-button>
+    </ion-segment>
   </ion-toolbar>
 </ion-header>
 

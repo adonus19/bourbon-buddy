@@ -169,6 +169,10 @@
                 Unsave
               </ion-item-option>
             } @else {
+              <ion-item-option class="opt opt--save" (click)="mark(a, 'saved')">
+                <ion-icon slot="top" name="bookmark-outline"></ion-icon>
+                Save
+              </ion-item-option>
               <ion-item-option class="opt opt--undo" (click)="clear(a)">
                 <ion-icon slot="top" name="arrow-undo-outline"></ion-icon>
                 Unread

@@ -31,9 +31,24 @@ const routes: Routes = [
           import('../numbers/numbers.module').then((m) => m.NumbersPageModule),
       },
       {
-        path: 'search',
-        loadChildren: () =>
-          import('../search/search.module').then((m) => m.SearchPageModule),
+        path: 'social',
+        children: [
+          { path: '', redirectTo: 'feed', pathMatch: 'full' },
+          {
+            path: 'feed',
+            loadChildren: () =>
+              import('../friends-feed/friends-feed.module').then(
+                (m) => m.FriendsFeedPageModule
+              ),
+          },
+          {
+            path: 'friends',
+            loadChildren: () =>
+              import('../friends/friends.module').then(
+                (m) => m.FriendsPageModule
+              ),
+          },
+        ],
       },
       {
         path: '',

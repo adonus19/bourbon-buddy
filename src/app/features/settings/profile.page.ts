@@ -7,7 +7,6 @@ import {
   ToastController,
 } from '@ionic/angular';
 import { Auth, updateProfile } from '@angular/fire/auth';
-import { Functions, httpsCallable } from '@angular/fire/functions';
 
 import { SightingVisibility } from '../../models';
 import { AuthService } from '../../core/auth/auth.service';
@@ -39,11 +38,9 @@ export class ProfilePage {
   private readonly exportService = inject(ExportService);
   private readonly notifications = inject(NotificationService);
   private readonly inbox = inject(InboxService);
-  private readonly functions = inject(Functions);
 
   /** Unread inbox count for the badge; refreshed on entering the page. */
   readonly inboxUnread = signal(0);
-  readonly backfilling = signal(false);
 
   // Already-loaded signals from the session state holder — no new Firebase reads.
   readonly user = this.auth.currentUser;
@@ -115,28 +112,6 @@ export class ProfilePage {
 
   async ionViewWillEnter(): Promise<void> {
     this.inboxUnread.set(await this.inbox.unreadCount());
-  }
-
-  /** Dev/test tool (BB-130): extract bottles for recent articles on demand. */
-  async backfillBottles(): Promise<void> {
-    if (this.backfilling()) {
-      return;
-    }
-    this.backfilling.set(true);
-    try {
-      const call = httpsCallable<
-        { limit: number },
-        { scanned: number; processed: number; skipped: number }
-      >(this.functions, 'backfillArticleBottles');
-      const res = await call({ limit: 25 });
-      await this.presentToast(
-        `Scanned ${res.data.scanned}, processed ${res.data.processed}.`
-      );
-    } catch {
-      await this.presentToast('Backfill failed — check the function logs.');
-    } finally {
-      this.backfilling.set(false);
-    }
   }
 
   async claimUsername(): Promise<void> {
