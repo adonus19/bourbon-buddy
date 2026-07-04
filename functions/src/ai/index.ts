@@ -32,9 +32,31 @@ const BACKFILL_MAX = 50;
 const BACKFILL_SPACING_MS = 1200; // gentle pacing to respect free-tier RPM
 const RATE_LIMITED = -2; // processArticle sentinel: hit the model rate limit
 
+// Category values must match the app's BourbonCategory enum; anything else the
+// model returns is dropped to null so it never pollutes the hunt-list form.
+const VALID_CATEGORIES = new Set([
+  "bourbon",
+  "rye",
+  "wheat_whiskey",
+  "tennessee",
+  "american_other",
+  "scotch",
+  "irish",
+  "japanese",
+  "world_other",
+]);
+
 interface MentionedBottle {
   name: string;
   bourbonId: string | null;
+  distillery: string | null;
+  category: string | null;
+}
+
+interface ExtractedBottle {
+  name: string;
+  distillery: string | null;
+  category: string | null;
 }
 
 /** Thrown when the model returns 429 so callers can back off / stop early. */
@@ -151,9 +173,9 @@ async function processArticle(
     return 0;
   }
 
-  let names: string[];
+  let extracted: ExtractedBottle[];
   try {
-    names = await extractBottleNames(text, apiKey);
+    extracted = await extractBottleNames(text, apiKey);
   } catch (err) {
     if (err instanceof RateLimitError) {
       return RATE_LIMITED; // caller decides whether to stop / retry later
@@ -164,14 +186,21 @@ async function processArticle(
 
   const seen = new Set<string>();
   const bottles: MentionedBottle[] = [];
-  for (const raw of names) {
-    const name = raw.trim();
+  for (const raw of extracted) {
+    const name = raw.name.trim();
     const key = normalizeBottleName(name);
     if (!key || seen.has(key)) {
       continue;
     }
     seen.add(key);
-    bottles.push({ name, bourbonId: await matchCatalog(db, key) });
+    const category =
+      raw.category && VALID_CATEGORIES.has(raw.category) ? raw.category : null;
+    bottles.push({
+      name,
+      bourbonId: await matchCatalog(db, key),
+      distillery: raw.distillery?.trim() || null,
+      category,
+    });
     if (bottles.length >= MAX_BOTTLES) {
       break;
     }
@@ -207,20 +236,29 @@ async function matchCatalog(
 
 /**
  * The ONLY model-specific code. Calls Groq (OpenAI-compatible) and returns the
- * bottle product names it found. JSON object output for robust parsing, temp 0,
- * hard output cap. Throws RateLimitError on 429.
+ * bottles it found, each with an optional distillery + category to pre-fill the
+ * hunt-list form. JSON object output for robust parsing, temp 0, hard output
+ * cap. Deliberately does NOT ask for price/MSRP (news snippets rarely carry a
+ * reliable price, and a hallucinated one is worse than a blank field). Throws
+ * RateLimitError on 429.
  */
 async function extractBottleNames(
   text: string,
   apiKey: string
-): Promise<string[]> {
+): Promise<ExtractedBottle[]> {
   const system =
-    "You extract whiskey/bourbon PRODUCT names from a news snippet. Reply ONLY " +
-    "with JSON of the form {\"bottles\": [\"name\", ...]}. Include specific " +
-    "products (releases, expressions, bottlings) like \"Weller 12 Year\" or " +
-    "\"E.H. Taylor Small Batch\". Exclude bare distillery/brand names not tied " +
-    "to a product, generic terms (bourbon, rye), people, places, and events. " +
-    "Use names as written, trimmed, no duplicates. If none, use an empty array.";
+    "You extract whiskey/bourbon PRODUCT mentions from a news snippet. Reply " +
+    "ONLY with JSON: {\"bottles\": [{\"name\": string, \"distillery\": " +
+    "string|null, \"category\": string|null}]}. " +
+    "name: the specific product (release/expression/bottling) as written, e.g. " +
+    "\"Weller 12 Year\" or \"E.H. Taylor Small Batch\". " +
+    "distillery: the producing distillery or brand owner if you are confident, " +
+    "else null. " +
+    "category: exactly one of bourbon, rye, wheat_whiskey, tennessee, " +
+    "american_other, scotch, irish, japanese, world_other — or null if unsure. " +
+    "Include specific products only; exclude bare distillery/brand names, " +
+    "generic terms (bourbon, rye), people, places, and events. Do NOT include " +
+    "price or invent details. No duplicates. If none, use an empty array.";
 
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
@@ -231,7 +269,7 @@ async function extractBottleNames(
     body: JSON.stringify({
       model: GROQ_MODEL,
       temperature: 0,
-      max_tokens: 512,
+      max_tokens: 768,
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: system },
@@ -254,5 +292,14 @@ async function extractBottleNames(
   if (!Array.isArray(parsed.bottles)) {
     return [];
   }
-  return parsed.bottles.filter((v): v is string => typeof v === "string");
+  return parsed.bottles
+    .filter((b): b is Record<string, unknown> => !!b && typeof b === "object")
+    .map((b) => ({
+      name: typeof b["name"] === "string" ? (b["name"] as string) : "",
+      distillery:
+        typeof b["distillery"] === "string" ? (b["distillery"] as string) : null,
+      category:
+        typeof b["category"] === "string" ? (b["category"] as string) : null,
+    }))
+    .filter((b) => b.name.trim().length > 0);
 }
