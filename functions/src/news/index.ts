@@ -57,17 +57,22 @@ async function ingestSource(
     await db
       .collection("newsArticles")
       .doc(urlHash(link)) // URL-derived id => dedupe on write
-      .set({
-        sourceName: source.name,
-        headline,
-        excerpt,
-        url: link,
-        thumbnailUrl: thumbnailFrom(item),
-        publishedAt: published ? Timestamp.fromDate(published) : null,
-        fetchedAt: Timestamp.now(),
-        categories: categorize(`${headline} ${excerpt ?? ""}`),
-        keywords: [],
-      });
+      // merge:true so re-fetching an existing article updates its fields WITHOUT
+      // wiping the AI-extracted mentionedBottles/bottlesExtractedAt (BB-130).
+      .set(
+        {
+          sourceName: source.name,
+          headline,
+          excerpt,
+          url: link,
+          thumbnailUrl: thumbnailFrom(item),
+          publishedAt: published ? Timestamp.fromDate(published) : null,
+          fetchedAt: Timestamp.now(),
+          categories: categorize(`${headline} ${excerpt ?? ""}`),
+          keywords: [],
+        },
+        { merge: true }
+      );
     written++;
   }
   return written;
