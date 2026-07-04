@@ -29,9 +29,12 @@ const GROQ_MODEL = "llama-3.1-8b-instant";
 const MAX_BOTTLES = 8;
 const MAX_TEXT_CHARS = 1500;
 const BACKFILL_DEFAULT = 15;
-const BACKFILL_MAX = 50;
-const BACKFILL_SPACING_MS = 1200; // gentle pacing to respect free-tier RPM
-const SWEEP_LIMIT = 100; // recent articles scanned per scheduled sweep
+const BACKFILL_MAX = 40;
+// ~6s between calls keeps us under the free-tier 6K tokens/min (TPM) cap — the
+// binding limit. Bursting faster just 429s and stalls; steady pacing is faster
+// end-to-end because it never trips the limit.
+const BACKFILL_SPACING_MS = 6000;
+const SWEEP_LIMIT = 200; // recent articles scanned per scheduled sweep
 const RATE_LIMITED = -2; // processArticle sentinel: hit the model rate limit
 
 // Category values must match the app's BourbonCategory enum; anything else the
@@ -133,10 +136,10 @@ export const backfillArticleBottles = onCall(
  */
 export const sweepArticleBottles = onSchedule(
   {
-    schedule: "every 2 hours",
+    schedule: "every 1 hours",
     region: "us-central1",
     secrets: [GROQ_API_KEY],
-    timeoutSeconds: 300,
+    timeoutSeconds: 540,
   },
   async () => {
     const res = await sweepUnprocessed(
