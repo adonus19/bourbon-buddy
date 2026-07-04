@@ -3,6 +3,8 @@
   "description": "Cloud Functions for Bourbon Buddy",
   "scripts": {
     "lint": "eslint --ext .js,.ts .",
+    "test": "jest",
+    "test:cov": "jest --coverage",
     "build": "tsc",
     "build:watch": "tsc --watch",
     "serve": "npm run build && firebase emulators:start --only functions",
@@ -22,9 +24,12 @@
     "rss-parser": "^3.13.0"
   },
   "devDependencies": {
+    "@types/jest": "^29.5.14",
     "@typescript-eslint/eslint-plugin": "^8.18.0",
     "@typescript-eslint/parser": "^8.18.0",
     "eslint": "^8.57.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.4.11",
     "typescript": "^5.7.0"
   },
   "private": true
