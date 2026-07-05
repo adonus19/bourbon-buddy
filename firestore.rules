@@ -54,8 +54,19 @@ service cloud.firestore {
                     && request.resource.data.name is string
                     && request.resource.data.name.size() > 0
                     && request.resource.data.name.size() <= 120;
+      // The creator may edit anything; any signed-in user may append to the
+      // crowdsourced UPC index (BB-175) — but ONLY the `upc` field, bounded, so
+      // scanning a bottle you (or the AI) didn't create still teaches the index.
       allow update: if isSignedIn()
-                    && resource.data.createdByUserId == request.auth.uid;
+                    && (
+                      resource.data.createdByUserId == request.auth.uid
+                      || (
+                        request.resource.data.diff(resource.data)
+                          .affectedKeys().hasOnly(['upc'])
+                        && request.resource.data.upc is list
+                        && request.resource.data.upc.size() <= 20
+                      )
+                    );
       allow delete: if false;
     }
 

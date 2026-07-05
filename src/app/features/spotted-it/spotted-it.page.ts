@@ -33,19 +33,27 @@ export class SpottedItPage {
   private readonly scanner = inject(BarcodeScannerService);
 
   saving = false;
-  // BB-174: the raw captured code. BB-175 will resolve it to a catalog bottle.
-  scannedCode: string | null = null;
+  // BB-175: a scanned code with no catalog match yet. Once the user names the
+  // bottle and saves, we attach this code to that catalog entry for next time.
+  private pendingUpc: string | null = null;
 
-  /** Open the camera scanner and capture a barcode. */
+  /** Scan a barcode and resolve it to a catalog bottle (BB-174/BB-175). */
   async scanBarcode(): Promise<void> {
     const result = await this.scanner.scan();
     if (!result) {
       return;
     }
-    this.scannedCode = result.code;
-    // BB-175 will turn this code into a bottle lookup + prefill; for now,
-    // confirm the capture so the flow is testable end-to-end.
-    await this.presentToast(`Scanned barcode ${result.code}.`);
+    const match = await this.catalog.findByUpc(result.code);
+    if (match) {
+      this.pendingUpc = null;
+      this.onBottleSelected(match);
+      await this.presentToast(`Matched ${match.name}.`);
+    } else {
+      this.pendingUpc = result.code;
+      await this.presentToast(
+        "New barcode — name the bottle and we'll remember it."
+      );
+    }
   }
 
   readonly form = this.fb.group({
@@ -116,6 +124,16 @@ export class SpottedItPage {
         },
         v.visibility === 'friends' ? 'friends' : 'private'
       );
+
+      // Best-effort: teach the UPC index (BB-175). Never fail the sighting for it.
+      if (this.pendingUpc) {
+        try {
+          await this.catalog.addUpc(bourbonId, this.pendingUpc);
+        } catch {
+          // index update is non-critical; the sighting already saved
+        }
+        this.pendingUpc = null;
+      }
 
       await this.presentToast('Spotted it. Sighting logged.');
       await this.router.navigateByUrl('/tabs/hunt-list', { replaceUrl: true });

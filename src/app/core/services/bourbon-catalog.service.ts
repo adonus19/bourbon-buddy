@@ -3,7 +3,9 @@ import {
   Firestore,
   QueryConstraint,
   addDoc,
+  arrayUnion,
   collection,
+  doc,
   endAt,
   getDocs,
   limit,
@@ -11,12 +13,14 @@ import {
   query,
   serverTimestamp,
   startAt,
+  updateDoc,
   where,
 } from '@angular/fire/firestore';
 
 import { Bourbon } from '../../models';
 import { AuthService } from '../auth/auth.service';
 import { normalizeBottleName } from '../../shared/utils/normalize-name';
+import { normalizeBarcode } from '../../shared/utils/barcode';
 
 /** Fields used to seed a catalog entry when a new bottle name is logged. */
 export type CatalogSeed = Pick<
@@ -95,10 +99,47 @@ export class BourbonCatalogService {
       proof: seed.proof ?? null,
       msrp: null,
       series: seed.series ?? null,
+      upc: [],
       createdAt: serverTimestamp(),
       createdByUserId: this.requireUid(),
     });
     return ref.id;
+  }
+
+  /**
+   * Look up a catalog bottle by a scanned/typed barcode (BB-175). The index is
+   * crowdsourced: `upc` is populated as users confirm bottles for codes. One
+   * bounded query; returns null for an unknown or malformed code.
+   */
+  async findByUpc(code: string): Promise<Bourbon | null> {
+    const normalized = normalizeBarcode(code);
+    if (!normalized) {
+      return null;
+    }
+    const snap = await getDocs(
+      query(
+        this.catalogCol(),
+        where('upc', 'array-contains', normalized),
+        limit(1)
+      )
+    );
+    return snap.empty
+      ? null
+      : ({ id: snap.docs[0].id, ...snap.docs[0].data() } as Bourbon);
+  }
+
+  /**
+   * Associate a barcode with a catalog bottle so future scans resolve instantly
+   * (BB-175). Idempotent via arrayUnion; no-ops on a malformed code.
+   */
+  async addUpc(bourbonId: string, code: string): Promise<void> {
+    const normalized = normalizeBarcode(code);
+    if (!normalized) {
+      return;
+    }
+    await updateDoc(doc(this.firestore, 'bourbons', bourbonId), {
+      upc: arrayUnion(normalized),
+    });
   }
 
   /** Returns the id of the first catalog doc matching the constraint, or null. */

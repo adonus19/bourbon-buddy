@@ -18,6 +18,7 @@ export interface Bourbon {
   proof?: number | null;
   msrp?: number | null;
   series?: string | null;
+  upc?: string[]; // crowdsourced UPC/EAN barcodes for scan lookup (BB-175)
   createdAt: Timestamp;
   createdByUserId: string;
 }
