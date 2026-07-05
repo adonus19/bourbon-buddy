@@ -1,8 +1,7 @@
 <ion-header [translucent]="true">
   <ion-toolbar>
-    <ion-title>Cellar</ion-title>
-    <ion-buttons slot="end">
-      @if (entries().length) {
+    @if (entries().length) {
+      <ion-buttons slot="start">
         <ion-button (click)="openFilter()" aria-label="Filter">
           <ion-icon
             slot="icon-only"
@@ -12,7 +11,9 @@
         <ion-button (click)="openSort()" aria-label="Sort">
           <ion-icon slot="icon-only" name="swap-vertical-outline"></ion-icon>
         </ion-button>
-      }
+      </ion-buttons>
+    }
+    <ion-buttons slot="end">
       <ion-button
         class="cellar-bell"
         routerLink="/inbox"
