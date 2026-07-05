@@ -39,6 +39,10 @@
     border: 1px solid var(--color-border);
     border-radius: var(--radius-card, 14px);
 
+    &--aging {
+      opacity: 0.8;
+    }
+
     &--stale {
       opacity: 0.55;
     }
@@ -112,7 +116,8 @@
     opacity: 0.6;
   }
 
-  &__stale-tag {
+  &__stale-tag,
+  &__aging-tag {
     margin-left: auto;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -121,5 +126,10 @@
     border: 1px solid var(--color-border);
     border-radius: 4px;
     padding: 1px 6px;
+  }
+
+  &__aging-tag {
+    color: var(--color-amber);
+    border-color: var(--color-amber);
   }
 }

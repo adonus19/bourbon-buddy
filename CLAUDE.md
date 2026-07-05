@@ -57,8 +57,10 @@ Full specs live in [docs/](docs/). Read these before non-trivial work:
 ## Key rules (see README for full list)
 - **Value Score** = `(rating/5)*100/purchasePrice`; stored on the log entry, only
   when both rating and price exist.
-- **Sighting staleness**: stale if `markedStaleManually || sightingDate > 60 days`;
-  computed on read, never stored.
+- **Sighting freshness** (BB-171): three tiers computed on read, never stored —
+  `fresh` (≤15d), `aging` (15–30d), `stale` (`markedStaleManually || >30d`).
+  `sightingFreshness()` in [sighting.ts](src/app/shared/utils/sighting.ts);
+  `isSightingStale` = the stale tier. Server drops stale sightings at 30 days.
 - **Bourbon catalog** (`/bourbons`) is shared; created on first use of a new name.
 - Timestamps use Firestore `Timestamp`, never JS Date/string.
 - **Design system** lives in [src/theme/variables.scss](src/theme/variables.scss)

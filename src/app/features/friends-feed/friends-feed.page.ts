@@ -15,7 +15,11 @@ import {
 import { SightingService } from '../../core/services/sighting.service';
 import { FriendService } from '../../core/services/friend.service';
 import { WishlistService } from '../../core/services/wishlist.service';
-import { isSightingStale } from '../../shared/utils/sighting';
+import {
+  SightingFreshness,
+  isSightingStale,
+  sightingFreshness,
+} from '../../shared/utils/sighting';
 import { relativeTime } from '../../shared/utils/relative-time';
 
 /**
@@ -150,6 +154,10 @@ export class FriendsFeedPage {
 
   isStale(s: Sighting): boolean {
     return isSightingStale(s);
+  }
+
+  freshness(s: Sighting): SightingFreshness {
+    return sightingFreshness(s);
   }
 
   matchEntryId(s: Sighting): string | null {

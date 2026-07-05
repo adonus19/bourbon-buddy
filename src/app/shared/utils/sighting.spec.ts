@@ -1,9 +1,11 @@
 import { Timestamp } from '@angular/fire/firestore';
 import { Sighting } from '../../models';
 import {
+  SIGHTING_AGING_DAYS,
   SIGHTING_STALE_DAYS,
   bestNonStalePrice,
   isSightingStale,
+  sightingFreshness,
 } from './sighting';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -38,6 +40,34 @@ describe('isSightingStale', () => {
     expect(isSightingStale(sighting(SIGHTING_STALE_DAYS - 1, 40), NOW)).toBe(
       false
     );
+  });
+});
+
+describe('sightingFreshness', () => {
+  it('is fresh at or under the aging threshold', () => {
+    expect(sightingFreshness(sighting(0, 40), NOW)).toBe('fresh');
+    expect(sightingFreshness(sighting(SIGHTING_AGING_DAYS, 40), NOW)).toBe(
+      'fresh'
+    );
+  });
+
+  it('is aging just past the aging threshold and up to the stale threshold', () => {
+    expect(sightingFreshness(sighting(SIGHTING_AGING_DAYS + 1, 40), NOW)).toBe(
+      'aging'
+    );
+    expect(sightingFreshness(sighting(SIGHTING_STALE_DAYS, 40), NOW)).toBe(
+      'aging'
+    );
+  });
+
+  it('is stale past the stale threshold', () => {
+    expect(sightingFreshness(sighting(SIGHTING_STALE_DAYS + 1, 40), NOW)).toBe(
+      'stale'
+    );
+  });
+
+  it('is stale when manually flagged regardless of date', () => {
+    expect(sightingFreshness(sighting(0, 40, true), NOW)).toBe('stale');
   });
 });
 
