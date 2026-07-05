@@ -17,7 +17,11 @@ import {
   PRIORITY_DISPLAY,
   STATUS_DISPLAY,
 } from '../../../shared/constants/wishlist-display';
-import { isSightingStale } from '../../../shared/utils/sighting';
+import {
+  SightingFreshness,
+  isSightingStale,
+  sightingFreshness,
+} from '../../../shared/utils/sighting';
 import { sightingErrorMessage } from '../../../shared/utils/sighting-error';
 import { SightingFormComponent } from '../../../shared/components/sighting-form/sighting-form.component';
 
@@ -85,6 +89,10 @@ export class WishlistDetailPage {
 
   isStale(s: Sighting): boolean {
     return isSightingStale(s);
+  }
+
+  freshness(s: Sighting): SightingFreshness {
+    return sightingFreshness(s);
   }
 
   /** Per-sighting MSRP delta. */

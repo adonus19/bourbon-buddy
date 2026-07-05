@@ -195,7 +195,10 @@ sightings/{sightingId}
   createdAt:      Timestamp
 ```
 
-**Staleness Logic:** `isStale = markedStaleManually || (today - sightingDate > 60 days)` — computed on read, not stored.
+**Staleness Logic (BB-171):** three tiers, computed on read, never stored —
+`fresh` (≤ 15 days), `aging` (> 15 and ≤ 30 days), `stale`
+(`markedStaleManually || > 30 days`). `isStale` = the `stale` tier. Stale
+sightings are hard-deleted at 30 days by `cleanupStaleSightings`.
 
 **Query Pattern:** `.orderBy('price', 'asc').orderBy('sightingDate', 'desc')`
 
@@ -413,7 +416,8 @@ sightings/{sightingId}
   createdAt:     Timestamp
 ```
 
-**Staleness:** `isStale = markedStaleManually || (today - sightingDate > 30 days)`
+**Staleness (BB-171):** three tiers on read — `fresh` (≤ 15d), `aging` (15–30d),
+`stale` (`markedStaleManually || > 30d`). `isStale` = the `stale` tier; hard-deleted at 30 days.
 — computed on read.
 
 **Queries:**

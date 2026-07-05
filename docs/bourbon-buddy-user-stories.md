@@ -352,7 +352,7 @@ Each story includes:
 **AC:**
 - Sightings list on both log entry detail and wishlist entry detail
 - Sorted by price asc, then date desc
-- Stale sightings (>60 days) visually de-emphasized with a "May be outdated" label
+- Freshness tiers (BB-171): `aging` (15–30d) softly flagged, `stale` (>30d) de-emphasized with a "May be outdated" label
 - Each row: Store Name, Price, Date, City/State, MSRP delta
 
 **SP:** 3
@@ -964,9 +964,202 @@ foundation incl. abuse controls.)
 
 ---
 
+# Active Post-Social Roadmap (Epics 12–15)
+
+> Agreed 2026-07-05. Iteration-scoped in
+> [bourbon-buddy-iteration-plan.md](bourbon-buddy-iteration-plan.md) under
+> **Active Roadmap (R1–R4)**. These build on the completed social/sightings
+> foundation (BB-100–BB-113, BB-160–BB-163).
+
+## Epic 12: Header & Sighting Hygiene *(Post-Social)*
+
+### BB-170 — Declutter Cellar & Hunt List Headers ✅ *(shipped 2026-07-05)*
+**As a** user, **I want** the Cellar and Hunt List title bars uncluttered, **so that** the action icons have room and I rely on the highlighted tab to know where I am.
+
+**AC:**
+- Cellar and Hunt List no longer render an `<ion-title>` text label
+- **Cellar:** Filter + Sort on the left (`slot="start"`); alert bell + profile stay on the right
+- **Hunt List:** Filter + Sort on the left; a single Sighting action (add icon + "Sighting" label) on the right, always visible (not gated on list length)
+- Filter/Sort only render when the list is non-empty
+- Placeholder left for a future Bigfoot SVG on the Sighting button (swap `name` → `[src]`)
+
+**SP:** 3
+
+---
+
+### BB-171 — Sighting Freshness Tiers (Fresh / Aging / Stale)
+**As a** user, **I want** sightings to age out on a realistic timeline with an in-between "aging" state, **so that** I can tell an almost-certainly-still-there find from a probably-gone one.
+
+**AC:**
+- Freshness computed on read (never stored), three tiers by sighting age:
+  - **Fresh** — ≤ 15 days
+  - **Aging** — > 15 and ≤ 30 days — shown with a soft "may be getting old" treatment, still visible/usable
+  - **Stale** — > 30 days OR `markedStaleManually` — de-emphasized and eligible for cleanup
+- New `sightingFreshness(s)` pure util returns `'fresh' | 'aging' | 'stale'`; `isSightingStale` retained as a thin wrapper (no caller breakage)
+- `bestNonStalePrice` continues to exclude `aging`? **No** — aging sightings still count as valid prices; only `stale` is excluded
+- Server `cleanupStaleSightings` hard-deletes at **30 days** (was 90)
+- Aging tier surfaced on the Hunt List detail and Friends' Feed sighting rows
+- Unit tests cover the 15-day and 30-day boundaries (TDD)
+- **Supersedes** the "> 60 days" de-emphasis in BB-041 and the 30/90-day notes in the data model & CLAUDE.md; those docs updated to match
+
+**SP:** 3
+
+---
+
+### BB-172 — News & AI Extraction Cadence Tuning
+**As a** user, **I want** fresher news and faster bottle extraction, **so that** chips appear soon after articles arrive.
+
+**AC:**
+- `fetchRssFeeds` schedule: every 12h → **every 6h**
+- `sweepArticleBottles` schedule: every 2h → **every 30 min**
+- Per-call pacing (`BACKFILL_SPACING_MS`) retained so a backlog burst stays under Groq's 6k TPM cap
+- Confirmed to remain within Groq free tier (steady-state ≪ 14.4k RPD / 500k TPD) and Firebase Blaze free allowances; the only cost is the pre-existing ~$0.20/mo for >3 Cloud Scheduler jobs (unchanged by cadence)
+
+**SP:** 1
+
+---
+
+## Epic 13: Fast Sighting Capture *(Post-Social)*
+
+### BB-173 — Contextual Floating Action Menu
+**As a** user, **I want** the page FAB to fan out into context-aware actions, **so that** logging a sighting is one tap from the Cellar or Hunt List.
+
+**AC:**
+- Cellar/Hunt List FAB becomes an `ion-fab` speed-dial (`ion-fab-list`)
+- **Cellar** actions: "Add bottle" + "Log sighting"
+- **Hunt List** actions: "Add to Hunt" + "Log sighting"
+- "Log sighting" routes to the standalone capture (`/spotted/new`) and is the primary sighting entry point (Hunt List header button becomes a secondary path)
+- Existing single-purpose FAB behavior preserved as the default/primary action
+
+**SP:** 3
+
+---
+
+### BB-174 — Barcode Scan Capture
+**As a** user, **I want** to scan a bottle's barcode with my camera, **so that** I can start a sighting or entry without typing.
+
+**AC:**
+- `core` BarcodeScannerService wraps the browser-native `BarcodeDetector` API with a `@zxing/browser` fallback (iOS Safari)
+- Camera modal with live preview, torch toggle where supported, and a clear "enter manually" fallback
+- Decodes UPC-A / EAN-13; returns the raw code to the caller
+- Graceful handling of denied camera permission, no camera, and no detection (timeout → manual entry)
+- Works over HTTPS PWA; no native shell required
+
+**SP:** 5
+
+---
+
+### BB-175 — Crowdsourced UPC → Catalog Index
+**As a** user, **I want** scanned barcodes to resolve to catalog bottles, **so that** scanning gets faster for everyone over time.
+
+**AC:**
+- `/bourbons` gains a `upc: string[]` field (indexed for lookup)
+- A scanned code first queries the catalog by UPC; a hit prefills the bottle
+- A miss prompts the user to pick/create the bottle (reusing `findOrCreate`), then stores the UPC on that catalog doc for future scans
+- No paid third-party UPC API; the index is built from user confirmations
+- Security rules allow appending a UPC to an existing catalog doc under the same constraints as other catalog edits
+
+**SP:** 3
+
+---
+
+### BB-176 — Scan-to-Sighting & Quick-Add Wiring
+**As a** user, **I want** a scan to drop me into a prefilled sighting (or cellar add), **so that** capture is near-instant.
+
+**AC:**
+- "Log sighting" in the FAB menu (BB-173) can launch the scanner (BB-174)
+- A resolved bottle (BB-175) prefills the sighting form (name, distillery, category, `bourbonId`)
+- Optional: scanner reachable from the Cellar "Add bottle" action for quick-add
+- Unknown code still lands the user in a usable manual form, not a dead end
+
+**SP:** 2
+
+---
+
+## Epic 14: Geo Sightings & Proximity Alerts *(Post-Social)*
+
+### BB-177 — Sighting Location Capture (opt-in)
+**As a** user, **I want** my sightings to record where I am, **so that** proximity features and a map can work — without exposing my exact position.
+
+**AC:**
+- Opt-in capture of device coordinates (browser Geolocation API) at spot-time; `lat`, `lng`, and a `geohash` stored on the sighting
+- Skipping location is always allowed; sighting still saves with store/city/state only
+- Precise coordinates are used **server-side only**; other users see approximate info (store/city), never raw coords
+- Privacy copy explains what's captured and why
+
+**SP:** 3
+
+---
+
+### BB-178 — Alert Radius & Base Location Preference
+**As a** user, **I want** to set a home area and a max alert distance, **so that** I'm only notified about finds near me.
+
+**AC:**
+- Profile gains an opt-in base location (coords) and `alertRadiusMiles` setting (sensible default, e.g. 30)
+- Setting is editable and clearable from Settings
+- Stored on `/users/{uid}`; used only by alert matching
+
+**SP:** 2
+
+---
+
+### BB-179 — Nearby Sightings Map View
+**As a** user, **I want** a map of recent nearby sightings, **so that** I can plan a run to grab a bottle.
+
+**AC:**
+- Map view plots non-stale sightings that have coordinates, within the user's radius
+- Markers show store/bottle/price; stale (BB-171) sightings excluded
+- Tapping a marker opens the sighting detail
+- Reads use the shared sightings listener/geohash query; no per-marker fetch fan-out
+
+**SP:** 5
+
+---
+
+### BB-180 — Proximity-Filtered Match Alerts
+**As a** user, **I want** Hunt List match alerts limited to my radius, **so that** notifications stay relevant.
+
+**AC:**
+- Extends BB-112: when a new sighting matches a friend's Hunt List, the alert function computes haversine distance between the sighting and the recipient's base location
+- Sightings outside the recipient's `alertRadiusMiles` are silently dropped (no push, no inbox record)
+- Recipients without a base location fall back to current (non-geo) behavior
+- Distance calc runs server-side only
+
+**SP:** 3
+
+---
+
+## Epic 15: Palate & Reliability *(Post-Social — last iteration before backlog)*
+
+### BB-181 — Structured Flavor Profile
+**As a** user, **I want** to capture nose/palate/finish with a structured flavor picker, **so that** my notes are consistent and can later power recommendations.
+
+**AC:**
+- Structured flavor tags (nose / palate / finish) selectable on a log entry, alongside free-text notes
+- Backed by the reference flavor-tag data; stored on the log entry
+- Displayed on the entry detail
+- Data shaped so a future "bottles like this" recommendation can consume it
+
+**SP:** 5
+
+---
+
+### BB-182 — Offline-First Sighting Capture
+**As a** user, **I want** to log a sighting with no signal and have it sync later, **so that** poor in-store connectivity never loses a find.
+
+**AC:**
+- Sighting capture works offline: the entry is queued locally and syncs when connectivity returns (Firestore offline persistence and/or an explicit outbox)
+- UI reflects pending/synced state to the user
+- No duplicate sightings on reconnect
+- Scoped to the sighting path (broader offline support remains backlog)
+
+**SP:** 5
+
+---
+
 # Backlog (Not Yet Iteration-Scoped)
 
-### BB-170 — News Full-Text Search (Algolia)
+### BB-190 — News Full-Text Search (Algolia)
 **As a** user, **I want to** search the entire news archive, **so that** I can find any article, not just the pages I've already scrolled.
 
 **Context:** the Dispatch feed has cursor pagination + client-side search over
@@ -987,3 +1180,31 @@ Typesense is the cheaper-at-scale alternative if Algolia costs grow.
 - Falls back to the current client-side search if the index is unavailable
 
 **SP:** 5
+
+---
+
+### BB-191 — Bottle Fill-Level & Pour Tracking
+**As a** user, **I want to** track how much is left in an open bottle and log pours against it, **so that** I know what I'm running low on.
+
+**Context:** partly covered already by **BB-020 (Pour Session Log)**, whose AC
+includes an editable "bottle remaining percentage." This backlog item is the
+explicit extension — fill-level as a first-class, glanceable attribute on the
+Cellar list, "kill bottle" action, and low-stock surfacing — to be scoped as an
+extension of BB-020 rather than a parallel feature.
+
+**AC (draft):**
+- Fill level visible on the Cellar list, not just the detail screen
+- "Mark open" / "Kill bottle" quick actions
+- Optional low-stock indicator/sort
+- Reuses BB-020's pour subcollection; no schema fork
+
+**SP:** TBD *(backlog)*
+
+---
+
+### Gamification — Palate Badges, Distillery Passport, "Bourbon Wrapped"
+Top of the backlog to pick up after the Active Roadmap. Already scoped at a high
+level under **Phase 5 — Gamification** in
+[bourbon-buddy-iteration-plan.md](bourbon-buddy-iteration-plan.md). Needs its own
+story breakdown (badge catalog, unlock rules, passport data model, shareable
+stats card) when promoted out of the backlog.

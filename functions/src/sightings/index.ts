@@ -17,7 +17,8 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { DAY_MS, LogSightingData, validate } from "./validate";
 
 const DAILY_SIGHTING_LIMIT = 40;
-const STALE_CLEANUP_DAYS = 90;
+// BB-171: sightings go stale at 30 days, so drop them at 30 rather than 90.
+const STALE_CLEANUP_DAYS = 30;
 
 export const logSighting = onCall({ region: "us-central1" }, async (request) => {
   const uid = request.auth?.uid;

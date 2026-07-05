@@ -77,10 +77,12 @@
         } @else {
           <ion-list class="sightings" lines="none">
             @for (s of sortedSightings(); track s.id) {
+              @let fresh = freshness(s);
               <ion-item-sliding>
                 <ion-item
                   class="sighting"
-                  [class.sighting--stale]="isStale(s)"
+                  [class.sighting--aging]="fresh === 'aging'"
+                  [class.sighting--stale]="fresh === 'stale'"
                 >
                   <div class="sighting__main">
                     <div class="sighting__top">
@@ -93,7 +95,11 @@
                           >{{ d.text }} vs MSRP</span
                         >
                       }
-                      @if (isStale(s)) {
+                      @if (fresh === 'aging') {
+                        <span class="sighting__aging"
+                          >Getting old — may still be there.</span
+                        >
+                      } @else if (fresh === 'stale') {
                         <span class="sighting__stale">May have moved on.</span>
                       }
                     </div>

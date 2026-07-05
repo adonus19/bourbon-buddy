@@ -46,7 +46,12 @@
   } @else {
     <div class="ffeed">
       @for (s of visible(); track s.id) {
-        <div class="ffeed__card" [class.ffeed__card--stale]="isStale(s)">
+        @let fresh = freshness(s);
+        <div
+          class="ffeed__card"
+          [class.ffeed__card--aging]="fresh === 'aging'"
+          [class.ffeed__card--stale]="fresh === 'stale'"
+        >
           <div class="ffeed__head">
             <span class="ffeed__bottle">{{ s.bourbonName || 'A bottle' }}</span>
             <span class="ffeed__price">${{ s.price }}</span>
@@ -75,7 +80,9 @@
             <span>{{ spotterName(s.spotterUid) }}</span>
             <span class="ffeed__dot">·</span>
             <span>{{ when(s) }}</span>
-            @if (isStale(s)) {
+            @if (fresh === 'aging') {
+              <span class="ffeed__aging-tag">aging</span>
+            } @else if (fresh === 'stale') {
               <span class="ffeed__stale-tag">stale</span>
             }
           </div>

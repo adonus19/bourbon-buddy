@@ -1,7 +1,7 @@
 # Bourbon Buddy — Iteration Plan (MVP)
 
-**Version:** 1.4
-**Last Updated:** 2026-06-30
+**Version:** 1.5
+**Last Updated:** 2026-07-05
 **Methodology:** Agile / Scrum-style iterations (2-week sprints)
 **Velocity Assumption:** ~25 story points per iteration (solo developer, part-time; adjust based on actual pace)
 **Total MVP Scope:** 152 SP across 7 iterations (not counting Iteration 0)
@@ -402,6 +402,43 @@ exists.
 Capacitor iOS build, reliable native push, barcode scanning, TestFlight, App
 Store submission. Best paired with / just ahead of the public launch so push and
 camera are first-class. Android follows after iOS is proven.
+
+---
+
+## Active Roadmap (Post-Social) — agreed 2026-07-05
+
+> The social/sightings foundation (BB-100–BB-113, BB-160–BB-163) has shipped.
+> This is the current working plan on top of it. Full stories + acceptance
+> criteria live under **Epics 12–15** in
+> [bourbon-buddy-user-stories.md](bourbon-buddy-user-stories.md). Iterations are
+> labelled R1–R4 to distinguish them from the original MVP iteration numbering.
+
+### Iteration R1 — Header & Sighting Hygiene (~7 SP)
+**Stories:** BB-170 ✅, BB-171, BB-172
+**Goal:** Declutter the Cellar/Hunt List headers, make sighting freshness
+realistic (Fresh/Aging/Stale at 15/30 days), and tune the news + AI cadences
+(6h / 30 min). Small, mostly config + a pure-function change (TDD).
+
+### Iteration R2 — Fast Sighting Capture (~13 SP)
+**Stories:** BB-173, BB-174, BB-175, BB-176
+**Goal:** Contextual FAB speed-dial (add-bottle / log-sighting) plus a PWA
+barcode scanner that builds a crowdsourced UPC→catalog index and prefills the
+sighting flow. Makes crowd-sourced sightings a one-tap, no-typing action.
+
+### Iteration R3 — Geo Sightings & Proximity Alerts (~13 SP)
+**Stories:** BB-177, BB-178, BB-179, BB-180
+**Goal:** Opt-in location on sightings (coords + geohash, privacy-guarded), a
+user base location + alert radius, a nearby-sightings map, and radius-filtered
+Hunt List match alerts (extends BB-112). Needs the geolocation + privacy design
+done up front.
+
+### Iteration R4 — Palate & Reliability (~10 SP) — *last before backlog*
+**Stories:** BB-181, BB-182
+**Goal:** Structured flavor profile (nose/palate/finish; feeds future recs) and
+offline-first sighting capture so poor in-store signal never drops a find.
+
+**After R4** we move to backlog items — **Gamification (Phase 5)** is top of the
+list, followed by **Bottle Fill-Level & Pour Tracking (BB-191, extends BB-020)**.
 
 ---
 
