@@ -96,8 +96,24 @@
   }
 
   <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-    <ion-fab-button routerLink="/entry/new" aria-label="Add a bourbon">
+    <ion-fab-button aria-label="Quick actions">
       <ion-icon name="add"></ion-icon>
     </ion-fab-button>
+    <ion-fab-list side="top">
+      <ion-fab-button
+        routerLink="/entry/new"
+        aria-label="Add a bottle to your cellar"
+        data-desc="Add a bottle"
+      >
+        <ion-icon name="wine"></ion-icon>
+      </ion-fab-button>
+      <ion-fab-button
+        routerLink="/spotted/new"
+        aria-label="Log a sighting"
+        data-desc="Log a sighting"
+      >
+        <ion-icon name="pricetag"></ion-icon>
+      </ion-fab-button>
+    </ion-fab-list>
   </ion-fab>
 </ion-content>

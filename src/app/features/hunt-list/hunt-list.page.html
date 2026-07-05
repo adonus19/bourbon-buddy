@@ -121,8 +121,24 @@
   }
 
   <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-    <ion-fab-button routerLink="/wishlist/new" aria-label="Add to hunt list">
+    <ion-fab-button aria-label="Quick actions">
       <ion-icon name="add"></ion-icon>
     </ion-fab-button>
+    <ion-fab-list side="top">
+      <ion-fab-button
+        routerLink="/wishlist/new"
+        aria-label="Add a bottle to your hunt list"
+        data-desc="Add to Hunt"
+      >
+        <ion-icon name="compass"></ion-icon>
+      </ion-fab-button>
+      <ion-fab-button
+        routerLink="/spotted/new"
+        aria-label="Log a sighting"
+        data-desc="Log a sighting"
+      >
+        <ion-icon name="pricetag"></ion-icon>
+      </ion-fab-button>
+    </ion-fab-list>
   </ion-fab>
 </ion-content>

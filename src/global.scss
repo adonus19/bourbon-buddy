@@ -73,6 +73,35 @@ h1, h2, h3, .font-display {
 }
 
 /* ----------------------------------------------------------------------------
+ * Speed-dial FAB action labels (BB-173)
+ * A pill label to the left of each mini-FAB in an ion-fab-list. The pseudo-
+ * element lives on the light-DOM host, so `attr(data-desc)` resolves cleanly
+ * without reaching into the button's shadow DOM.
+ * ------------------------------------------------------------------------- */
+ion-fab-list ion-fab-button[data-desc] {
+  position: relative;
+  overflow: visible;
+
+  &::after {
+    content: attr(data-desc);
+    position: absolute;
+    top: 50%;
+    right: calc(100% + 12px);
+    transform: translateY(-50%);
+    white-space: nowrap;
+    pointer-events: none;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text-primary);
+    background: rgba(22, 18, 14, 0.92);
+    border: 1px solid var(--color-border-bright);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  }
+}
+
+/* ----------------------------------------------------------------------------
  * Motion — respect reduced-motion preferences (brief: animations collapse)
  * ------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
