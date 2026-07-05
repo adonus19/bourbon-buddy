@@ -8,6 +8,7 @@ import { Bourbon, SightingVisibility } from '../../models';
 import { AuthService } from '../../core/auth/auth.service';
 import { BourbonCatalogService } from '../../core/services/bourbon-catalog.service';
 import { SightingService } from '../../core/services/sighting.service';
+import { BarcodeScannerService } from '../../core/services/barcode-scanner.service';
 import { sightingErrorMessage } from '../../shared/utils/sighting-error';
 
 /**
@@ -29,8 +30,23 @@ export class SpottedItPage {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastController);
+  private readonly scanner = inject(BarcodeScannerService);
 
   saving = false;
+  // BB-174: the raw captured code. BB-175 will resolve it to a catalog bottle.
+  scannedCode: string | null = null;
+
+  /** Open the camera scanner and capture a barcode. */
+  async scanBarcode(): Promise<void> {
+    const result = await this.scanner.scan();
+    if (!result) {
+      return;
+    }
+    this.scannedCode = result.code;
+    // BB-175 will turn this code into a bottle lookup + prefill; for now,
+    // confirm the capture so the flow is testable end-to-end.
+    await this.presentToast(`Scanned barcode ${result.code}.`);
+  }
 
   readonly form = this.fb.group({
     bourbonName: ['', [Validators.required, Validators.maxLength(120)]],
