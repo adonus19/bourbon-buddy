@@ -15,6 +15,16 @@
     </p>
 
     <p class="eyebrow spot__section">The bottle</p>
+    <ion-button
+      class="spot__scan"
+      type="button"
+      fill="outline"
+      expand="block"
+      (click)="scanBarcode()"
+    >
+      <ion-icon slot="start" name="barcode-outline"></ion-icon>
+      Scan barcode
+    </ion-button>
     <app-bourbon-autocomplete
       [value]="form.controls.bourbonName.value || ''"
       (valueChange)="onNameInput($event)"

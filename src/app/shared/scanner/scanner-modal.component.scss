@@ -1,0 +1,51 @@
+.scanner {
+  --background: var(--color-bg-primary);
+}
+
+.scanner__stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: #000;
+  overflow: hidden;
+  border-radius: 0 0 var(--radius-card, 14px) var(--radius-card, 14px);
+}
+
+.scanner__video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.scanner__reticle {
+  position: absolute;
+  inset: 18% 12%;
+  border: 2px solid rgba(240, 232, 220, 0.9);
+  border-radius: 12px;
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.35);
+}
+
+.scanner__torch {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  --color: var(--color-text-primary);
+}
+
+.scanner__hint {
+  text-align: center;
+  padding: 0 20px;
+  margin: 16px 0 0;
+  color: var(--color-text-primary);
+
+  &--muted {
+    color: var(--color-amber);
+    font-size: 13px;
+    margin-top: 6px;
+  }
+}
+
+.scanner__manual {
+  padding: 12px 16px 24px;
+}

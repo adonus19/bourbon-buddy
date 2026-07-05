@@ -1,0 +1,80 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Scan barcode</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="cancel()" aria-label="Close">
+        <ion-icon slot="icon-only" name="close"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="scanner">
+  <div class="scanner__stage">
+    <video #video class="scanner__video" playsinline muted></video>
+    <div class="scanner__reticle" aria-hidden="true"></div>
+
+    @if (torchAvailable()) {
+      <ion-button
+        class="scanner__torch"
+        fill="clear"
+        (click)="toggleTorch()"
+        [attr.aria-label]="torchOn() ? 'Turn off flashlight' : 'Turn on flashlight'"
+      >
+        <ion-icon
+          slot="icon-only"
+          [name]="torchOn() ? 'flashlight' : 'flashlight-outline'"
+        ></ion-icon>
+      </ion-button>
+    }
+  </div>
+
+  @switch (status()) {
+    @case ('starting') {
+      <p class="scanner__hint">Starting camera…</p>
+    }
+    @case ('scanning') {
+      <p class="scanner__hint">Point at the barcode on the bottle or shelf tag.</p>
+    }
+    @case ('denied') {
+      <p class="scanner__hint">
+        Camera access was blocked. Enter the barcode number below.
+      </p>
+    }
+    @case ('unavailable') {
+      <p class="scanner__hint">No camera found. Enter the barcode number below.</p>
+    }
+    @case ('error') {
+      <p class="scanner__hint">
+        Couldn’t start the scanner. Enter the barcode number below.
+      </p>
+    }
+  }
+
+  @if (showManualHint() && status() === 'scanning') {
+    <p class="scanner__hint scanner__hint--muted">
+      Having trouble? Type the number instead.
+    </p>
+  }
+
+  <div class="scanner__manual">
+    <ion-item>
+      <ion-input
+        label="Barcode number"
+        labelPlacement="stacked"
+        inputmode="numeric"
+        placeholder="e.g. 0 12345 67890 5"
+        [value]="manualCode()"
+        (ionInput)="onManualInput($any($event.detail.value) || '')"
+        (keyup.enter)="submitManual()"
+      ></ion-input>
+    </ion-item>
+    <ion-button
+      expand="block"
+      [disabled]="!manualValid()"
+      (click)="submitManual()"
+    >
+      Use this number
+    </ion-button>
+  </div>
+</ion-content>
