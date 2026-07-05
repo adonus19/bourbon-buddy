@@ -223,9 +223,18 @@ bourbons/{bourbonId}
   proof:              number | null
   msrp:               number | null
   series:             string | null
+  upc:                string[]         // crowdsourced UPC/EAN barcodes (BB-175)
   createdAt:          Timestamp
   createdByUserId:    string           // which user added this to catalog
 ```
+
+**UPC index (BB-175):** `upc` is a crowdsourced list of barcodes. A scan queries
+`where('upc', 'array-contains', code)`; on a miss the user names the bottle and
+the code is appended (`arrayUnion`) to that catalog doc. `array-contains` on a
+single field is auto-indexed, so no composite index is needed. Security rules let
+**any** signed-in user append to `upc` (and only `upc`, bounded to 20) so scanning
+a bottle you didn't create still teaches the index; all other edits stay
+creator-only.
 
 **Query Patterns:**
 - Name autocomplete: `.where('nameLowercase', '>=', query).where('nameLowercase', '<=', query + '\uf8ff').limit(10)`
