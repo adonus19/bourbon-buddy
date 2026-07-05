@@ -136,7 +136,7 @@ export const backfillArticleBottles = onCall(
  */
 export const sweepArticleBottles = onSchedule(
   {
-    schedule: "every 1 hours",
+    schedule: "every 30 minutes",
     region: "us-central1",
     secrets: [GROQ_API_KEY],
     timeoutSeconds: 540,
