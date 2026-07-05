@@ -1,6 +1,6 @@
 /**
  * News Feed Cloud Functions (BB-050).
- *   fetchRssFeeds       — every 12h: parse RSS sources, dedupe by URL hash,
+ *   fetchRssFeeds       — every 6h: parse RSS sources, dedupe by URL hash,
  *                         write /newsArticles, skip items older than 90 days.
  *   cleanupOldArticles  — monthly: delete /newsArticles older than 90 days.
  *   cleanupReadArticles — hourly: delete read articleStates older than 24h and
@@ -79,7 +79,7 @@ async function ingestSource(
 }
 
 export const fetchRssFeeds = onSchedule(
-  { schedule: "every 12 hours", timeoutSeconds: 300, memory: "256MiB" },
+  { schedule: "every 6 hours", timeoutSeconds: 300, memory: "256MiB" },
   async () => {
     const db = getFirestore();
     const results = await Promise.allSettled(
