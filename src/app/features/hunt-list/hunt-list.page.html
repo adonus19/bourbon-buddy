@@ -1,11 +1,7 @@
 <ion-header [translucent]="true">
   <ion-toolbar>
-    <ion-title>Hunt List</ion-title>
-    <ion-buttons slot="end">
-      <ion-button routerLink="/spotted/new" aria-label="Spotted a bottle">
-        <ion-icon slot="icon-only" name="pricetag-outline"></ion-icon>
-      </ion-button>
-      @if (entries().length) {
+    @if (entries().length) {
+      <ion-buttons slot="start">
         <ion-button (click)="openFilter()" aria-label="Filter">
           <ion-icon
             slot="icon-only"
@@ -15,7 +11,14 @@
         <ion-button (click)="openSort()" aria-label="Sort">
           <ion-icon slot="icon-only" name="swap-vertical-outline"></ion-icon>
         </ion-button>
-      }
+      </ion-buttons>
+    }
+    <ion-buttons slot="end">
+      <ion-button routerLink="/spotted/new" aria-label="Log a sighting">
+        <!-- TODO(BB-170): swap for Bigfoot SVG via [src] once art is ready. -->
+        <ion-icon slot="start" name="add-outline"></ion-icon>
+        Sighting
+      </ion-button>
     </ion-buttons>
   </ion-toolbar>
 
