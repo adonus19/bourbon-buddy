@@ -98,11 +98,17 @@ export class ScannerModalComponent implements AfterViewInit, OnDestroy {
       return;
     }
     try {
+      // Own the camera ourselves and wait for real dimensions BEFORE decoding.
+      // On iOS Safari, video "plays" before loadedmetadata sets videoWidth, and
+      // ZXing sizes its capture canvas once at loop start — so handing it a
+      // not-yet-sized element yields a 0×0 canvas that never decodes.
+      await this.startCamera(video);
+
       const Detector = (globalThis as Record<string, unknown>)[
         'BarcodeDetector'
       ] as BarcodeDetectorCtor | undefined;
       if (Detector) {
-        await this.startNative(video, Detector);
+        this.startNativeLoop(video, Detector);
       } else {
         await this.startZxing(video);
       }
@@ -113,21 +119,55 @@ export class ScannerModalComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  private async startNative(
-    video: HTMLVideoElement,
-    Detector: BarcodeDetectorCtor
-  ): Promise<void> {
+  /** Acquire the back camera, attach it, and wait until it has real dimensions. */
+  private async startCamera(video: HTMLVideoElement): Promise<void> {
+    // iOS requires an inline, muted video to autoplay a camera stream.
+    video.setAttribute('playsinline', 'true');
+    video.muted = true;
     this.stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment' },
+      video: { facingMode: { ideal: 'environment' } },
     });
     video.srcObject = this.stream;
-    await video.play();
+    await video.play().catch(() => undefined);
+    await this.waitForVideoDimensions(video);
     this.detectTorch();
+  }
 
+  /** Resolve once the video reports non-zero dimensions (bounded, never hangs). */
+  private waitForVideoDimensions(video: HTMLVideoElement): Promise<void> {
+    if (video.videoWidth > 0) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        video.removeEventListener('loadedmetadata', check);
+        clearInterval(poll);
+        clearTimeout(safety);
+        resolve();
+      };
+      const check = (): void => {
+        if (video.videoWidth > 0) {
+          finish();
+        }
+      };
+      video.addEventListener('loadedmetadata', check);
+      const poll = setInterval(check, 100);
+      const safety = setTimeout(finish, 3000); // proceed regardless after 3s
+    });
+  }
+
+  private startNativeLoop(
+    video: HTMLVideoElement,
+    Detector: BarcodeDetectorCtor
+  ): void {
     this.detector = new Detector({
       formats: ['upc_a', 'upc_e', 'ean_13', 'ean_8'],
     });
-
     const tick = async (): Promise<void> => {
       if (this.done || !this.detector) {
         return;
@@ -158,22 +198,18 @@ export class ScannerModalComponent implements AfterViewInit, OnDestroy {
       BarcodeFormat.EAN_8,
     ]);
     const reader = new BrowserMultiFormatReader(hints);
-    this.zxingControls = await reader.decodeFromVideoDevice(
-      undefined,
-      video,
-      (result) => {
-        if (this.done || !result) {
-          return;
-        }
-        const code = normalizeBarcode(result.getText());
-        if (code) {
-          this.finish(code, 'scan', BarcodeFormat[result.getBarcodeFormat()]);
-        }
+    // Decode from the element we already started (does not re-attach/dispose the
+    // stream), so the capture canvas is sized from a video that already has
+    // real dimensions.
+    this.zxingControls = await reader.decodeFromVideoElement(video, (result) => {
+      if (this.done || !result) {
+        return;
       }
-    );
-    // ZXing attaches the stream to the video element; grab it for torch control.
-    this.stream = (video.srcObject as MediaStream) ?? null;
-    this.detectTorch();
+      const code = normalizeBarcode(result.getText());
+      if (code) {
+        this.finish(code, 'scan', BarcodeFormat[result.getBarcodeFormat()]);
+      }
+    });
   }
 
   private detectTorch(): void {

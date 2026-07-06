@@ -94,6 +94,16 @@ describe('ScannerModalComponent (manual entry logic)', () => {
     expect(() => component.ngOnDestroy()).not.toThrow();
   });
 
+  it('waitForVideoDimensions resolves immediately when already sized', async () => {
+    await (
+      component as unknown as {
+        waitForVideoDimensions(v: HTMLVideoElement): Promise<void>;
+      }
+    ).waitForVideoDimensions({ videoWidth: 640 } as HTMLVideoElement);
+    // Contract: resolves without hanging when the video already has dimensions.
+    expect(component.status()).toBe('starting');
+  });
+
   it('takes the ZXing fallback path when BarcodeDetector is absent', async () => {
     (component as unknown as { videoRef: unknown }).videoRef = {
       nativeElement: document.createElement('video'),
