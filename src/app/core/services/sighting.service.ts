@@ -14,6 +14,7 @@ import {
   query,
   serverTimestamp,
   startAfter,
+  Timestamp,
   updateDoc,
   where,
 } from '@angular/fire/firestore';
@@ -80,7 +81,7 @@ export class SightingService {
       this.functions,
       'logSighting'
     );
-    await callable({
+    const res = await callable({
       bourbonId,
       bourbonName: bourbonName ?? null,
       storeName: input.storeName,
@@ -93,7 +94,14 @@ export class SightingService {
       lat: location?.lat ?? null,
       lng: location?.lng ?? null,
     });
-    await this.recomputeBestPrice(uid, bourbonId);
+    // Fold the just-created sighting into the recompute: the function's write
+    // may not be visible to our query index yet (cross-actor read-after-write),
+    // so passing it explicitly stops the card from missing a brand-new sighting.
+    await this.recomputeBestPrice(uid, bourbonId, {
+      id: res.data?.id,
+      price: input.price,
+      sightingDate: input.sightingDate,
+    });
   }
 
   /** Max friends we fan a single feed query across (Firestore `in` cap). */
@@ -157,7 +165,8 @@ export class SightingService {
    */
   private async recomputeBestPrice(
     uid: string,
-    bourbonId: string
+    bourbonId: string,
+    justAdded?: { id?: string; price: number; sightingDate: Timestamp }
   ): Promise<void> {
     const mine = await getDocs(
       query(
@@ -166,9 +175,20 @@ export class SightingService {
         where('spotterUid', '==', uid)
       )
     );
-    const best = bestNonStalePrice(
-      mine.docs.map((d) => ({ id: d.id, ...d.data() }) as Sighting)
+    const sightings = mine.docs.map(
+      (d) => ({ id: d.id, ...d.data() }) as Sighting
     );
+    // Include the just-added sighting if the query hasn't caught up to it yet
+    // (deduped by id, so no double-count once the index does catch up).
+    if (justAdded && !sightings.some((s) => s.id === justAdded.id)) {
+      sightings.push({
+        id: justAdded.id,
+        price: justAdded.price,
+        sightingDate: justAdded.sightingDate,
+        markedStaleManually: false,
+      } as Sighting);
+    }
+    const best = bestNonStalePrice(sightings);
 
     const entries = await getDocs(
       query(
