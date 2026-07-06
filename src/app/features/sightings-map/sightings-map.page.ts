@@ -10,6 +10,16 @@ import { GeolocationService } from '../../core/services/geolocation.service';
 import { WishlistService } from '../../core/services/wishlist.service';
 import { ACTIVE_WISHLIST_STATUSES, Sighting } from '../../models';
 import { isSightingStale } from '../../shared/utils/sighting';
+import { isWithinMiles } from '../../shared/utils/geo';
+
+const MILES_TO_METERS = 1609.34;
+const DEFAULT_RADIUS_MILES = 50;
+
+interface BaseArea {
+  center: [number, number];
+  label: string | null;
+  radiusMiles: number;
+}
 
 // Geographic center of the contiguous US — a sane fallback when we have no
 // base location, no device location, and no plotted sightings.
@@ -40,8 +50,13 @@ export class SightingsMapPage {
   readonly hasKey = !!environment.maptilerKey;
   readonly loading = signal(true);
   readonly count = signal(0);
+  // Radius-filter context for the info bar / empty states (BB-179 Pass 2).
+  readonly radiusMiles = signal<number | null>(null);
+  readonly baseLabel = signal<string | null>(null);
+  readonly hiddenByRadius = signal(0);
 
   private map?: L.Map;
+  private center: [number, number] | null = null;
   private built = false;
 
   async ionViewDidEnter(): Promise<void> {
@@ -70,13 +85,31 @@ export class SightingsMapPage {
       return;
     }
 
-    const [center, mappable, names, huntIndex] = await Promise.all([
-      this.resolveCenter(),
+    const [base, allMappable, names, huntIndex] = await Promise.all([
+      this.resolveBase(),
       this.loadSightings(),
       this.friendNames(),
       Promise.resolve(this.buildHuntIndex()),
     ]);
+
+    // Radius filter (BB-178/179): only when a base location is set. Without one
+    // we can't anchor a radius, so we show everything with coordinates.
+    const mappable = base
+      ? allMappable.filter((s) =>
+          isWithinMiles(
+            { lat: base.center[0], lng: base.center[1] },
+            { lat: s.lat as number, lng: s.lng as number },
+            base.radiusMiles
+          )
+        )
+      : allMappable;
+
+    const center = base?.center ?? (await this.deviceCenter());
+    this.center = center;
     this.count.set(mappable.length);
+    this.hiddenByRadius.set(base ? allMappable.length - mappable.length : 0);
+    this.radiusMiles.set(base?.radiusMiles ?? null);
+    this.baseLabel.set(base?.label ?? null);
 
     const map = L.map(el, { zoomControl: true }).setView(
       center ?? US_CENTER,
@@ -90,6 +123,26 @@ export class SightingsMapPage {
         maxZoom: 20,
       }
     ).addTo(map);
+
+    // Visualize the base location + radius.
+    if (base) {
+      L.circle(base.center, {
+        radius: base.radiusMiles * MILES_TO_METERS,
+        color: '#c8873a',
+        weight: 1,
+        fillColor: '#c8873a',
+        fillOpacity: 0.06,
+      }).addTo(map);
+      L.circleMarker(base.center, {
+        radius: 6,
+        weight: 2,
+        color: '#f0e8dc',
+        fillColor: '#141210',
+        fillOpacity: 1,
+      })
+        .bindPopup('Your base location')
+        .addTo(map);
+    }
 
     const markers: L.CircleMarker[] = [];
     for (const s of mappable) {
@@ -120,14 +173,30 @@ export class SightingsMapPage {
     this.loading.set(false);
   }
 
-  /** Base location → device location → null (caller falls back to markers/US). */
-  private async resolveCenter(): Promise<[number, number] | null> {
+  /** The user's opt-in base location + alert radius (BB-178), if set. */
+  private resolveBase(): BaseArea | null {
     const p = this.auth.profile();
-    if (p?.baseLat != null && p?.baseLng != null) {
-      return [p.baseLat, p.baseLng];
+    if (p?.baseLat == null || p?.baseLng == null) {
+      return null;
     }
+    return {
+      center: [p.baseLat, p.baseLng],
+      label: p.baseLocationLabel ?? null,
+      radiusMiles: p.alertRadiusMiles ?? DEFAULT_RADIUS_MILES,
+    };
+  }
+
+  /** Device location, used to center when there's no base location set. */
+  private async deviceCenter(): Promise<[number, number] | null> {
     const c = await this.geo.getCurrentPosition();
     return c ? [c.lat, c.lng] : null;
+  }
+
+  /** Recenter the map on the base/device location (BB-179 Pass 2). */
+  recenter(): void {
+    if (this.map && this.center) {
+      this.map.setView(this.center, 11);
+    }
   }
 
   private async loadSightings(): Promise<Sighting[]> {
