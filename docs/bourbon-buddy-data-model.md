@@ -419,11 +419,20 @@ sightings/{sightingId}
   price:         number
   city:          string | null
   state:         string | null
+  lat:           number | null  // opt-in device coords at spot-time (BB-177)
+  lng:           number | null
+  geohash:       string | null  // derived server-side from lat/lng for range queries
   sightingDate:  Timestamp
   markedStaleManually: boolean
   visibility:    string        // "private" | "friends"
   createdAt:     Timestamp
 ```
+
+**Location (BB-177):** coordinates are **opt-in**, captured on-device and sent
+through the `logSighting` callable, which validates ranges and derives `geohash`
+server-side (so it's always consistent with lat/lng). Coordinates power "near me"
+/ map (BB-179) and proximity alerts (BB-180); the UI never renders raw numbers,
+only store/city. Missing/denied location simply stores nulls.
 
 **Staleness (BB-171):** three tiers on read — `fresh` (≤ 15d), `aging` (15–30d),
 `stale` (`markedStaleManually || > 30d`). `isStale` = the `stale` tier; hard-deleted at 30 days.

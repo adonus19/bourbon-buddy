@@ -30,6 +30,20 @@
   }
 }
 
+.spot__location {
+  margin: 14px 2px 0;
+
+  ion-toggle {
+    font-size: 15px;
+  }
+}
+
+.spot__location-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
 .spot__field {
   margin-bottom: 12px;
 }

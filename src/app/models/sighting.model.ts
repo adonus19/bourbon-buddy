@@ -21,6 +21,11 @@ export interface Sighting {
   city?: string | null;
   state?: string | null;
   notes?: string | null;
+  // Opt-in location (BB-177). Coordinates power "near me" / map / proximity
+  // features; geohash is derived server-side. Never shown as raw numbers in UI.
+  lat?: number | null;
+  lng?: number | null;
+  geohash?: string | null;
   markedStaleManually: boolean;
   visibility: SightingVisibility;
   createdAt: Timestamp;

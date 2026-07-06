@@ -15,6 +15,7 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 
 import { DAY_MS, LogSightingData, validate } from "./validate";
+import { encodeGeohash } from "../shared/geohash";
 
 const DAILY_SIGHTING_LIMIT = 40;
 // BB-171: sightings go stale at 30 days, so drop them at 30 rather than 90.
@@ -48,6 +49,11 @@ export const logSighting = onCall({ region: "us-central1" }, async (request) => 
       count: count + 1,
       updatedAt: FieldValue.serverTimestamp(),
     });
+    // Opt-in location (BB-177): geohash is derived server-side from the
+    // validated coordinates so it's always consistent with lat/lng.
+    const geohash =
+      v.lat != null && v.lng != null ? encodeGeohash(v.lat, v.lng) : null;
+
     tx.set(sightingRef, {
       bourbonId: v.bourbonId,
       bourbonName: d.bourbonName ?? null,
@@ -58,6 +64,9 @@ export const logSighting = onCall({ region: "us-central1" }, async (request) => 
       city: d.city ?? null,
       state: d.state ?? null,
       notes: d.notes ?? null,
+      lat: v.lat,
+      lng: v.lng,
+      geohash,
       markedStaleManually: false,
       visibility: v.visibility,
       createdAt: FieldValue.serverTimestamp(),
