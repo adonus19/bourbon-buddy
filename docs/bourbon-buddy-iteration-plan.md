@@ -425,8 +425,10 @@ realistic (Fresh/Aging/Stale at 15/30 days), and tune the news + AI cadences
 barcode scanner that builds a crowdsourced UPC→catalog index and prefills the
 sighting flow. Makes crowd-sourced sightings a one-tap, no-typing action.
 
-### Iteration R3 — Geo Sightings & Proximity Alerts (~15 SP)
-**Stories:** BB-177, BB-183, BB-178, BB-179, BB-180
+### Iteration R3 — Geo Sightings & Proximity Alerts (~17 SP)
+**Stories:** BB-177, BB-183, BB-178, **BB-092** (push-reliability fix, inserted
+before BB-180 since proximity alerts depend on working background push), BB-179,
+BB-180
 **Goal:** Opt-in location on sightings (coords + geohash, privacy-guarded), a
 user base location + alert radius, a nearby-sightings map, and radius-filtered
 Hunt List match alerts (extends BB-112). Needs the geolocation + privacy design

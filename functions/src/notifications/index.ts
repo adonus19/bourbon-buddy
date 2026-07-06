@@ -74,13 +74,15 @@ export async function sendNotificationToUser(
 
   const response = await getMessaging().sendEachForMulticast({
     tokens,
-    notification: { title: payload.title, body: payload.body },
+    // Data-only (BB-092): our service worker renders every push via a raw
+    // `push` handler — the only path that fires reliably on iOS PWAs. A
+    // top-level `notification` field would auto-display and double-fire on
+    // platforms where the browser shows it too, so we keep it all in `data`.
     data: {
-      ...(payload.data ?? {}),
+      title: payload.title,
+      body: payload.body,
       ...(payload.link ? { link: payload.link } : {}),
-    },
-    webpush: {
-      fcmOptions: payload.link ? { link: payload.link } : undefined,
+      ...(payload.data ?? {}),
     },
   });
 

@@ -70,6 +70,19 @@ describe("sendNotificationToUser", () => {
     expect(deleteFn).toHaveBeenCalledTimes(1); // the one dead token
   });
 
+  it("sends data-only messages so the SW controls display (BB-092)", async () => {
+    prefsGet.mockResolvedValue(prefsSnap({ sightingMatch: true }));
+    tokensGet.mockResolvedValue(tokensSnap(["t1"]));
+    sendEachForMulticast.mockResolvedValue({
+      successCount: 1,
+      responses: [{ success: true }],
+    });
+    await sendNotificationToUser("u1", payload, "sightingMatch");
+    const msg = sendEachForMulticast.mock.calls[0][0];
+    expect(msg.notification).toBeUndefined();
+    expect(msg.data).toEqual({ title: "Hi", body: "There", link: "/inbox" });
+  });
+
   it("without a type, skips prefs/inbox and just delivers", async () => {
     tokensGet.mockResolvedValue(tokensSnap(["t1"]));
     sendEachForMulticast.mockResolvedValue({
