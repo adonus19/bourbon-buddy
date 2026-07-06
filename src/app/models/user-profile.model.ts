@@ -15,6 +15,12 @@ export interface UserProfile {
   friendCount?: number; // denormalized, maintained on friend add/remove
   // Default visibility applied to new sightings (BB-110); overridable per log.
   defaultSightingVisibility?: SightingVisibility;
+  // Proximity alert prefs (BB-178). Opt-in base location + max notify distance;
+  // used only by sighting match-alert filtering (BB-180). Label is display-only.
+  baseLat?: number | null;
+  baseLng?: number | null;
+  baseLocationLabel?: string | null; // e.g. "Louisville, KY"
+  alertRadiusMiles?: number | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

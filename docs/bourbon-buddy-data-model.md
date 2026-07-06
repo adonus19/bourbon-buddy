@@ -35,9 +35,17 @@ users/{userId}
   avatarUrl:      string | null        // Firebase Storage download URL
   bio:            string | null
   homeRegion:     string | null        // e.g., "Charlotte, NC"
+  baseLat:        number | null        // opt-in alert base location (BB-178)
+  baseLng:        number | null
+  baseLocationLabel: string | null     // display-only, e.g. "Louisville, KY"
+  alertRadiusMiles:  number | null     // max distance for proximity alerts
   createdAt:      Timestamp
   updatedAt:      Timestamp
 ```
+
+**Alert prefs (BB-178):** base location + radius are opt-in, owner-writable, and
+consumed **only** by proximity match-alert filtering (BB-180). Coordinates never
+appear in the public projection (`/publicProfiles`).
 
 ---
 

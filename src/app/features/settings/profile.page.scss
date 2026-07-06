@@ -70,6 +70,40 @@
     margin: 2px 0 0;
   }
 
+  &__alert-base {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 4px 2px 8px;
+  }
+
+  &__alert-base-label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+
+    strong {
+      color: var(--color-text-primary);
+      font-weight: 600;
+    }
+  }
+
+  &__alert-base-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  &__alert-radius {
+    --background: transparent;
+    --padding-start: 0;
+    margin-bottom: 8px;
+  }
+
   &__account-btn {
     --border-color: var(--color-border-bright);
     --color: var(--color-text-primary);
