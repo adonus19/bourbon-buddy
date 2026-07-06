@@ -5,6 +5,8 @@
  */
 import { HttpsError } from "firebase-functions/v2/https";
 
+import { isValidLat, isValidLng } from "../shared/geohash";
+
 export const STORE_MAX = 120;
 export const TEXT_MAX = 80;
 export const NOTES_MAX = 500;
@@ -21,6 +23,8 @@ export interface LogSightingData {
   state?: string | null;
   notes?: string | null;
   visibility?: string;
+  lat?: number | null;
+  lng?: number | null;
 }
 
 export interface ValidatedSighting {
@@ -29,6 +33,8 @@ export interface ValidatedSighting {
   price: number;
   sightingDateMillis: number;
   visibility: string;
+  lat: number | null;
+  lng: number | null;
 }
 
 function bad(message: string): never {
@@ -64,11 +70,26 @@ export function validate(d: LogSightingData): ValidatedSighting {
     }
   }
   const visibility = d.visibility === "friends" ? "friends" : "private";
+
+  // Location is opt-in (BB-177): accept only a complete, in-range coordinate
+  // pair, otherwise store nothing.
+  let lat: number | null = null;
+  let lng: number | null = null;
+  if (d.lat != null || d.lng != null) {
+    if (!isValidLat(d.lat) || !isValidLng(d.lng)) {
+      bad("Invalid location coordinates.");
+    }
+    lat = d.lat;
+    lng = d.lng;
+  }
+
   return {
     bourbonId: d.bourbonId as string,
     storeName: d.storeName as string,
     price: d.price as number,
     sightingDateMillis: when,
     visibility,
+    lat,
+    lng,
   };
 }

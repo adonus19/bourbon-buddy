@@ -73,4 +73,26 @@ describe("validate (logSighting input)", () => {
       validate({ ...ok(), city: null, state: null, notes: null })
     ).not.toThrow();
   });
+
+  describe("location (BB-177)", () => {
+    it("stores null coordinates when none are provided", () => {
+      const v = validate(ok());
+      expect(v.lat).toBeNull();
+      expect(v.lng).toBeNull();
+    });
+
+    it("accepts a valid coordinate pair", () => {
+      const v = validate({ ...ok(), lat: 42.6, lng: -5.6 });
+      expect(v.lat).toBe(42.6);
+      expect(v.lng).toBe(-5.6);
+    });
+
+    it("rejects out-of-range or half-supplied coordinates", () => {
+      expect(() => validate({ ...ok(), lat: 999, lng: 0 })).toThrow("location");
+      expect(() => validate({ ...ok(), lat: 42.6, lng: 200 })).toThrow(
+        "location"
+      );
+      expect(() => validate({ ...ok(), lat: 42.6 })).toThrow("location");
+    });
+  });
 });

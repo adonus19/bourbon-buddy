@@ -9,6 +9,10 @@ import { AuthService } from '../../core/auth/auth.service';
 import { BourbonCatalogService } from '../../core/services/bourbon-catalog.service';
 import { SightingService } from '../../core/services/sighting.service';
 import { BarcodeScannerService } from '../../core/services/barcode-scanner.service';
+import {
+  Coordinates,
+  GeolocationService,
+} from '../../core/services/geolocation.service';
 import { sightingErrorMessage } from '../../shared/utils/sighting-error';
 
 /**
@@ -32,9 +36,40 @@ export class SpottedItPage {
   private readonly route = inject(ActivatedRoute);
   private readonly toast = inject(ToastController);
   private readonly scanner = inject(BarcodeScannerService);
+  private readonly geo = inject(GeolocationService);
 
   saving = false;
   private autoScanned = false;
+
+  // Opt-in location (BB-177). Captured when the user enables the toggle; passed
+  // to the sighting on save. Coordinates are never shown as raw numbers.
+  readonly attachLocation = signal(false);
+  readonly locating = signal(false);
+  private coords: Coordinates | null = null;
+
+  async onToggleLocation(enabled: boolean): Promise<void> {
+    if (!enabled) {
+      this.attachLocation.set(false);
+      this.coords = null;
+      return;
+    }
+    this.locating.set(true);
+    try {
+      const coords = await this.geo.getCurrentPosition();
+      if (coords) {
+        this.coords = coords;
+        this.attachLocation.set(true);
+      } else {
+        this.coords = null;
+        this.attachLocation.set(false);
+        await this.presentToast(
+          "Couldn't get your location. You can still log the sighting."
+        );
+      }
+    } finally {
+      this.locating.set(false);
+    }
+  }
 
   /** Deep-link fast path: /spotted/new?scan=1 (from the FAB) opens the camera. */
   ionViewDidEnter(): void {
@@ -142,7 +177,8 @@ export class SpottedItPage {
           state: this.strOrNull(v.state),
           notes: this.strOrNull(v.notes),
         },
-        v.visibility === 'friends' ? 'friends' : 'private'
+        v.visibility === 'friends' ? 'friends' : 'private',
+        this.attachLocation() ? this.coords : null
       );
 
       // Best-effort: teach the UPC index (BB-175). Never fail the sighting for it.

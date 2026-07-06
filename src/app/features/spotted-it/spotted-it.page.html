@@ -85,6 +85,26 @@
       ></ion-input>
     </div>
 
+    <div class="spot__location">
+      <ion-toggle
+        [checked]="attachLocation()"
+        [disabled]="locating()"
+        (ionChange)="onToggleLocation($any($event.detail.checked))"
+      >
+        Attach my location
+      </ion-toggle>
+      <p class="spot__location-hint">
+        @if (locating()) {
+          Getting your location…
+        } @else if (attachLocation()) {
+          📍 Location attached — helps others find this bottle nearby.
+        } @else {
+          Helps others find it nearby. Your exact coordinates are never shown —
+          only the store and city.
+        }
+      </p>
+    </div>
+
     <ion-textarea
       class="spot__field"
       fill="solid"

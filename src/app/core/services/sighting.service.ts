@@ -72,7 +72,8 @@ export class SightingService {
     bourbonId: string,
     bourbonName: string | null,
     input: SightingInput,
-    visibility: SightingVisibility = 'private'
+    visibility: SightingVisibility = 'private',
+    location: { lat: number; lng: number } | null = null
   ): Promise<void> {
     const uid = this.requireUid();
     const callable = httpsCallable<unknown, { id: string }>(
@@ -89,6 +90,8 @@ export class SightingService {
       state: input.state ?? null,
       notes: input.notes ?? null,
       visibility,
+      lat: location?.lat ?? null,
+      lng: location?.lng ?? null,
     });
     await this.recomputeBestPrice(uid, bourbonId);
   }
