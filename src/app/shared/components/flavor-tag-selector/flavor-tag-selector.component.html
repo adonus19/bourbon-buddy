@@ -18,22 +18,45 @@
   @if (expanded()) {
     <div class="flavor__groups">
       @for (group of groups; track group.category) {
-        <div class="flavor__group">
-          <span class="flavor__group-name">{{ group.category }}</span>
-          <div class="flavor__chips">
-            @for (tag of group.tags; track tag) {
-              <button
-                type="button"
-                class="chip"
-                [class.chip--selected]="isSelected(tag)"
-                (click)="toggle(tag)"
-              >
-                {{ tag }}
-              </button>
-            }
+        @if (group.common.length || showMore()) {
+          <div class="flavor__group">
+            <span class="flavor__group-name">{{ group.category }}</span>
+            <div class="flavor__chips">
+              @for (tag of group.common; track tag) {
+                <button
+                  type="button"
+                  class="chip"
+                  [class.chip--selected]="isSelected(tag)"
+                  (click)="toggle(tag)"
+                >
+                  {{ tag }}
+                </button>
+              }
+              @for (tag of group.extended; track tag) {
+                @if (showExtended(tag)) {
+                  <button
+                    type="button"
+                    class="chip"
+                    [class.chip--selected]="isSelected(tag)"
+                    (click)="toggle(tag)"
+                  >
+                    {{ tag }}
+                  </button>
+                }
+              }
+            </div>
           </div>
-        </div>
+        }
       }
+
+      <button
+        type="button"
+        class="flavor__more"
+        (click)="toggleShowMore()"
+        [attr.aria-expanded]="showMore()"
+      >
+        {{ showMore() ? 'Show fewer flavors' : 'Show more flavors' }}
+      </button>
     </div>
   }
 </div>

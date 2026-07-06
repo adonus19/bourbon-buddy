@@ -87,3 +87,16 @@
     color: var(--color-amber-light);
   }
 }
+
+.flavor__more {
+  align-self: flex-start;
+  margin-top: 4px;
+  background: none;
+  border: none;
+  padding: 4px 2px;
+  color: var(--color-amber);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}

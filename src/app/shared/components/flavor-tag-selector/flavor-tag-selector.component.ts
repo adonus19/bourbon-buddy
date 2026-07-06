@@ -24,9 +24,20 @@ export class FlavorTagSelectorComponent {
 
   readonly groups = FLAVOR_TAG_GROUPS;
   readonly expanded = signal(true);
+  // Reveals the extended (long-tail) tier of each category (BB-181).
+  readonly showMore = signal(false);
 
   isSelected(tag: string): boolean {
     return this.selected().includes(tag);
+  }
+
+  /** Extended tags render when "show more" is on, or if already selected. */
+  showExtended(tag: string): boolean {
+    return this.showMore() || this.isSelected(tag);
+  }
+
+  toggleShowMore(): void {
+    this.showMore.update((v) => !v);
   }
 
   toggle(tag: string): void {
