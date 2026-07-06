@@ -49,7 +49,20 @@ self.addEventListener('push', (event) => {
     badge: '/assets/icon/icon-192.png',
     data,
   };
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    (async () => {
+      await self.registration.showNotification(title, options);
+      // BB-093: reflect the server-supplied unread count on the app icon.
+      const count = parseInt(data.badge, 10);
+      if (!Number.isNaN(count) && 'setAppBadge' in navigator) {
+        try {
+          await navigator.setAppBadge(count);
+        } catch (e) {
+          /* Badging API unavailable */
+        }
+      }
+    })()
+  );
 });
 
 // Deep-link on tap: focus an existing tab or open the target path.

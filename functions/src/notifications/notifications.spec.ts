@@ -2,12 +2,17 @@ const addFn = jest.fn(() => Promise.resolve({ id: "n1" }));
 const deleteFn = jest.fn(() => Promise.resolve());
 const prefsGet = jest.fn();
 const tokensGet = jest.fn();
+const countGet = jest.fn(() => Promise.resolve({ data: () => ({ count: 3 }) }));
 const sendEachForMulticast = jest.fn();
 
 jest.mock("firebase-admin/firestore", () => ({
   getFirestore: jest.fn(() => ({
     doc: jest.fn(() => ({ get: prefsGet, delete: deleteFn })),
-    collection: jest.fn(() => ({ add: addFn, get: tokensGet })),
+    collection: jest.fn(() => ({
+      add: addFn,
+      get: tokensGet,
+      where: jest.fn(() => ({ count: jest.fn(() => ({ get: countGet })) })),
+    })),
   })),
   FieldValue: { serverTimestamp: () => "ts" },
   Timestamp: { fromMillis: jest.fn(), now: jest.fn() },
@@ -80,7 +85,13 @@ describe("sendNotificationToUser", () => {
     await sendNotificationToUser("u1", payload, "sightingMatch");
     const msg = sendEachForMulticast.mock.calls[0][0];
     expect(msg.notification).toBeUndefined();
-    expect(msg.data).toEqual({ title: "Hi", body: "There", link: "/inbox" });
+    // Data-only, and carries the unread count for the app-icon badge (BB-093).
+    expect(msg.data).toEqual({
+      title: "Hi",
+      body: "There",
+      link: "/inbox",
+      badge: "3",
+    });
   });
 
   it("without a type, skips prefs/inbox and just delivers", async () => {

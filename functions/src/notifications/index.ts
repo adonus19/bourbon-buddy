@@ -45,6 +45,10 @@ export async function sendNotificationToUser(
 ): Promise<number> {
   const db = getFirestore();
 
+  // Unread inbox count → OS app-icon badge (BB-093). Computed after the inbox
+  // record is written so it includes this notification.
+  let badgeCount: number | null = null;
+
   if (type) {
     const prefsSnap = await db.doc(`users/${uid}/settings/notifications`).get();
     const prefs = prefsSnap.data() ?? {};
@@ -62,6 +66,12 @@ export async function sendNotificationToUser(
       read: false,
       createdAt: FieldValue.serverTimestamp(),
     });
+    const unread = await db
+      .collection(`users/${uid}/notifications`)
+      .where("read", "==", false)
+      .count()
+      .get();
+    badgeCount = unread.data().count;
   }
 
   const tokensSnap = await db.collection(`users/${uid}/fcmTokens`).get();
@@ -82,6 +92,7 @@ export async function sendNotificationToUser(
       title: payload.title,
       body: payload.body,
       ...(payload.link ? { link: payload.link } : {}),
+      ...(badgeCount != null ? { badge: String(badgeCount) } : {}),
       ...(payload.data ?? {}),
     },
   });
