@@ -59,6 +59,8 @@ export class SpottedItPage {
       if (coords) {
         this.coords = coords;
         this.attachLocation.set(true);
+        // BB-183: fill City/State from the coords, non-blocking, never clobbering.
+        void this.prefillCityState(coords);
       } else {
         this.coords = null;
         this.attachLocation.set(false);
@@ -68,6 +70,22 @@ export class SpottedItPage {
       }
     } finally {
       this.locating.set(false);
+    }
+  }
+
+  /** Reverse-geocode coords into City/State, only filling blanks (BB-183). */
+  private async prefillCityState(coords: Coordinates): Promise<void> {
+    const place = await this.geo.reverseGeocode(coords.lat, coords.lng);
+    if (!place) {
+      return;
+    }
+    const city = this.form.controls.city;
+    const state = this.form.controls.state;
+    if (place.city && !(city.value ?? '').trim()) {
+      city.setValue(place.city);
+    }
+    if (place.state && !(state.value ?? '').trim()) {
+      state.setValue(place.state);
     }
   }
 
