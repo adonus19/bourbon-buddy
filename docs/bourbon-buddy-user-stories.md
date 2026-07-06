@@ -579,6 +579,24 @@ Each story includes:
 
 ---
 
+### BB-092 — iOS PWA Background Push Reliability
+**As a** user with the app installed to my home screen, **I want to** receive push notifications when the app is closed, **so that** alerts actually reach me.
+
+**Context:** FCM's `messaging.onBackgroundMessage` doesn't fire on iOS installed
+PWAs; only the foreground `onMessage` path worked, so notifications appeared only
+while the app was open and unlocked.
+
+**AC:**
+- Service worker renders background pushes via a raw `self.addEventListener('push', …)` → `showNotification` (the path iOS actually delivers to); `onBackgroundMessage` removed
+- Cloud Functions send **data-only** messages (title/body/link under `data`) so the SW is the single display path and no double-notification occurs on other platforms
+- Foreground toast handler reads title/body from `data`
+- Notification tap still deep-links via `notificationclick`
+- Verified on an installed iOS PWA with the app closed
+
+**SP:** 2
+
+---
+
 ## Epic 10: Social Graph *(Phase 4)*
 
 ### BB-100 — Public Profile & Username

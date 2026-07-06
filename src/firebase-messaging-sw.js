@@ -22,18 +22,34 @@ firebase.initializeApp({
   appId: '1:906555272492:web:f0b394b4f243213b5a5089',
 });
 
-const messaging = firebase.messaging();
+// Initializing messaging keeps FCM's token/subscription plumbing working; we do
+// NOT use its onBackgroundMessage handler, which doesn't fire on iOS PWAs.
+firebase.messaging();
 
-// Show a notification for data/background messages.
-messaging.onBackgroundMessage((payload) => {
-  const title = payload.notification?.title || 'Bourbon Buddy';
+// Render every background push ourselves (BB-092). iOS delivers web push to the
+// standard `push` event — the only handler that reliably fires for an installed
+// PWA. Messages are sent data-only, so payload fields live under `data`; we also
+// read `notification` defensively in case a legacy message arrives.
+self.addEventListener('push', (event) => {
+  if (!event.data) {
+    return;
+  }
+  let payload = {};
+  try {
+    payload = event.data.json();
+  } catch (e) {
+    payload = {};
+  }
+  const data = payload.data || {};
+  const note = payload.notification || {};
+  const title = note.title || data.title || 'Bourbon Buddy';
   const options = {
-    body: payload.notification?.body || '',
+    body: note.body || data.body || '',
     icon: '/assets/icon/icon-192.png',
     badge: '/assets/icon/icon-192.png',
-    data: payload.data || {},
+    data,
   };
-  self.registration.showNotification(title, options);
+  event.waitUntil(self.registration.showNotification(title, options));
 });
 
 // Deep-link on tap: focus an existing tab or open the target path.

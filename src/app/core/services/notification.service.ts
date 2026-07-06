@@ -219,8 +219,11 @@ export class NotificationService {
     }
     this.foregroundBound = true;
     onMessage(this.messaging, (payload) => {
-      const title = payload.notification?.title ?? 'Bourbon Buddy';
-      const body = payload.notification?.body ?? '';
+      // Messages are data-only (BB-092), so read from `data`; fall back to
+      // `notification` defensively for any legacy message shape.
+      const data = (payload.data ?? {}) as { title?: string; body?: string };
+      const title = payload.notification?.title ?? data.title ?? 'Bourbon Buddy';
+      const body = payload.notification?.body ?? data.body ?? '';
       void this.toast
         .create({
           header: title,
