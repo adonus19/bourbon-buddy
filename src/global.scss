@@ -126,7 +126,9 @@ ion-fab-list ion-fab-button[data-desc] {
     color: var(--color-text-secondary);
     margin-top: 2px;
   }
+  &__directions,
   &__view {
+    display: block;
     margin-top: 8px;
     width: 100%;
     padding: 6px 10px;
@@ -135,7 +137,14 @@ ion-fab-list ion-fab-button[data-desc] {
     background: transparent;
     color: var(--color-amber);
     font-size: 13px;
+    text-align: center;
     cursor: pointer;
+  }
+
+  &__directions {
+    background: var(--color-amber);
+    color: var(--color-bg-primary);
+    text-decoration: none;
   }
 }
 

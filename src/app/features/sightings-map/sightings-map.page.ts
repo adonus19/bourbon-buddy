@@ -261,14 +261,33 @@ export class SightingsMapPage {
       );
     const place = [s.city, s.state].filter(Boolean).map(esc).join(', ');
     const who = esc(names.get(s.spotterUid) ?? 'Someone');
+    // Native-app deep link handles directions; a plain <a> avoids popup blockers.
+    const dir = this.directionsUrl(s.lat as number, s.lng as number);
     return `
       <div class="map-popup">
         <div class="map-popup__bottle">${esc(s.bourbonName || 'A bottle')}</div>
         <div class="map-popup__price">$${esc(s.price)}</div>
         <div class="map-popup__store">${esc(s.storeName)}${place ? ' &middot; ' + place : ''}</div>
         <div class="map-popup__who">Spotted by ${who}</div>
+        <a class="map-popup__directions" href="${dir}" target="_blank" rel="noopener">Directions</a>
         ${entryId ? '<button type="button" class="map-popup__view">View on Hunt List</button>' : ''}
       </div>`;
+  }
+
+  /** Directions deep link: Apple Maps on iOS, Google Maps elsewhere. */
+  private directionsUrl(lat: number, lng: number): string {
+    return this.isIos()
+      ? `https://maps.apple.com/?daddr=${lat},${lng}`
+      : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+  }
+
+  private isIos(): boolean {
+    const ua = navigator.userAgent;
+    return (
+      /iPad|iPhone|iPod/.test(ua) ||
+      // iPadOS reports as MacIntel with touch.
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    );
   }
 
   private wireViewLink(e: L.PopupEvent, entryId: string): void {
