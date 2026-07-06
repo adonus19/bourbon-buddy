@@ -1,0 +1,56 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/tabs/social" text=""></ion-back-button>
+    </ion-buttons>
+    <ion-title>Sightings map</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  @if (!hasKey) {
+    <div class="map-msg">
+      <ion-icon name="map-outline" aria-hidden="true"></ion-icon>
+      <h2>Map needs a key</h2>
+      <p>
+        Add a free MapTiler key to <code>environment.maptilerKey</code> to enable
+        the sightings map.
+      </p>
+    </div>
+  } @else {
+    <div #mapEl class="map-canvas"></div>
+
+    @if (!loading() && radiusMiles() !== null) {
+      <div class="map-chip">
+        Within {{ radiusMiles() }} mi
+        @if (baseLabel()) {
+          of {{ baseLabel() }}
+        }
+      </div>
+    }
+
+    @if (!loading()) {
+      <ion-fab slot="fixed" vertical="bottom" horizontal="start">
+        <ion-fab-button size="small" (click)="recenter()" aria-label="Recenter">
+          <ion-icon name="locate-outline"></ion-icon>
+        </ion-fab-button>
+      </ion-fab>
+    }
+
+    @if (loading()) {
+      <div class="map-overlay">
+        <ion-spinner name="dots"></ion-spinner>
+      </div>
+    } @else if (count() === 0) {
+      <div class="map-overlay map-overlay--note">
+        @if (hiddenByRadius() > 0) {
+          No sightings within {{ radiusMiles() }} mi — {{ hiddenByRadius() }}
+          farther away. Widen your alert radius in Settings to see them.
+        } @else {
+          No sightings with a location yet. Toggle “Attach my location” when you
+          log one.
+        }
+      </div>
+    }
+  }
+</ion-content>

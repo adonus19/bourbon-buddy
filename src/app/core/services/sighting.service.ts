@@ -143,6 +143,54 @@ export class SightingService {
     return { items, last };
   }
 
+  /**
+   * Friends' shared + the user's own sightings, for the nearby-sightings map
+   * (BB-179). Two bounded one-shot reads (no per-marker fan-out); the caller
+   * filters to those with coordinates, non-stale, and within radius.
+   */
+  async nearbySightings(
+    friendUids: string[],
+    selfUid: string,
+    max = 200
+  ): Promise<Sighting[]> {
+    const uids = friendUids.slice(0, SightingService.FEED_UID_CAP);
+    const toItems = (s: {
+      docs: QueryDocumentSnapshot<DocumentData>[];
+    }): Sighting[] =>
+      s.docs.map((d) => ({ id: d.id, ...d.data() }) as Sighting);
+
+    const reads: Promise<Sighting[]>[] = [
+      // The user's own sightings (any visibility). Bare equality — no index.
+      getDocs(
+        query(this.col(), where('spotterUid', '==', selfUid), limit(max))
+      ).then(toItems),
+    ];
+    if (uids.length) {
+      // Friends' shared sightings (reuses the feed's composite index).
+      reads.push(
+        getDocs(
+          query(
+            this.col(),
+            where('visibility', '==', 'friends'),
+            where('spotterUid', 'in', uids),
+            orderBy('createdAt', 'desc'),
+            limit(max)
+          )
+        ).then(toItems)
+      );
+    }
+
+    const byId = new Map<string, Sighting>();
+    for (const arr of await Promise.all(reads)) {
+      for (const s of arr) {
+        if (s.id) {
+          byId.set(s.id, s);
+        }
+      }
+    }
+    return [...byId.values()];
+  }
+
   async setStale(
     sightingId: string,
     bourbonId: string,
