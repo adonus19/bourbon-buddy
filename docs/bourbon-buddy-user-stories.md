@@ -1187,6 +1187,18 @@ fallback but its usage policy is stricter.
 
 ---
 
+### BB-184 — Directions from a Map Pin
+**As a** user, **I want** a "Directions" button on a map sighting, **so that** I can navigate to the store in one tap.
+
+**AC:**
+- Each pin popup has a Directions link that deep-links to the native maps app: Apple Maps on iOS, Google Maps elsewhere
+- Uses the sighting's coordinates as the destination; opens in a new tab so it hands off to the maps app
+- Rendered as a plain anchor (no popup-blocker issues); coexists with the "View on Hunt List" action
+
+**SP:** 1
+
+---
+
 ## Epic 15: Palate & Reliability *(Post-Social — last iteration before backlog)*
 
 ### BB-181 — Structured Flavor Profile
