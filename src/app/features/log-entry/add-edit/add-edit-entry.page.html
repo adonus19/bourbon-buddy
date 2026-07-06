@@ -33,6 +33,12 @@
       (valueChange)="onNameInput($event)"
       (selected)="onBottleSelected($event)"
     ></app-bourbon-autocomplete>
+    @if (lookingUp()) {
+      <div class="entry__lookup">
+        <ion-spinner name="dots"></ion-spinner>
+        Looking up bottle…
+      </div>
+    }
     @if (form.controls.bourbonName.touched && form.controls.bourbonName.invalid) {
       <div class="entry__error">A name is required.</div>
     }

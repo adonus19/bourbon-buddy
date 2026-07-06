@@ -49,32 +49,3 @@
 .scanner__manual {
   padding: 12px 16px 24px;
 }
-
-.scanner__diag {
-  margin: 0 12px 20px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.4);
-}
-
-.scanner__diag-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 6px 4px 12px;
-  font-size: 12px;
-  color: var(--color-text-secondary, #b9ab99);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.scanner__diag-log {
-  margin: 0;
-  padding: 8px 12px;
-  max-height: 180px;
-  overflow: auto;
-  font-size: 11px;
-  line-height: 1.35;
-  white-space: pre-wrap;
-  word-break: break-word;
-  color: var(--color-text-primary);
-}

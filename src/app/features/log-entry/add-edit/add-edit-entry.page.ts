@@ -283,6 +283,8 @@ export class AddEditEntryPage {
 
   // BB-175/176: a scanned code with no catalog match yet, attached on save.
   private pendingUpc: string | null = null;
+  // Non-blocking indicator while a scanned code is looked up in the catalog.
+  readonly lookingUp = signal(false);
 
   /** Scan a barcode to quick-add a bottle (BB-176). */
   async scanBarcode(): Promise<void> {
@@ -290,16 +292,21 @@ export class AddEditEntryPage {
     if (!result) {
       return;
     }
-    const match = await this.catalog.findByUpc(result.code);
-    if (match) {
-      this.pendingUpc = null;
-      this.onBottleSelected(match);
-      await this.presentToast(`Matched ${match.name}.`);
-    } else {
-      this.pendingUpc = result.code;
-      await this.presentToast(
-        "New barcode — fill in the bottle and we'll remember it."
-      );
+    this.lookingUp.set(true);
+    try {
+      const match = await this.catalog.findByUpc(result.code);
+      if (match) {
+        this.pendingUpc = null;
+        this.onBottleSelected(match);
+        await this.presentToast(`Matched ${match.name}.`);
+      } else {
+        this.pendingUpc = result.code;
+        await this.presentToast(
+          "New barcode — fill in the bottle and we'll remember it."
+        );
+      }
+    } finally {
+      this.lookingUp.set(false);
     }
   }
 

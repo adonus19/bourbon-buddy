@@ -1091,6 +1091,26 @@ foundation incl. abuse controls.)
 
 ---
 
+### BB-183 — Auto-fill City / State from Location
+**As a** user logging a sighting, **I want** the City and State fields pre-filled from my location, **so that** I don't have to type them (a common ask surfaced while testing the barcode scanner).
+
+**Context:** reuses the coordinates captured in BB-177. Reverse-geocoding
+(coords → city/state) can be done with a **free, key-less, CORS-enabled client
+API** (e.g. BigDataCloud's reverse-geocode-client) — no paid Google/Mapbox
+dependency, keeping it within the free-tier philosophy. Nominatim/OSM is a
+fallback but its usage policy is stricter.
+
+**AC:**
+- When location is granted (BB-177), reverse-geocode the coordinates and pre-fill the sighting's City and State
+- Fields remain **editable** — auto-fill is a convenience, never a lock
+- Fully degrades: no permission / offline / lookup failure → fields simply stay blank, no error surfaced
+- No paid geocoding service; stays within free tier
+- Depends on **BB-177** (needs the captured coordinates)
+
+**SP:** 2
+
+---
+
 ### BB-178 — Alert Radius & Base Location Preference
 **As a** user, **I want** to set a home area and a max alert distance, **so that** I'm only notified about finds near me.
 

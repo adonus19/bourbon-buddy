@@ -71,18 +71,6 @@ export class ScannerModalComponent implements AfterViewInit, OnDestroy {
     () => normalizeBarcode(this.manualCode()) !== null
   );
 
-  // --- On-device diagnostics (temporary, BB-174 iOS debugging) ------------
-  readonly diag = signal<string[]>([]);
-  private readonly t0 = Date.now();
-  private frames = 0;
-
-  private log(msg: string): void {
-    const line = `+${Date.now() - this.t0}ms ${msg}`;
-    // eslint-disable-next-line no-console
-    console.log('[scanner]', line);
-    this.diag.update((lines) => [...lines, line].slice(-16));
-  }
-
   private stream: MediaStream | null = null;
   private zxingControls: IScannerControls | null = null;
   private rafId: number | null = null;
@@ -103,26 +91,9 @@ export class ScannerModalComponent implements AfterViewInit, OnDestroy {
     this.manualCode.set(value);
   }
 
-  async copyDiag(): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(this.diag().join('\n'));
-      this.log('diagnostics copied');
-    } catch {
-      this.log('clipboard unavailable — screenshot instead');
-    }
-  }
-
   private async start(): Promise<void> {
-    const nav = navigator as Navigator & { standalone?: boolean };
-    this.log(
-      `env standalone=${nav.standalone ?? 'n/a'} secure=${window.isSecureContext} ` +
-        `mediaDevices=${!!navigator.mediaDevices} ` +
-        `getUserMedia=${!!navigator.mediaDevices?.getUserMedia} ` +
-        `BarcodeDetector=${'BarcodeDetector' in globalThis}`
-    );
     const video = this.videoRef?.nativeElement;
     if (!video) {
-      this.log('no <video> element');
       this.status.set('error');
       return;
     }
@@ -137,17 +108,13 @@ export class ScannerModalComponent implements AfterViewInit, OnDestroy {
         'BarcodeDetector'
       ] as BarcodeDetectorCtor | undefined;
       if (Detector) {
-        this.log('decode path: native BarcodeDetector');
         this.startNativeLoop(video, Detector);
       } else {
-        this.log('decode path: ZXing');
         await this.startZxing(video);
       }
       this.status.set('scanning');
       this.armManualHint();
     } catch (err) {
-      const e = err as { name?: string; message?: string };
-      this.log(`START ERROR ${e?.name ?? '?'}: ${e?.message ?? err}`);
       this.handleStartError(err);
     }
   }
@@ -162,7 +129,6 @@ export class ScannerModalComponent implements AfterViewInit, OnDestroy {
     // iOS requires an inline, muted video to autoplay a camera stream.
     video.setAttribute('playsinline', 'true');
     video.muted = true;
-    this.log('requesting camera…');
     // Request a higher resolution: at 480p a UPC's bars can be sub-pixel and
     // undecodable. 1280×720 gives the decoder far more to work with.
     this.stream = await navigator.mediaDevices.getUserMedia({
@@ -172,21 +138,9 @@ export class ScannerModalComponent implements AfterViewInit, OnDestroy {
         height: { ideal: 720 },
       },
     });
-    const track = this.stream.getVideoTracks()[0];
-    const s = track?.getSettings?.() ?? {};
-    this.log(
-      `stream ok tracks=${this.stream.getVideoTracks().length} ` +
-        `facing=${s.facingMode ?? '?'} ${s.width ?? '?'}x${s.height ?? '?'}`
-    );
     video.srcObject = this.stream;
-    try {
-      await video.play();
-      this.log('video.play() ok');
-    } catch (e) {
-      this.log(`video.play() failed: ${(e as Error)?.name ?? e}`);
-    }
+    await video.play().catch(() => undefined);
     await this.waitForVideoDimensions(video);
-    this.log(`video dims ${video.videoWidth}x${video.videoHeight}`);
     this.detectTorch();
   }
 
@@ -231,10 +185,6 @@ export class ScannerModalComponent implements AfterViewInit, OnDestroy {
       }
       try {
         const found = await this.detector.detect(video);
-        this.frames++;
-        if (this.frames === 1 || this.frames % 30 === 0) {
-          this.log(`native frame ${this.frames} found=${found.length}`);
-        }
         for (const b of found) {
           const code = normalizeBarcode(b.rawValue);
           if (code) {
@@ -269,29 +219,15 @@ export class ScannerModalComponent implements AfterViewInit, OnDestroy {
     // Decode from the element we already started (does not re-attach/dispose the
     // stream), so the capture canvas is sized from a video that already has
     // real dimensions.
-    this.zxingControls = await reader.decodeFromVideoElement(
-      video,
-      (result, error) => {
-        this.frames++;
-        // The callback fires every frame with either a result or a decode error;
-        // sampling it confirms the loop is running and what it's seeing.
-        if (this.frames === 1 || this.frames % 30 === 0) {
-          this.log(
-            `zxing frame ${this.frames} ${video.videoWidth}x${video.videoHeight} ` +
-              `err=${error?.name ?? '-'}`
-          );
-        }
-        if (this.done || !result) {
-          return;
-        }
-        this.log(`DECODED ${result.getText()}`);
-        const code = normalizeBarcode(result.getText());
-        if (code) {
-          this.finish(code, 'scan', BarcodeFormat[result.getBarcodeFormat()]);
-        }
+    this.zxingControls = await reader.decodeFromVideoElement(video, (result) => {
+      if (this.done || !result) {
+        return;
       }
-    );
-    this.log('zxing decode loop started');
+      const code = normalizeBarcode(result.getText());
+      if (code) {
+        this.finish(code, 'scan', BarcodeFormat[result.getBarcodeFormat()]);
+      }
+    });
   }
 
   private detectTorch(): void {

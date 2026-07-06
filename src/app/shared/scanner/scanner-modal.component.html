@@ -77,13 +77,4 @@
       Use this number
     </ion-button>
   </div>
-
-  <!-- Temporary on-device diagnostics (BB-174 iOS debugging). -->
-  <div class="scanner__diag">
-    <div class="scanner__diag-head">
-      <span>Scanner diagnostics</span>
-      <ion-button size="small" fill="clear" (click)="copyDiag()">Copy</ion-button>
-    </div>
-    <pre class="scanner__diag-log">{{ diag().join('\n') }}</pre>
-  </div>
 </ion-content>
