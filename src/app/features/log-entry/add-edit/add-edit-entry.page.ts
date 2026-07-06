@@ -19,6 +19,7 @@ import {
   LogEntryService,
 } from '../../../core/services/log-entry.service';
 import { BourbonCatalogService } from '../../../core/services/bourbon-catalog.service';
+import { BarcodeScannerService } from '../../../core/services/barcode-scanner.service';
 import { StorageService } from '../../../core/services/storage.service';
 import { WishlistService } from '../../../core/services/wishlist.service';
 import { AuthService } from '../../../core/auth/auth.service';
@@ -33,6 +34,7 @@ export class AddEditEntryPage {
   private readonly fb = inject(FormBuilder);
   private readonly logService = inject(LogEntryService);
   private readonly catalog = inject(BourbonCatalogService);
+  private readonly scanner = inject(BarcodeScannerService);
   private readonly storage = inject(StorageService);
   private readonly wishlist = inject(WishlistService);
   private readonly auth = inject(AuthService);
@@ -279,6 +281,28 @@ export class AddEditEntryPage {
     });
   }
 
+  // BB-175/176: a scanned code with no catalog match yet, attached on save.
+  private pendingUpc: string | null = null;
+
+  /** Scan a barcode to quick-add a bottle (BB-176). */
+  async scanBarcode(): Promise<void> {
+    const result = await this.scanner.scan();
+    if (!result) {
+      return;
+    }
+    const match = await this.catalog.findByUpc(result.code);
+    if (match) {
+      this.pendingUpc = null;
+      this.onBottleSelected(match);
+      await this.presentToast(`Matched ${match.name}.`);
+    } else {
+      this.pendingUpc = result.code;
+      await this.presentToast(
+        "New barcode — fill in the bottle and we'll remember it."
+      );
+    }
+  }
+
   // --- Mutually-exclusive / dependent fields -----------------------------
   onNasToggle(checked: boolean): void {
     const age = this.form.controls.ageStatement;
@@ -411,6 +435,15 @@ export class AddEditEntryPage {
           ...baseInput,
           labelPhotoUrl: null,
         });
+        // Best-effort: teach the UPC index (BB-175). Never fail the save for it.
+        if (this.pendingUpc) {
+          try {
+            await this.catalog.addUpc(bourbonId, this.pendingUpc);
+          } catch {
+            // index update is non-critical; the entry already saved
+          }
+          this.pendingUpc = null;
+        }
         if (this.photoFile) {
           const uid = this.requireUid();
           const url = await this.storage.uploadLabel(uid, newId, this.photoFile);

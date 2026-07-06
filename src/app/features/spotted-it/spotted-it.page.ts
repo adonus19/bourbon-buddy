@@ -1,6 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { FormBuilder, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { ToastController } from '@ionic/angular';
 import { Timestamp } from '@angular/fire/firestore';
 
@@ -29,10 +29,23 @@ export class SpottedItPage {
   private readonly sightings = inject(SightingService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly toast = inject(ToastController);
   private readonly scanner = inject(BarcodeScannerService);
 
   saving = false;
+  private autoScanned = false;
+
+  /** Deep-link fast path: /spotted/new?scan=1 (from the FAB) opens the camera. */
+  ionViewDidEnter(): void {
+    if (this.autoScanned) {
+      return;
+    }
+    this.autoScanned = true;
+    if (this.route.snapshot.queryParamMap.get('scan')) {
+      void this.scanBarcode();
+    }
+  }
   // BB-175: a scanned code with no catalog match yet. Once the user names the
   // bottle and saves, we attach this code to that catalog entry for next time.
   private pendingUpc: string | null = null;
