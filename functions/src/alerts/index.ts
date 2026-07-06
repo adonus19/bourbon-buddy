@@ -22,6 +22,7 @@ import { logger } from "firebase-functions/v2";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 
 import { sendNotificationToUser } from "../notifications";
+import { withinAlertRadius } from "../shared/geo";
 
 const ACTIVE_STATUSES = [
   "actively_looking",
@@ -73,7 +74,8 @@ export const onSightingCreated = onDocumentWritten(
       await personalPriceAlerts(db, spotterUid, bourbonId, price, store);
     }
 
-    // 2) Sighting Match Alerts to the spotter's friends (BB-112).
+    // 2) Sighting Match Alerts to the spotter's friends (BB-112), filtered by
+    //    each recipient's alert radius (BB-180).
     if (sighting.visibility === "friends") {
       await friendMatchAlerts(
         db,
@@ -83,7 +85,8 @@ export const onSightingCreated = onDocumentWritten(
         price,
         store,
         bottleName,
-        locSuffix(sighting)
+        locSuffix(sighting),
+        { lat: sighting.lat, lng: sighting.lng }
       );
     }
   }
@@ -135,7 +138,8 @@ async function friendMatchAlerts(
   price: number,
   store: string,
   bottleName: string,
-  loc: string
+  loc: string,
+  coords: { lat?: unknown; lng?: unknown }
 ): Promise<void> {
   const friendsSnap = await db.collection(`users/${spotterUid}/friends`).get();
   if (friendsSnap.empty) {
@@ -158,6 +162,15 @@ async function friendMatchAlerts(
       ACTIVE_STATUSES.includes(d.data().status as string)
     );
     if (!match) {
+      continue;
+    }
+
+    // Proximity filter (BB-180): drop silently when the recipient set a base
+    // location and this sighting is beyond their radius. Fails open — no base
+    // location or no sighting coords means we still deliver.
+    const recipient =
+      (await db.doc(`users/${recipientUid}`).get()).data() ?? {};
+    if (!withinAlertRadius(coords, recipient)) {
       continue;
     }
 
