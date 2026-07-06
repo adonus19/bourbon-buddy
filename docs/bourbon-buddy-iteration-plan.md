@@ -427,8 +427,8 @@ sighting flow. Makes crowd-sourced sightings a one-tap, no-typing action.
 
 ### Iteration R3 — Geo Sightings & Proximity Alerts (~17 SP)
 **Stories:** BB-177, BB-183, BB-178, **BB-092** (push-reliability fix, inserted
-before BB-180 since proximity alerts depend on working background push), BB-179,
-BB-180
+before BB-180 since proximity alerts depend on working background push),
+**BB-093** (app-icon badge, follow-on to BB-092), BB-179, BB-180
 **Goal:** Opt-in location on sightings (coords + geohash, privacy-guarded), a
 user base location + alert radius, a nearby-sightings map, and radius-filtered
 Hunt List match alerts (extends BB-112). Needs the geolocation + privacy design

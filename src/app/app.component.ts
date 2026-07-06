@@ -1,4 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
+
+import { InboxService } from './core/services/inbox.service';
 
 @Component({
   selector: 'app-root',
@@ -6,4 +8,23 @@ import { Component } from '@angular/core';
   styleUrls: ['app.component.scss'],
   standalone: false,
 })
-export class AppComponent {}
+export class AppComponent implements OnInit {
+  private readonly inbox = inject(InboxService);
+
+  ngOnInit(): void {
+    // Keep the OS app-icon badge in step with unread inbox items (BB-093):
+    // sync on launch and whenever the app returns to the foreground.
+    this.syncBadge();
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        this.syncBadge();
+      }
+    });
+  }
+
+  private syncBadge(): void {
+    // unreadCount() applies the badge as a side effect (or clears it when 0 /
+    // signed out); we don't need the return value here.
+    void this.inbox.unreadCount();
+  }
+}

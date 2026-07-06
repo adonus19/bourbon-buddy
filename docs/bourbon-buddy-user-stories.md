@@ -597,6 +597,26 @@ while the app was open and unlocked.
 
 ---
 
+### BB-093 — App Icon Badge Count
+**As a** user, **I want** the app icon to show a count of unread notifications, **so that** I can see at a glance that something's waiting without opening the app.
+
+**Context:** uses the **Badging API** (`navigator.setAppBadge` / `clearAppBadge`),
+supported on installed PWAs — Android and iOS 16.4+. The count is driven by us,
+not automatic: the send function includes the unread total in the push, the SW
+sets it, and the app keeps it in sync.
+
+**AC:**
+- Cloud Functions include the recipient's unread inbox count in the (data-only) push payload
+- The service worker's `push` handler calls `navigator.setAppBadge(count)` alongside `showNotification`
+- The app syncs the badge to the unread count on launch and on foreground resume (`visibilitychange`)
+- Reading/marking notifications updates the badge; clearing all sets it to zero
+- Sign-out clears the badge
+- Silent no-op where the Badging API is unsupported
+
+**SP:** 2
+
+---
+
 ## Epic 10: Social Graph *(Phase 4)*
 
 ### BB-100 — Public Profile & Username

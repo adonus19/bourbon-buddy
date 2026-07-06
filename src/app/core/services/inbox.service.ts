@@ -49,12 +49,15 @@ export class InboxService {
   async unreadCount(): Promise<number> {
     const uid = this.auth.snapshotUser?.uid;
     if (!uid) {
+      this.applyAppBadge(0);
       return 0;
     }
     const snap = await getCountFromServer(
       query(this.col(uid), where('read', '==', false))
     );
-    return snap.data().count;
+    const count = snap.data().count;
+    this.applyAppBadge(count);
+    return count;
   }
 
   async markRead(id: string): Promise<void> {
@@ -65,6 +68,8 @@ export class InboxService {
     await updateDoc(doc(this.firestore, `users/${uid}/notifications/${id}`), {
       read: true,
     });
+    // Resync the OS app-icon badge to the remaining unread (BB-093).
+    void this.unreadCount();
   }
 
   async markAllRead(items: AppNotification[]): Promise<void> {
@@ -80,6 +85,33 @@ export class InboxService {
       });
     }
     await batch.commit();
+    this.applyAppBadge(0);
+  }
+
+  /** Clear the OS app-icon badge, e.g. on sign-out (BB-093). */
+  clearAppBadge(): void {
+    this.applyAppBadge(0);
+  }
+
+  /**
+   * Reflect the unread count onto the OS app-icon badge via the Badging API
+   * (BB-093). Supported on installed PWAs — Android and iOS 16.4+; a silent
+   * no-op everywhere else.
+   */
+  private applyAppBadge(count: number): void {
+    const nav = navigator as Navigator & {
+      setAppBadge?: (n?: number) => Promise<void>;
+      clearAppBadge?: () => Promise<void>;
+    };
+    try {
+      if (count > 0) {
+        void nav.setAppBadge?.(count);
+      } else {
+        void nav.clearAppBadge?.();
+      }
+    } catch {
+      // Badging API unavailable — ignore.
+    }
   }
 
   private col(uid: string) {

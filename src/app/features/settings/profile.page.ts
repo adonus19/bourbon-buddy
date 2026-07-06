@@ -339,6 +339,7 @@ export class ProfilePage {
   private async signOut(): Promise<void> {
     // Drop this device's push token before the session ends.
     await this.notifications.cleanupForSignOut();
+    this.inbox.clearAppBadge();
     await this.auth.signOut();
     await this.presentToast('See you next pour.');
     await this.router.navigateByUrl('/login', { replaceUrl: true });
