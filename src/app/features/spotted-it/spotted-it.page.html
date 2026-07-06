@@ -30,6 +30,12 @@
       (valueChange)="onNameInput($event)"
       (selected)="onBottleSelected($event)"
     ></app-bourbon-autocomplete>
+    @if (lookingUp()) {
+      <div class="spot__lookup">
+        <ion-spinner name="dots"></ion-spinner>
+        Looking up bottle…
+      </div>
+    }
 
     <p class="eyebrow spot__section">Where & how much</p>
     <ion-input

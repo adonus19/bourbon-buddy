@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ToastController } from '@ionic/angular';
@@ -49,6 +49,8 @@ export class SpottedItPage {
   // BB-175: a scanned code with no catalog match yet. Once the user names the
   // bottle and saves, we attach this code to that catalog entry for next time.
   private pendingUpc: string | null = null;
+  // Non-blocking indicator while a scanned code is looked up in the catalog.
+  readonly lookingUp = signal(false);
 
   /** Scan a barcode and resolve it to a catalog bottle (BB-174/BB-175). */
   async scanBarcode(): Promise<void> {
@@ -56,16 +58,21 @@ export class SpottedItPage {
     if (!result) {
       return;
     }
-    const match = await this.catalog.findByUpc(result.code);
-    if (match) {
-      this.pendingUpc = null;
-      this.onBottleSelected(match);
-      await this.presentToast(`Matched ${match.name}.`);
-    } else {
-      this.pendingUpc = result.code;
-      await this.presentToast(
-        "New barcode — name the bottle and we'll remember it."
-      );
+    this.lookingUp.set(true);
+    try {
+      const match = await this.catalog.findByUpc(result.code);
+      if (match) {
+        this.pendingUpc = null;
+        this.onBottleSelected(match);
+        await this.presentToast(`Matched ${match.name}.`);
+      } else {
+        this.pendingUpc = result.code;
+        await this.presentToast(
+          "New barcode — name the bottle and we'll remember it."
+        );
+      }
+    } finally {
+      this.lookingUp.set(false);
     }
   }
 

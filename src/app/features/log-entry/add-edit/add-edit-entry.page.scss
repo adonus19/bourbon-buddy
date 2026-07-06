@@ -59,6 +59,21 @@
   margin: -8px 2px 14px;
 }
 
+.entry__lookup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 2px 0;
+  font-size: 13px;
+  color: var(--color-amber);
+
+  ion-spinner {
+    width: 18px;
+    height: 18px;
+    --color: var(--color-amber);
+  }
+}
+
 .entry__rating {
   display: flex;
   justify-content: center;
