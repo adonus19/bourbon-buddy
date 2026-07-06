@@ -434,13 +434,31 @@ user base location + alert radius, a nearby-sightings map, and radius-filtered
 Hunt List match alerts (extends BB-112). Needs the geolocation + privacy design
 done up front.
 
-### Iteration R4 — Palate & Reliability (~10 SP) — *last before backlog*
+### Iteration R4 — Palate & Reliability (~8 SP)
 **Stories:** BB-181, BB-182
-**Goal:** Structured flavor profile (nose/palate/finish; feeds future recs) and
-offline-first sighting capture so poor in-store signal never drops a find.
+**Goal:** Expand the flavor picker into a curated, tiered flavor wheel (BB-181 —
+the canonical taxonomy that R5 depends on) and add offline-first sighting capture
+so poor in-store signal never drops a find.
 
-**After R4** we move to backlog items — **Gamification (Phase 5)** is top of the
-list, followed by **Bottle Fill-Level & Pour Tracking (BB-191, extends BB-020)**.
+### Iteration R5 — Guided Tasting & Catalog Intelligence (~8 SP)
+**Stories:** BB-185, BB-186
+**Goal:** AI-enrich catalog bottles with a flavor profile **mapped to the BB-181
+taxonomy** (no scraping, no verbatim third-party notes), then pre-fill those
+suggestions when logging a bottle (Untappd-style; you confirm/adjust). Reuses the
+Groq extraction infra (BB-130) + free-tier pacing.
+**Depends on:** BB-181 (canonical vocabulary).
+
+### Iteration R6 — Fast Sighting Entry (~5 SP)
+**Stories:** BB-187
+**Goal:** Tap a nearby retailer to auto-fill store + city/state on a sighting,
+via an OpenStreetMap **Overpass** query run server-side (cached, fair-use). First
+pass = Retailers; Venues (bars/restaurants, BB-189) are backlog.
+**Independent** of R5 — can slot whenever.
+
+**After R6** we move to backlog — **Gamification (Phase 5)** is top of the list,
+then **Crowdsourced Flavor Aggregation (BB-188)**, **Nearby Venue Picker
+(BB-189)**, **Bottle Fill-Level & Pour Tracking (BB-191)**, and **News Full-Text
+Search (BB-190)**.
 
 ---
 
