@@ -163,8 +163,14 @@ export class ScannerModalComponent implements AfterViewInit, OnDestroy {
     video.setAttribute('playsinline', 'true');
     video.muted = true;
     this.log('requesting camera…');
+    // Request a higher resolution: at 480p a UPC's bars can be sub-pixel and
+    // undecodable. 1280×720 gives the decoder far more to work with.
     this.stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' } },
+      video: {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      },
     });
     const track = this.stream.getVideoTracks()[0];
     const s = track?.getSettings?.() ?? {};
@@ -252,7 +258,14 @@ export class ScannerModalComponent implements AfterViewInit, OnDestroy {
       BarcodeFormat.EAN_13,
       BarcodeFormat.EAN_8,
     ]);
-    const reader = new BrowserMultiFormatReader(hints);
+    // TRY_HARDER scans more rows/rotations per frame — critical for hand-held
+    // 1D barcodes that don't land exactly on the center scan line.
+    hints.set(DecodeHintType.TRY_HARDER, true);
+    // Default is 500ms between attempts (~2 fps). Tighten it for a live scan.
+    const reader = new BrowserMultiFormatReader(hints, {
+      delayBetweenScanAttempts: 100,
+      delayBetweenScanSuccess: 100,
+    });
     // Decode from the element we already started (does not re-attach/dispose the
     // stream), so the capture canvas is sized from a video that already has
     // real dimensions.
