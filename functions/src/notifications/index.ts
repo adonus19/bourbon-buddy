@@ -159,6 +159,10 @@ export const sendTestNotification = onCall(
       title: "Bourbon Buddy",
       body: "🥃 Test notification — your push is working.",
       link: "/tabs/dispatch",
+      // Carry a badge so the test also exercises the app-icon badge (BB-093).
+      // (The untyped test writes no inbox record, so the count is a stand-in;
+      // opening the app resyncs the badge to the real unread total.)
+      data: { badge: "1" },
     });
     return { sent };
   }

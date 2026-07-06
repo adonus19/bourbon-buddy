@@ -1,12 +1,16 @@
 import { Component, computed, inject } from '@angular/core';
-import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import {
+  takeUntilDestroyed,
+  toObservable,
+  toSignal,
+} from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AlertController, ModalController, ToastController } from '@ionic/angular';
 import { Timestamp } from '@angular/fire/firestore';
-import { of } from 'rxjs';
-import { switchMap } from 'rxjs/operators';
+import { combineLatest, of } from 'rxjs';
+import { shareReplay, switchMap } from 'rxjs/operators';
 
-import { Sighting } from '../../../models';
+import { Sighting, WishlistEntry } from '../../../models';
 import { WishlistService } from '../../../core/services/wishlist.service';
 import {
   SightingInput,
@@ -19,6 +23,7 @@ import {
 } from '../../../shared/constants/wishlist-display';
 import {
   SightingFreshness,
+  bestNonStalePrice,
   isSightingStale,
   sightingFreshness,
 } from '../../../shared/utils/sighting';
@@ -49,16 +54,44 @@ export class WishlistDetailPage {
 
   // Sightings are keyed by the bottle (bourbonId), not the wishlist entry, so
   // the listener swaps once the entry (hence its bourbonId) has loaded.
-  private readonly sightings = toSignal(
-    toObservable(this.entry).pipe(
-      switchMap((e) =>
-        e?.bourbonId
-          ? this.sightingService.sightingsForBottle(e.bourbonId)
-          : of<Sighting[]>([])
-      )
+  private readonly sightings$ = toObservable(this.entry).pipe(
+    switchMap((e) =>
+      e?.bourbonId
+        ? this.sightingService.sightingsForBottle(e.bourbonId)
+        : of<Sighting[]>([])
     ),
-    { initialValue: [] as Sighting[] }
+    // One shared listener feeds both the signal and the self-heal below.
+    shareReplay({ bufferSize: 1, refCount: true })
   );
+  private readonly sightings = toSignal(this.sightings$, {
+    initialValue: [] as Sighting[],
+  });
+
+  constructor() {
+    // Self-heal the cached best-sighting price (BB-161). The card on the Hunt
+    // List reads this cached field; if it drifted (e.g. a sighting logged before
+    // the recompute-race fix), reconcile it against the live sightings here —
+    // the one place we already hold both the entry and its real sightings.
+    combineLatest([toObservable(this.entry), this.sightings$])
+      .pipe(takeUntilDestroyed())
+      .subscribe(([entry, sightings]) =>
+        this.reconcileBestPrice(entry, sightings)
+      );
+  }
+
+  private reconcileBestPrice(
+    entry: WishlistEntry | undefined,
+    sightings: Sighting[]
+  ): void {
+    if (!entry?.id) {
+      return;
+    }
+    const best = bestNonStalePrice(sightings);
+    if (best === (entry.bestSightingPrice ?? null)) {
+      return;
+    }
+    void this.wishlist.setBestSightingPrice(entry.id, best);
+  }
   readonly sortedSightings = computed(() =>
     [...this.sightings()].sort(
       (a, b) =>
