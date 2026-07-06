@@ -5,6 +5,7 @@ import { IonicModule } from '@ionic/angular';
 import { RouterModule } from '@angular/router';
 
 import { SharedModule } from '../../../shared/shared.module';
+import { ScannerModule } from '../../../shared/scanner/scanner.module';
 import { AddEditEntryPage } from './add-edit-entry.page';
 
 @NgModule({
@@ -13,6 +14,7 @@ import { AddEditEntryPage } from './add-edit-entry.page';
     ReactiveFormsModule,
     IonicModule,
     SharedModule,
+    ScannerModule,
     RouterModule.forChild([{ path: '', component: AddEditEntryPage }]),
   ],
   declarations: [AddEditEntryPage],
