@@ -96,6 +96,19 @@ export class WishlistService {
     await deleteDoc(this.docRef(uid, id));
   }
 
+  /**
+   * Reconcile the cached best-sighting price (BB-161). Used by the detail page
+   * to self-heal an entry whose cache drifted (e.g. a sighting logged before the
+   * recompute race was fixed). Only writes when the value actually changes.
+   */
+  async setBestSightingPrice(id: string, price: number | null): Promise<void> {
+    const uid = this.requireUid();
+    await updateDoc(this.docRef(uid, id), {
+      bestSightingPrice: price,
+      updatedAt: serverTimestamp(),
+    });
+  }
+
   private col(uid: string) {
     return collection(this.firestore, `users/${uid}/wishlistEntries`);
   }
