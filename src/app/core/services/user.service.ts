@@ -165,6 +165,39 @@ export class UserService {
     });
   }
 
+  /** Sets the opt-in base location for proximity alerts (BB-178). */
+  async setAlertLocation(
+    uid: string,
+    lat: number,
+    lng: number,
+    label: string | null
+  ): Promise<void> {
+    await updateDoc(this.userDocRef(uid), {
+      baseLat: lat,
+      baseLng: lng,
+      baseLocationLabel: label ?? null,
+      updatedAt: serverTimestamp(),
+    });
+  }
+
+  /** Clears the base location (BB-178); radius preference is left intact. */
+  async clearAlertLocation(uid: string): Promise<void> {
+    await updateDoc(this.userDocRef(uid), {
+      baseLat: null,
+      baseLng: null,
+      baseLocationLabel: null,
+      updatedAt: serverTimestamp(),
+    });
+  }
+
+  /** Sets the max distance for proximity alerts, in miles (BB-178). */
+  async setAlertRadiusMiles(uid: string, miles: number): Promise<void> {
+    await updateDoc(this.userDocRef(uid), {
+      alertRadiusMiles: miles,
+      updatedAt: serverTimestamp(),
+    });
+  }
+
   /** Flips the discoverable-by-username opt-in on both profile docs. */
   async setDiscoverable(uid: string, value: boolean): Promise<void> {
     await updateDoc(this.userDocRef(uid), {

@@ -141,6 +141,57 @@
       </ion-segment-button>
     </ion-segment>
 
+    <p class="eyebrow profile__section">Sighting alerts</p>
+    <p class="profile__hint">
+      Get notified when a friend spots a Hunt List bottle near you. Set a base
+      location and how far you want to hear about.
+    </p>
+
+    <div class="profile__alert-base">
+      <div class="profile__alert-base-label">
+        <span>Base location</span>
+        <strong>
+          @if (hasBaseLocation()) {
+            {{ baseLocationLabel() || 'Location set' }}
+          } @else {
+            Not set
+          }
+        </strong>
+      </div>
+      <div class="profile__alert-base-actions">
+        <ion-button
+          size="small"
+          fill="outline"
+          [disabled]="locatingBase()"
+          (click)="setBaseLocation()"
+        >
+          @if (locatingBase()) {
+            Locating…
+          } @else {
+            {{ hasBaseLocation() ? 'Update' : 'Use current location' }}
+          }
+        </ion-button>
+        @if (hasBaseLocation()) {
+          <ion-button size="small" fill="clear" (click)="clearBaseLocation()">
+            Clear
+          </ion-button>
+        }
+      </div>
+    </div>
+
+    <ion-item lines="none" class="profile__alert-radius">
+      <ion-select
+        label="Alert radius"
+        interface="popover"
+        [value]="alertRadiusMiles()"
+        (ionChange)="onRadiusChange($any($event.detail.value))"
+      >
+        @for (miles of radiusOptions; track miles) {
+          <ion-select-option [value]="miles">{{ miles }} miles</ion-select-option>
+        }
+      </ion-select>
+    </ion-item>
+
     <p class="eyebrow profile__section">Notifications</p>
 
     <ion-button

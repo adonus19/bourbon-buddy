@@ -14,6 +14,7 @@ import { USERNAME_TAKEN, UserService } from '../../core/services/user.service';
 import { ExportKind, ExportService } from '../../core/services/export.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { InboxService } from '../../core/services/inbox.service';
+import { GeolocationService } from '../../core/services/geolocation.service';
 import {
   USERNAME_MAX,
   USERNAME_MIN,
@@ -38,6 +39,7 @@ export class ProfilePage {
   private readonly exportService = inject(ExportService);
   private readonly notifications = inject(NotificationService);
   private readonly inbox = inject(InboxService);
+  private readonly geo = inject(GeolocationService);
 
   /** Unread inbox count for the badge; refreshed on entering the page. */
   readonly inboxUnread = signal(0);
@@ -78,6 +80,18 @@ export class ProfilePage {
   readonly defaultVisibility = computed<SightingVisibility>(
     () => this.profile()?.defaultSightingVisibility ?? 'private'
   );
+
+  // Proximity alert prefs (BB-178).
+  readonly DEFAULT_ALERT_RADIUS = 50;
+  readonly radiusOptions = [10, 25, 50, 100, 250];
+  readonly hasBaseLocation = computed(() => this.profile()?.baseLat != null);
+  readonly baseLocationLabel = computed(
+    () => this.profile()?.baseLocationLabel ?? null
+  );
+  readonly alertRadiusMiles = computed(
+    () => this.profile()?.alertRadiusMiles ?? this.DEFAULT_ALERT_RADIUS
+  );
+  readonly locatingBase = signal(false);
 
   saving = false;
   claimingUsername = false;
@@ -150,6 +164,62 @@ export class ProfilePage {
       await this.userService.setDefaultSightingVisibility(uid, value);
     } catch {
       await this.presentToast("Couldn't update. Try again.");
+    }
+  }
+
+  /** Capture the user's current location as their alert base (BB-178). */
+  async setBaseLocation(): Promise<void> {
+    const uid = this.user()?.uid;
+    if (!uid || this.locatingBase()) {
+      return;
+    }
+    this.locatingBase.set(true);
+    try {
+      const coords = await this.geo.getCurrentPosition();
+      if (!coords) {
+        await this.presentToast("Couldn't get your location. Try again.");
+        return;
+      }
+      const place = await this.geo.reverseGeocode(coords.lat, coords.lng);
+      const label = place
+        ? [place.city, place.state].filter(Boolean).join(', ') || null
+        : null;
+      await this.userService.setAlertLocation(
+        uid,
+        coords.lat,
+        coords.lng,
+        label
+      );
+      await this.presentToast('Base location set.');
+    } catch {
+      await this.presentToast("Couldn't save your location. Try again.");
+    } finally {
+      this.locatingBase.set(false);
+    }
+  }
+
+  async clearBaseLocation(): Promise<void> {
+    const uid = this.user()?.uid;
+    if (!uid) {
+      return;
+    }
+    try {
+      await this.userService.clearAlertLocation(uid);
+      await this.presentToast('Base location cleared.');
+    } catch {
+      await this.presentToast("Couldn't update. Try again.");
+    }
+  }
+
+  async onRadiusChange(miles: number): Promise<void> {
+    const uid = this.user()?.uid;
+    if (!uid || miles === this.alertRadiusMiles()) {
+      return;
+    }
+    try {
+      await this.userService.setAlertRadiusMiles(uid, miles);
+    } catch {
+      await this.presentToast("Couldn't update alert radius. Try again.");
     }
   }
 
