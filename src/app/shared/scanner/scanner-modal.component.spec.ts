@@ -104,14 +104,13 @@ describe('ScannerModalComponent (manual entry logic)', () => {
     expect(component.status()).toBe('starting');
   });
 
-  it('takes the ZXing fallback path when BarcodeDetector is absent', async () => {
+  it('reports "unavailable" when there is no camera API', async () => {
     (component as unknown as { videoRef: unknown }).videoRef = {
       nativeElement: document.createElement('video'),
     };
-    // No BarcodeDetector in jsdom → startZxing runs; the stubbed reader has no
-    // decodeFromVideoDevice, so it throws and we surface an error status.
+    // jsdom has no navigator.mediaDevices → startCamera throws NotFoundError.
     await component.ngAfterViewInit();
-    expect(component.status()).toBe('error');
+    expect(component.status()).toBe('unavailable');
   });
 
   it('takes the native path when BarcodeDetector exists and maps denial', async () => {
