@@ -17,6 +17,7 @@ export const environment = {
     measurementId: 'REPLACE_WITH_PROD_MEASUREMENT_ID',
   },
   vapidKey: 'REPLACE_WITH_PROD_VAPID_KEY',
+  maptilerKey: 'REPLACE_WITH_PROD_MAPTILER_KEY',
   emulators: {
     auth: { host: 'localhost', port: 9099 },
     firestore: { host: 'localhost', port: 8080 },

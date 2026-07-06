@@ -21,6 +21,9 @@ export const environment = {
   // settings → Cloud Messaging → Web Push certificates → Generate key pair,
   // then paste the public key here. Push stays disabled until this is set.
   vapidKey: 'BGbdzq8vd4Nm2sOE7Fn8tiytt-IzmwWC-OHRdYUIpEnbB68eBgTRmL-XeNtHSVGCGPnMRCry5i-Czk5Z4-M-ugQ',
+  // MapTiler tile key for the sightings map (BB-179). Free tier at
+  // maptiler.com → Account → Keys. The map shows a "needs a key" notice until set.
+  maptilerKey: '',
   emulators: {
     auth: { host: 'localhost', port: 9099 },
     firestore: { host: 'localhost', port: 8080 },

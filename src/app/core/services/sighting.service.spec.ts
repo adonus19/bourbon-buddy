@@ -100,4 +100,28 @@ describe('SightingService.add — best-price recompute (BB-161 race fix)', () =>
       updatedAt: 'ts',
     });
   });
+
+  it('nearbySightings merges own + friends and dedupes by id (BB-179)', async () => {
+    const snap = (
+      docs: { id: string; data?: Record<string, unknown> }[]
+    ) => ({ docs: docs.map((d) => ({ id: d.id, data: () => d.data ?? {} })) });
+    asMock(getDocs)
+      // own
+      .mockResolvedValueOnce(snap([{ id: 's1', data: { bourbonName: 'A' } }]))
+      // friends' shared (s1 repeats, s2 is new)
+      .mockResolvedValueOnce(snap([{ id: 's1' }, { id: 's2' }]));
+
+    const items = await service.nearbySightings(['f1'], 'u1');
+
+    expect(items.map((s) => s.id).sort()).toEqual(['s1', 's2']);
+  });
+
+  it('nearbySightings skips the friends query when there are no friends', async () => {
+    asMock(getDocs).mockResolvedValueOnce({
+      docs: [{ id: 's1', data: () => ({}) }],
+    });
+    const items = await service.nearbySightings([], 'u1');
+    expect(getDocs).toHaveBeenCalledTimes(1);
+    expect(items).toHaveLength(1);
+  });
 });

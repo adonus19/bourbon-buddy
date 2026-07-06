@@ -80,6 +80,14 @@ const routes: Routes = [
       ),
   },
   {
+    path: 'sightings/map',
+    canActivate: [authGuard],
+    loadChildren: () =>
+      import('./features/sightings-map/sightings-map.module').then(
+        (m) => m.SightingsMapPageModule
+      ),
+  },
+  {
     path: 'wishlist/:id/edit',
     canActivate: [authGuard],
     loadChildren: () =>

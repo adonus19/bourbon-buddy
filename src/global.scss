@@ -18,6 +18,10 @@
 @import "@ionic/angular/css/typography.css";
 @import "@ionic/angular/css/display.css";
 
+/* Leaflet base styles for the sightings map (BB-179). Global because Leaflet
+ * renders outside Angular's component encapsulation. */
+@import "leaflet/dist/leaflet.css";
+
 /* Optional CSS utils that can be commented out */
 @import "@ionic/angular/css/padding.css";
 @import "@ionic/angular/css/float-elements.css";
@@ -98,6 +102,40 @@ ion-fab-list ion-fab-button[data-desc] {
     background: rgba(22, 18, 14, 0.92);
     border: 1px solid var(--color-border-bright);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  }
+}
+
+/* ----------------------------------------------------------------------------
+ * Sightings-map marker popups (BB-179) — rendered inside Leaflet's DOM.
+ * ------------------------------------------------------------------------- */
+.map-popup {
+  min-width: 150px;
+
+  &__bottle {
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
+  &__price {
+    color: var(--color-amber);
+    font-weight: 600;
+    margin-top: 2px;
+  }
+  &__store,
+  &__who {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin-top: 2px;
+  }
+  &__view {
+    margin-top: 8px;
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid var(--color-amber);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--color-amber);
+    font-size: 13px;
+    cursor: pointer;
   }
 }
 
