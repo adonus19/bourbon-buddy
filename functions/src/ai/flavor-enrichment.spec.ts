@@ -1,5 +1,6 @@
 import {
   applyEnrichment,
+  articleFlavorSeed,
   buildFlavorPrompt,
   FlavorTags,
   generateFlavorTags,
@@ -130,6 +131,24 @@ describe("generateFlavorTags (prompt → model → sanitize)", () => {
       palate: ["Cherry"],
       finish: ["Oak"],
     });
+  });
+});
+
+describe("articleFlavorSeed (BB-185 feed a)", () => {
+  it("returns canonical seed tags when the article carries notes", () => {
+    expect(
+      articleFlavorSeed({
+        nose: ["vanilla", "oak"],
+        palate: ["dark cherry"],
+        finish: ["leather"],
+      })
+    ).toEqual({ nose: ["Vanilla", "Oak"], palate: ["Cherry"], finish: ["Leather"] });
+  });
+
+  it("returns null for an announcement article with no usable notes", () => {
+    expect(articleFlavorSeed({ nose: [], palate: [], finish: [] })).toBeNull();
+    expect(articleFlavorSeed(null)).toBeNull();
+    expect(articleFlavorSeed({ nose: ["gasoline", "plastic"] })).toBeNull();
   });
 });
 

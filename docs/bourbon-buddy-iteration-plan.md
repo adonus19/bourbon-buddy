@@ -446,7 +446,7 @@ duplicate-safe by a client-generated `clientId` the server keys the doc on. A
 tappable banner (`OfflineSyncBadgeComponent`) surfaces the pending count.
 
 ### Iteration R5 — Guided Tasting & Catalog Intelligence (~8 SP)
-**Stories:** BB-185, BB-186
+**Stories:** BB-185 ✅ *(server engine)*, BB-186
 **Goal:** AI-enrich catalog bottles with a flavor profile **mapped to the BB-181
 taxonomy** (no scraping, no verbatim third-party notes), then pre-fill those
 suggestions when logging a bottle (Untappd-style; you confirm/adjust). Reuses the

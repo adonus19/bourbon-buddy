@@ -76,6 +76,16 @@ export function hasAnyTags(t: FlavorTags): boolean {
   return t.nose.length + t.palate.length + t.finish.length > 0;
 }
 
+/**
+ * Feed (a), BB-185: turn an article's raw flavor cues into canonical seed tags,
+ * or null if the article carried no usable (canonical) tasting notes. Same
+ * matcher/guardrail as on-demand enrichment — never stores verbatim prose.
+ */
+export function articleFlavorSeed(rawFlavor: unknown): FlavorTags | null {
+  const tags = sanitizeFlavorTags(rawFlavor);
+  return hasAnyTags(tags) ? tags : null;
+}
+
 /** Prompt the model then sanitize its reply to canonical tags. */
 export async function generateFlavorTags(
   bottle: BottleContext,
