@@ -25,6 +25,9 @@ export interface LogSightingData {
   visibility?: string;
   lat?: number | null;
   lng?: number | null;
+  // Client-generated idempotency key (BB-182): lets an offline sighting be
+  // replayed on reconnect without creating a duplicate. Doc-id-safe charset.
+  clientId?: string | null;
 }
 
 export interface ValidatedSighting {
@@ -35,7 +38,11 @@ export interface ValidatedSighting {
   visibility: string;
   lat: number | null;
   lng: number | null;
+  clientId: string | null;
 }
+
+// Doc-id-safe idempotency key: a UUID or similar short token.
+export const CLIENT_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
 function bad(message: string): never {
   throw new HttpsError("invalid-argument", message);
@@ -71,6 +78,16 @@ export function validate(d: LogSightingData): ValidatedSighting {
   }
   const visibility = d.visibility === "friends" ? "friends" : "private";
 
+  // Optional idempotency key (BB-182). Reject a malformed one rather than
+  // silently ignoring it, so a duplicate-suppressing replay can't be defeated.
+  let clientId: string | null = null;
+  if (d.clientId != null) {
+    if (typeof d.clientId !== "string" || !CLIENT_ID_RE.test(d.clientId)) {
+      bad("Invalid client id.");
+    }
+    clientId = d.clientId;
+  }
+
   // Location is opt-in (BB-177): accept only a complete, in-range coordinate
   // pair, otherwise store nothing.
   let lat: number | null = null;
@@ -91,5 +108,6 @@ export function validate(d: LogSightingData): ValidatedSighting {
     visibility,
     lat,
     lng,
+    clientId,
   };
 }

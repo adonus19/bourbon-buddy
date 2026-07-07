@@ -74,6 +74,27 @@ describe("validate (logSighting input)", () => {
     ).not.toThrow();
   });
 
+  describe("clientId idempotency key (BB-182)", () => {
+    it("defaults to null when absent", () => {
+      expect(validate(ok()).clientId).toBeNull();
+    });
+
+    it("accepts a doc-id-safe token", () => {
+      const id = "8f1c2b3a-0d4e-4f56-9abc-1234567890ab";
+      expect(validate({ ...ok(), clientId: id }).clientId).toBe(id);
+    });
+
+    it("rejects an over-long or illegal client id", () => {
+      expect(() => validate({ ...ok(), clientId: "x".repeat(65) })).toThrow(
+        "client id"
+      );
+      expect(() => validate({ ...ok(), clientId: "bad/id" })).toThrow(
+        "client id"
+      );
+      expect(() => validate({ ...ok(), clientId: "" })).toThrow("client id");
+    });
+  });
+
   describe("location (BB-177)", () => {
     it("stores null coordinates when none are provided", () => {
       const v = validate(ok());
