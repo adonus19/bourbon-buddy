@@ -1258,17 +1258,19 @@ controlled and legally safe (no verbatim third-party notes ever stored).
 
 ---
 
-### BB-186 — Flavor Auto-Populate on Log
+### BB-186 — Flavor Auto-Populate on Log ✅
 **As a** user, **I want** a bottle's suggested flavor notes pre-filled when I log it, **so that** I confirm or adjust instead of starting from a blank slate (Untappd-style).
 
 **AC:**
-- Logging a bottle that has an enriched profile (BB-185) pre-selects the suggested nose/palate/finish tags
-- Suggested-but-unconfirmed tags are visually distinct from ones you explicitly chose; you can remove any and add your own
-- Saving records **your final selection** as the tasting note — the suggestion is a starting point, not the stored truth
-- No enriched profile → the picker opens empty as today
-- A subtle "suggested" hint indicates where pre-filled tags came from
+- Logging a bottle that has an enriched profile (BB-185) pre-selects the suggested nose/palate/finish tags — ✅ `getFlavorSuggestions` → `enrichBottleFlavor` on bottle select (also generates at point-of-use when no profile exists yet)
+- Suggested-but-unconfirmed tags are visually distinct from ones you explicitly chose; you can remove any and add your own — ✅ `FlavorTagSelector` `suggested` input: dashed-outline chips vs solid "chosen" fill
+- Saving records **your final selection** as the tasting note — the suggestion is a starting point, not the stored truth — ✅ suggestions are just pre-set form values; "suggested" state is purely presentational
+- No enriched profile → the picker opens empty as today — ✅ best-effort; any failure/empty leaves it blank, never blocks logging
+- A subtle "suggested" hint indicates where pre-filled tags came from — ✅ "✨ Suggested for you — tap to adjust" + a lookup spinner
 
-**SP:** 3
+**Guards:** add-mode only; never clobbers tags you've edited; re-picking a bottle refreshes untouched suggestions.
+
+**SP:** 3 — **shipped in 3 passes:** (1) service + form pre-fill, (2) suggested chip styling + hint, (3) loading state + re-pick refresh + tests.
 
 ---
 

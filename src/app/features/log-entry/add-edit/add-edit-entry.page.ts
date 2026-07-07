@@ -218,34 +218,46 @@ export class AddEditEntryPage {
    * failure/no-profile just leaves the picker empty.
    */
   private async autoPopulateFlavors(bourbonId: string): Promise<void> {
-    if (this.isEditMode || !bourbonId || this.hasAnyFlavorTags()) {
+    if (this.isEditMode || !bourbonId) {
+      return;
+    }
+    // Only auto-fill when the tags are empty or still exactly the last applied
+    // suggestion (untouched) — re-picking a bottle refreshes them, but tags
+    // you've edited yourself are never overwritten.
+    if (!this.tagsAreUntouchedSuggestions()) {
       return;
     }
     this.loadingSuggestions.set(true);
     try {
       const s = await this.catalog.getFlavorSuggestions(bourbonId);
-      // Re-check after the await — the user may have started typing tags.
-      if (!s || this.hasAnyFlavorTags()) {
-        return;
+      if (!this.tagsAreUntouchedSuggestions()) {
+        return; // the user started editing during the lookup
       }
+      const next: FlavorSuggestions = s ?? { nose: [], palate: [], finish: [] };
       this.form.patchValue({
-        noseTags: s.nose,
-        palateTags: s.palate,
-        finishTags: s.finish,
+        noseTags: next.nose,
+        palateTags: next.palate,
+        finishTags: next.finish,
       });
-      this.suggestedFlavors.set(s);
+      this.suggestedFlavors.set(next);
     } finally {
       this.loadingSuggestions.set(false);
     }
   }
 
-  private hasAnyFlavorTags(): boolean {
+  /** Current flavor tags are empty or still exactly the last suggestion set. */
+  private tagsAreUntouchedSuggestions(): boolean {
     const c = this.form.controls;
-    return !!(
-      c.noseTags.value?.length ||
-      c.palateTags.value?.length ||
-      c.finishTags.value?.length
+    const s = this.suggestedFlavors();
+    return (
+      this.sameList(c.noseTags.value ?? [], s.nose) &&
+      this.sameList(c.palateTags.value ?? [], s.palate) &&
+      this.sameList(c.finishTags.value ?? [], s.finish)
     );
+  }
+
+  private sameList(a: string[], b: string[]): boolean {
+    return a.length === b.length && a.every((v, i) => v === b[i]);
   }
 
   private patchFromEntry(e: LogEntry): void {

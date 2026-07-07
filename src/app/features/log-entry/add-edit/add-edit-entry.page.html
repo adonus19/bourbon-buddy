@@ -274,6 +274,13 @@
       ></app-rating-widget>
     </div>
 
+    @if (loadingSuggestions()) {
+      <p class="entry__suggesting">
+        <ion-spinner name="dots"></ion-spinner>
+        Finding flavor suggestions…
+      </p>
+    }
+
     <app-flavor-tag-selector
       label="Nose"
       [selected]="form.controls.noseTags.value || []"
