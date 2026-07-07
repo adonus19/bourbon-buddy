@@ -23,6 +23,10 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { normalizeBottleName } from "../shared/normalize";
 import { buildModelText, fetchArticleBody } from "./article-text";
 
+// AI Flavor Enrichment (BB-185) — canonical-constrained tasting notes, cached
+// on /bourbons. Re-exported so the top-level barrel pulls it from "./ai".
+export { enrichBottleFlavor } from "./flavor-enrichment";
+
 const GROQ_API_KEY = defineSecret("GROQ_API_KEY");
 
 // Free-tier: 30 RPM, 14.4k RPD, fast. Swap here if limits/models change.
