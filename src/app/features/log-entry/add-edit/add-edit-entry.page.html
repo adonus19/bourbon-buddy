@@ -274,9 +274,17 @@
       ></app-rating-widget>
     </div>
 
+    @if (loadingSuggestions()) {
+      <p class="entry__suggesting">
+        <ion-spinner name="dots"></ion-spinner>
+        Finding flavor suggestions…
+      </p>
+    }
+
     <app-flavor-tag-selector
       label="Nose"
       [selected]="form.controls.noseTags.value || []"
+      [suggested]="suggestedFlavors().nose"
       (selectedChange)="setTags('noseTags', $event)"
     ></app-flavor-tag-selector>
     <ion-textarea
@@ -291,6 +299,7 @@
     <app-flavor-tag-selector
       label="Palate"
       [selected]="form.controls.palateTags.value || []"
+      [suggested]="suggestedFlavors().palate"
       (selectedChange)="setTags('palateTags', $event)"
     ></app-flavor-tag-selector>
     <ion-textarea
@@ -305,6 +314,7 @@
     <app-flavor-tag-selector
       label="Finish"
       [selected]="form.controls.finishTags.value || []"
+      [suggested]="suggestedFlavors().finish"
       (selectedChange)="setTags('finishTags', $event)"
     ></app-flavor-tag-selector>
     <ion-textarea

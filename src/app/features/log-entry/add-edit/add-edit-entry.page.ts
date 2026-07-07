@@ -18,7 +18,10 @@ import {
   LogEntryInput,
   LogEntryService,
 } from '../../../core/services/log-entry.service';
-import { BourbonCatalogService } from '../../../core/services/bourbon-catalog.service';
+import {
+  BourbonCatalogService,
+  FlavorSuggestions,
+} from '../../../core/services/bourbon-catalog.service';
 import { BarcodeScannerService } from '../../../core/services/barcode-scanner.service';
 import { StorageService } from '../../../core/services/storage.service';
 import { WishlistService } from '../../../core/services/wishlist.service';
@@ -57,6 +60,15 @@ export class AddEditEntryPage {
     this.route.snapshot.queryParamMap.get('fromWishlist');
 
   saving = false;
+
+  // AI flavor auto-populate (BB-186): tags pre-filled from the catalog profile,
+  // tracked separately so the picker can mark them "suggested" vs user-chosen.
+  readonly suggestedFlavors = signal<FlavorSuggestions>({
+    nose: [],
+    palate: [],
+    finish: [],
+  });
+  readonly loadingSuggestions = signal(false);
 
   // Label photo: pending selection / removal applied on save.
   private photoFile: File | null = null;
@@ -197,6 +209,55 @@ export class AddEditEntryPage {
       subType: w.subType ?? null,
       personalNotes: w.externalTastingNotes ?? '',
     });
+    void this.autoPopulateFlavors(w.bourbonId);
+  }
+
+  /**
+   * Pre-select AI flavor suggestions for the chosen bottle (BB-186). Add-mode
+   * only, and never clobbers tags you've already entered. Best-effort: a
+   * failure/no-profile just leaves the picker empty.
+   */
+  private async autoPopulateFlavors(bourbonId: string): Promise<void> {
+    if (this.isEditMode || !bourbonId) {
+      return;
+    }
+    // Only auto-fill when the tags are empty or still exactly the last applied
+    // suggestion (untouched) — re-picking a bottle refreshes them, but tags
+    // you've edited yourself are never overwritten.
+    if (!this.tagsAreUntouchedSuggestions()) {
+      return;
+    }
+    this.loadingSuggestions.set(true);
+    try {
+      const s = await this.catalog.getFlavorSuggestions(bourbonId);
+      if (!this.tagsAreUntouchedSuggestions()) {
+        return; // the user started editing during the lookup
+      }
+      const next: FlavorSuggestions = s ?? { nose: [], palate: [], finish: [] };
+      this.form.patchValue({
+        noseTags: next.nose,
+        palateTags: next.palate,
+        finishTags: next.finish,
+      });
+      this.suggestedFlavors.set(next);
+    } finally {
+      this.loadingSuggestions.set(false);
+    }
+  }
+
+  /** Current flavor tags are empty or still exactly the last suggestion set. */
+  private tagsAreUntouchedSuggestions(): boolean {
+    const c = this.form.controls;
+    const s = this.suggestedFlavors();
+    return (
+      this.sameList(c.noseTags.value ?? [], s.nose) &&
+      this.sameList(c.palateTags.value ?? [], s.palate) &&
+      this.sameList(c.finishTags.value ?? [], s.finish)
+    );
+  }
+
+  private sameList(a: string[], b: string[]): boolean {
+    return a.length === b.length && a.every((v, i) => v === b[i]);
   }
 
   private patchFromEntry(e: LogEntry): void {
@@ -262,8 +323,10 @@ export class AddEditEntryPage {
   onNameInput(value: string): void {
     this.form.controls.bourbonName.setValue(value);
     this.form.controls.bourbonName.markAsDirty();
-    // Typing means we're no longer tied to a specific catalog doc.
+    // Typing means we're no longer tied to a specific catalog doc — drop the
+    // "suggested" marking (any pre-filled tags become your own to keep or clear).
     this.form.controls.bourbonId.setValue('');
+    this.suggestedFlavors.set({ nose: [], palate: [], finish: [] });
   }
 
   onBottleSelected(b: Bourbon): void {
@@ -279,6 +342,7 @@ export class AddEditEntryPage {
       proof: b.proof ?? null,
       series: b.series ?? '',
     });
+    void this.autoPopulateFlavors(b.id ?? '');
   }
 
   // BB-175/176: a scanned code with no catalog match yet, attached on save.

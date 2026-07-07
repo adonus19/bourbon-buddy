@@ -17,10 +17,19 @@ import {
   where,
 } from '@angular/fire/firestore';
 
+import { Functions, httpsCallable } from '@angular/fire/functions';
+
 import { Bourbon } from '../../models';
 import { AuthService } from '../auth/auth.service';
 import { normalizeBottleName } from '../../shared/utils/normalize-name';
 import { normalizeBarcode } from '../../shared/utils/barcode';
+
+/** AI-suggested tasting tags for a bottle (BB-186), canonical labels (BB-181). */
+export interface FlavorSuggestions {
+  nose: string[];
+  palate: string[];
+  finish: string[];
+}
 
 /** Fields used to seed a catalog entry when a new bottle name is logged. */
 export type CatalogSeed = Pick<
@@ -44,7 +53,43 @@ export type CatalogSeed = Pick<
 @Injectable({ providedIn: 'root' })
 export class BourbonCatalogService {
   private readonly firestore = inject(Firestore);
+  private readonly functions = inject(Functions);
   private readonly auth = inject(AuthService);
+
+  /**
+   * AI flavor suggestions for a bottle (BB-186), via the `enrichBottleFlavor`
+   * callable (BB-185). The server returns a cached profile or generates one on
+   * the spot (enrich-at-point-of-use), so this is a single round-trip.
+   * Best-effort: returns null on any failure or empty profile, so the picker
+   * simply opens empty.
+   */
+  async getFlavorSuggestions(
+    bourbonId: string
+  ): Promise<FlavorSuggestions | null> {
+    if (!bourbonId) {
+      return null;
+    }
+    try {
+      const callable = httpsCallable<
+        { bourbonId: string },
+        { flavorProfile: Partial<FlavorSuggestions> | null }
+      >(this.functions, 'enrichBottleFlavor');
+      const profile = (await callable({ bourbonId })).data?.flavorProfile;
+      if (!profile) {
+        return null;
+      }
+      const tags: FlavorSuggestions = {
+        nose: profile.nose ?? [],
+        palate: profile.palate ?? [],
+        finish: profile.finish ?? [],
+      };
+      return tags.nose.length || tags.palate.length || tags.finish.length
+        ? tags
+        : null;
+    } catch {
+      return null; // best-effort — never block logging on enrichment
+    }
+  }
 
   /** Prefix search on nameLowercase for the name autocomplete. */
   async search(term: string): Promise<Bourbon[]> {

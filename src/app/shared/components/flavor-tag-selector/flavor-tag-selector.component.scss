@@ -86,6 +86,21 @@
     border-color: var(--color-amber);
     color: var(--color-amber-light);
   }
+
+  // AI-suggested (BB-186): selected, but tentative — a dashed outline sets it
+  // apart from tags you explicitly tapped.
+  &--suggested {
+    border-style: dashed;
+    background: transparent;
+  }
+}
+
+.flavor__hint {
+  margin: 0 0 8px 2px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-amber-light);
 }
 
 .flavor__more {

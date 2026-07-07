@@ -17,6 +17,10 @@
 
   @if (expanded()) {
     <div class="flavor__groups">
+      @if (hasSuggested()) {
+        <p class="flavor__hint">✨ Suggested for you — tap to adjust</p>
+      }
+
       <button
         type="button"
         class="flavor__more"
@@ -36,6 +40,7 @@
                   type="button"
                   class="chip"
                   [class.chip--selected]="isSelected(tag)"
+                  [class.chip--suggested]="isSuggested(tag)"
                   (click)="toggle(tag)"
                 >
                   {{ tag }}
@@ -47,6 +52,7 @@
                     type="button"
                     class="chip"
                     [class.chip--selected]="isSelected(tag)"
+                    [class.chip--suggested]="isSuggested(tag)"
                     (click)="toggle(tag)"
                   >
                     {{ tag }}
