@@ -22,6 +22,11 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 
 import { normalizeBottleName } from "../shared/normalize";
 import { buildModelText, fetchArticleBody } from "./article-text";
+import { articleFlavorSeed } from "./flavor-enrichment";
+
+// AI Flavor Enrichment (BB-185) — canonical-constrained tasting notes, cached
+// on /bourbons. Re-exported so the top-level barrel pulls it from "./ai".
+export { enrichBottleFlavor } from "./flavor-enrichment";
 
 const GROQ_API_KEY = defineSecret("GROQ_API_KEY");
 
@@ -71,6 +76,9 @@ interface ExtractedBottle {
   name: string;
   distillery: string | null;
   category: string | null;
+  // Raw flavor cues the article attributes to this bottle (BB-185 feed a);
+  // mapped to canonical tags server-side. Absent/empty for non-review articles.
+  flavor?: unknown;
 }
 
 /** Thrown when the model returns 429 so callers can back off / stop early. */
@@ -292,12 +300,15 @@ async function processArticle(
     const category =
       raw.category && VALID_CATEGORIES.has(raw.category) ? raw.category : null;
     const distillery = raw.distillery?.trim() || null;
-    bottles.push({
-      name,
-      bourbonId: await matchOrCreateCatalog(db, key, name, distillery, category),
-      distillery,
-      category,
-    });
+    const bourbonId = await matchOrCreateCatalog(db, key, name, distillery, category);
+    bottles.push({ name, bourbonId, distillery, category });
+    // Feed (a), BB-185: seed the bottle's catalog flavor profile from any
+    // tasting notes in the article. Best-effort — never fail extraction for it.
+    try {
+      await seedArticleFlavor(db, bourbonId, raw.flavor);
+    } catch (err) {
+      logger.warn(`Flavor seed failed for ${bourbonId}`, err);
+    }
     if (bottles.length >= MAX_BOTTLES) {
       break;
     }
@@ -370,6 +381,38 @@ async function matchOrCreateCatalog(
 }
 
 /**
+ * Seeds a catalog bottle's flavor profile from an article's tasting notes
+ * (BB-185 feed a), respecting enrich-once: skips a bottle already enriched by
+ * on-demand generation or a prior article, so sparse cues never clobber a fuller
+ * profile. Reads the doc to check `flavorEnrichedAt` first (cheap, and only for
+ * the rare review article that actually carries notes).
+ */
+async function seedArticleFlavor(
+  db: FirebaseFirestore.Firestore,
+  bourbonId: string,
+  rawFlavor: unknown
+): Promise<void> {
+  const tags = articleFlavorSeed(rawFlavor);
+  if (!tags) {
+    return;
+  }
+  const ref = db.collection("bourbons").doc(bourbonId);
+  const snap = await ref.get();
+  if (snap.get("flavorEnrichedAt")) {
+    return; // already enriched — don't overwrite (feed b or a prior article)
+  }
+  await ref.update({
+    flavorProfile: {
+      ...tags,
+      source: "ai",
+      model: GROQ_MODEL,
+      generatedAt: Timestamp.now(),
+    },
+    flavorEnrichedAt: FieldValue.serverTimestamp(),
+  });
+}
+
+/**
  * The ONLY model-specific code. Calls Groq (OpenAI-compatible) and returns the
  * bottles it found, each with an optional distillery + category to pre-fill the
  * hunt-list form. JSON object output for robust parsing, temp 0, hard output
@@ -384,13 +427,18 @@ async function extractBottleNames(
   const system =
     "You extract whiskey/bourbon PRODUCT mentions from a news snippet. Reply " +
     "ONLY with JSON: {\"bottles\": [{\"name\": string, \"distillery\": " +
-    "string|null, \"category\": string|null}]}. " +
+    "string|null, \"category\": string|null, \"flavor\": {\"nose\": string[], " +
+    "\"palate\": string[], \"finish\": string[]}}]}. " +
     "name: the specific product (release/expression/bottling) as written, e.g. " +
     "\"Weller 12 Year\" or \"E.H. Taylor Small Batch\". " +
     "distillery: the producing distillery or brand owner if you are confident, " +
     "else null. " +
     "category: exactly one of bourbon, rye, wheat_whiskey, tennessee, " +
     "american_other, scotch, irish, japanese, world_other — or null if unsure. " +
+    "flavor: ONLY if the article gives tasting notes for this bottle, the flavor " +
+    "words it uses per stage (e.g. vanilla, oak, cherry, smoke). MOST articles " +
+    "are announcements with NO tasting notes — for those use empty arrays. Never " +
+    "invent flavors. " +
     "Include specific products only; exclude bare distillery/brand names, " +
     "generic terms (bourbon, rye), people, places, and events. Do NOT include " +
     "price or invent details. No duplicates. If none, use an empty array.";
@@ -435,6 +483,7 @@ async function extractBottleNames(
         typeof b["distillery"] === "string" ? (b["distillery"] as string) : null,
       category:
         typeof b["category"] === "string" ? (b["category"] as string) : null,
+      flavor: b["flavor"] ?? null,
     }))
     .filter((b) => b.name.trim().length > 0);
 }

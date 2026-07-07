@@ -7,6 +7,11 @@
 // Each category is split into two tiers:
 //   common   — the everyday notes, shown by default
 //   extended — the long tail, revealed by the selector's "Show more" toggle
+//
+// ⚠️ This is the source of truth for the flavor vocabulary. The Cloud Functions
+// AI matcher keeps a flat mirror of these labels in
+// `functions/src/ai/flavor-taxonomy.ts` (CANONICAL_FLAVOR_TAGS) — update both
+// together when adding/renaming tags (BB-185).
 
 export interface FlavorTagGroup {
   category: string;
