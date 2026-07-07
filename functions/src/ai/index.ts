@@ -13,7 +13,7 @@
  * Manager secret (GROQ_API_KEY), never in code. All model-specific code lives in
  * `extractBottleNames`, so swapping providers again is a one-function change.
  */
-import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { FieldValue, getFirestore, Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { defineSecret } from "firebase-functions/params";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
@@ -21,19 +21,28 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 
 import { normalizeBottleName } from "../shared/normalize";
+import { buildModelText, fetchArticleBody } from "./article-text";
 
 const GROQ_API_KEY = defineSecret("GROQ_API_KEY");
 
 // Free-tier: 30 RPM, 14.4k RPD, fast. Swap here if limits/models change.
 const GROQ_MODEL = "llama-3.1-8b-instant";
-const MAX_BOTTLES = 8;
-const MAX_TEXT_CHARS = 1500;
+// Range-guide articles can list 10+ expressions, so keep this generous.
+const MAX_BOTTLES = 12;
+// Feed the model the real article body, not just the teaser (BB-130 fix). ~5k
+// chars ≈ 1.3k input tokens — enough to catch bottles named deep in a review.
+const MAX_TEXT_CHARS = 5000;
+// Below this, the stored bodyText is just a teaser (or absent) and we fetch the
+// article URL to get the full body instead.
+const MIN_BODY_CHARS = 600;
 const BACKFILL_DEFAULT = 15;
-const BACKFILL_MAX = 40;
-// ~6s between calls keeps us under the free-tier 6K tokens/min (TPM) cap — the
-// binding limit. Bursting faster just 429s and stalls; steady pacing is faster
-// end-to-end because it never trips the limit.
-const BACKFILL_SPACING_MS = 6000;
+const BACKFILL_MAX = 60;
+// Pacing for the batch sweeps to stay under the free-tier 6K tokens/min (TPM)
+// cap — the binding limit. With ~5k-char inputs a call is ~1.6k tokens, so
+// ~3 calls/min (18s spacing) keeps us safely under 6K TPM. Bursting faster just
+// 429s and stalls; steady pacing is faster end-to-end. (The realtime onCreate
+// path isn't paced — a lone 429 there is deferred to the sweep on purpose.)
+const BACKFILL_SPACING_MS = 18000;
 const SWEEP_LIMIT = 200; // recent articles scanned per scheduled sweep
 const RATE_LIMITED = -2; // processArticle sentinel: hit the model rate limit
 
@@ -108,20 +117,40 @@ export const extractBottlesFromArticle = onDocumentCreated(
  * that haven't been processed yet. Signed-in only and capped at 50 per call so
  * it can't run away. (Lock down or remove before a public launch.)
  */
+const REPROCESS_MAX_HOURS = 48; // forced-reprocess window ceiling
+
 export const backfillArticleBottles = onCall(
-  { region: "us-central1", secrets: [GROQ_API_KEY], timeoutSeconds: 300 },
+  { region: "us-central1", secrets: [GROQ_API_KEY], timeoutSeconds: 540 },
   async (request) => {
     if (!request.auth?.uid) {
       throw new HttpsError("unauthenticated", "Sign in to run the backfill.");
     }
-    const requested = Number((request.data as { limit?: number })?.limit);
+    const data = request.data as {
+      limit?: number;
+      force?: boolean;
+      sinceHours?: number;
+    };
+    const requested = Number(data?.limit);
     const limit = Math.min(
       Math.max(Number.isFinite(requested) ? requested : BACKFILL_DEFAULT, 1),
       BACKFILL_MAX
     );
-    const res = await sweepUnprocessed(getFirestore(), GROQ_API_KEY.value(), limit);
+    // force + sinceHours re-extracts already-processed articles fetched within
+    // the window (used to reprocess after an extraction improvement, BB-130).
+    const force = data?.force === true;
+    const sinceHours = Number(data?.sinceHours);
+    const sinceMs =
+      force && Number.isFinite(sinceHours) && sinceHours > 0
+        ? Date.now() - Math.min(sinceHours, REPROCESS_MAX_HOURS) * 3600_000
+        : undefined;
+
+    const res = await sweepUnprocessed(getFirestore(), GROQ_API_KEY.value(), limit, {
+      force,
+      sinceMs,
+    });
     logger.info(
-      `Backfill: scanned ${res.scanned}, processed ${res.processed}` +
+      `Backfill${force ? " (force)" : ""}: scanned ${res.scanned}, processed ` +
+        `${res.processed}` +
         (res.rateLimited ? " (stopped: rate limited)." : ".")
     );
     return res;
@@ -161,27 +190,30 @@ export const sweepArticleBottles = onSchedule(
 async function sweepUnprocessed(
   db: FirebaseFirestore.Firestore,
   apiKey: string,
-  limit: number
+  limit: number,
+  opts: { force?: boolean; sinceMs?: number } = {}
 ): Promise<{
   scanned: number;
   processed: number;
   skipped: number;
   rateLimited: boolean;
 }> {
-  const snap = await db
+  let query: FirebaseFirestore.Query = db
     .collection("newsArticles")
-    .orderBy("fetchedAt", "desc")
-    .limit(limit)
-    .get();
+    .orderBy("fetchedAt", "desc");
+  if (opts.sinceMs) {
+    query = query.where("fetchedAt", ">=", Timestamp.fromMillis(opts.sinceMs));
+  }
+  const snap = await query.limit(limit).get();
 
   let processed = 0;
   let skipped = 0;
   let rateLimited = false;
   for (const doc of snap.docs) {
     const data = doc.data();
-    if (data.bottlesExtractedAt) {
+    if (!opts.force && data.bottlesExtractedAt) {
       skipped++;
-      continue; // already extracted
+      continue; // already extracted (force re-extracts anyway)
     }
     const n = await processArticle(db, doc.ref, data, apiKey);
     if (n === RATE_LIMITED) {
@@ -214,7 +246,25 @@ async function processArticle(
   }
   const headline = (article.headline as string) ?? "";
   const excerpt = (article.excerpt as string) ?? "";
-  const text = `${headline}\n${excerpt}`.trim().slice(0, MAX_TEXT_CHARS);
+  const storedBody = (article.bodyText as string) ?? "";
+  const url = (article.url as string) ?? "";
+
+  // Prefer the full body from the feed; if it's only a teaser (or absent),
+  // fetch the article URL and extract the body. Fall back to the excerpt so an
+  // extraction never runs on nothing. This is why the model missed bottles
+  // named deep in an article: it only ever saw the ~320-char teaser (BB-130).
+  let body = storedBody;
+  if (body.length < MIN_BODY_CHARS && url) {
+    const fetched = await fetchArticleBody(url);
+    if (fetched.length > body.length) {
+      body = fetched;
+    }
+  }
+  if (body.length < excerpt.length) {
+    body = excerpt;
+  }
+
+  const text = buildModelText(headline, body, MAX_TEXT_CHARS);
   if (text.length < 12) {
     return 0;
   }

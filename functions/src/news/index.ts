@@ -18,14 +18,21 @@ import {
   thumbnailFrom,
   urlHash,
 } from "./parse";
+import { htmlToText } from "../ai/article-text";
 
 const MAX_AGE_DAYS = 90;
 const MAX_AGE_MS = MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
 const READ_RETENTION_MS = 24 * 60 * 60 * 1000;
+// Full article body (from the feed's content:encoded) cached for AI bottle
+// extraction only (BB-130). The short `excerpt` still drives the UI card.
+const MAX_BODY_CHARS = 8000;
 
 type FeedItem = Parser.Item & {
   enclosure?: { url?: string };
   "media:content"?: { $?: { url?: string } };
+  // rss-parser maps <content:encoded> to `content` (full HTML body); many
+  // WordPress feeds populate it. `contentSnippet` is its stripped teaser.
+  content?: string;
 };
 
 const parser: Parser<unknown, FeedItem> = new Parser({
@@ -53,6 +60,9 @@ async function ingestSource(
 
     const headline = (item.title ?? "").trim() || "(untitled)";
     const excerpt = (item.contentSnippet ?? "").trim().slice(0, 320) || null;
+    // Full body for AI extraction only (not shown in the UI). Empty when the
+    // feed syndicates just a teaser — the extractor then fetches the URL itself.
+    const bodyText = htmlToText(item.content ?? "").slice(0, MAX_BODY_CHARS) || null;
 
     await db
       .collection("newsArticles")
@@ -64,6 +74,7 @@ async function ingestSource(
           sourceName: source.name,
           headline,
           excerpt,
+          bodyText,
           url: link,
           thumbnailUrl: thumbnailFrom(item),
           publishedAt: published ? Timestamp.fromDate(published) : null,
