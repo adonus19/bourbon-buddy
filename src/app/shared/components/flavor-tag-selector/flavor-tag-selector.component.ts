@@ -1,4 +1,4 @@
-import { Component, input, output, signal } from '@angular/core';
+import { Component, computed, input, output, signal } from '@angular/core';
 
 import { FLAVOR_TAG_GROUPS } from '../../constants/flavor-tags';
 
@@ -19,6 +19,9 @@ import { FLAVOR_TAG_GROUPS } from '../../constants/flavor-tags';
 export class FlavorTagSelectorComponent {
   readonly label = input<string>('');
   readonly selected = input<string[]>([]);
+  // AI-suggested tags (BB-186): selected tags that also appear here render as
+  // "suggested" (tentative) rather than an explicit user pick.
+  readonly suggested = input<string[]>([]);
 
   readonly selectedChange = output<string[]>();
 
@@ -27,8 +30,19 @@ export class FlavorTagSelectorComponent {
   // Reveals the extended (long-tail) tier of each category (BB-181).
   readonly showMore = signal(false);
 
+  // True while any currently-selected tag is still an unconfirmed suggestion.
+  readonly hasSuggested = computed(() => {
+    const sel = this.selected();
+    return this.suggested().some((t) => sel.includes(t));
+  });
+
   isSelected(tag: string): boolean {
     return this.selected().includes(tag);
+  }
+
+  /** A selected tag that came from the AI suggestion (BB-186). */
+  isSuggested(tag: string): boolean {
+    return this.suggested().includes(tag) && this.isSelected(tag);
   }
 
   /** Extended tags render when "show more" is on, or if already selected. */
