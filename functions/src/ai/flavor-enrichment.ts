@@ -14,6 +14,7 @@
 import { FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 
 import { CANONICAL_FLAVOR_TAGS, matchCanonicalTags } from "./flavor-taxonomy";
 import { GROQ_API_KEY, GROQ_MODEL, RateLimitError, chatJson } from "./groq";
@@ -76,6 +77,53 @@ export function hasAnyTags(t: FlavorTags): boolean {
   return t.nose.length + t.palate.length + t.finish.length > 0;
 }
 
+// A profile is "adequate" (BB-185) when it's a real profile, not a thin seed:
+// enough tags, spread across enough stages. Tunable knobs.
+export const MIN_TOTAL_TAGS = 5;
+export const MIN_STAGES = 2;
+
+/** Whether a profile is solid enough to stop enriching (gate for feed b). */
+export function isAdequateProfile(t: FlavorTags): boolean {
+  const total = t.nose.length + t.palate.length + t.finish.length;
+  const stages = [t.nose, t.palate, t.finish].filter((s) => s.length > 0).length;
+  return total >= MIN_TOTAL_TAGS && stages >= MIN_STAGES;
+}
+
+/** Read canonical tag arrays out of a stored FlavorProfile (already canonical). */
+export function profileToTags(profile: unknown): FlavorTags {
+  const p = (profile ?? {}) as Record<string, unknown>;
+  const arr = (v: unknown): string[] =>
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  return { nose: arr(p["nose"]), palate: arr(p["palate"]), finish: arr(p["finish"]) };
+}
+
+/** Union two tag sets per stage (existing first), deduped and capped. */
+export function mergeFlavorTags(a: FlavorTags, b: FlavorTags): FlavorTags {
+  const union = (x: string[], y: string[]): string[] => {
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const t of [...x, ...y]) {
+      if (!seen.has(t)) {
+        seen.add(t);
+        out.push(t);
+      }
+    }
+    return out.slice(0, MAX_TAGS_PER_STAGE);
+  };
+  return {
+    nose: union(a.nose, b.nose),
+    palate: union(a.palate, b.palate),
+    finish: union(a.finish, b.finish),
+  };
+}
+
+/** Structural equality of two tag sets (order-sensitive, matching merge output). */
+export function sameTags(a: FlavorTags, b: FlavorTags): boolean {
+  const eq = (x: string[], y: string[]): boolean =>
+    x.length === y.length && x.every((v, i) => v === y[i]);
+  return eq(a.nose, b.nose) && eq(a.palate, b.palate) && eq(a.finish, b.finish);
+}
+
 /**
  * Feed (a), BB-185: turn an article's raw flavor cues into canonical seed tags,
  * or null if the article carried no usable (canonical) tasting notes. Same
@@ -110,13 +158,17 @@ interface StoredBottle {
 }
 
 export interface EnrichResult {
-  status: "cached" | "empty" | "generated" | "refreshed";
+  status: "cached" | "empty" | "generated" | "augmented" | "refreshed";
   flavorProfile: unknown;
 }
 
 /**
  * The enrichment decision + write, decoupled from Firestore/Groq/onCall so it's
  * unit-testable. `generate` is injected (the onCall binds the real Groq call).
+ *
+ * Gate is ADEQUACY, not mere existence (BB-185): a thin/partial profile is
+ * upgraded rather than locked, and the freshly generated tags are MERGED into
+ * whatever was already there (feed a + feed b accumulate).
  */
 export async function applyEnrichment(
   ref: EnrichTarget,
@@ -124,20 +176,23 @@ export async function applyEnrichment(
   refresh: boolean,
   generate: (b: BottleContext) => Promise<FlavorTags>
 ): Promise<EnrichResult> {
-  // Enrich-once: a bottle hits the model at most once unless a refresh is asked.
-  if (bottle.flavorEnrichedAt && !refresh) {
+  const existing = profileToTags(bottle.flavorProfile);
+
+  // Already solid → no model call (cost control), unless a refresh is forced.
+  if (isAdequateProfile(existing) && !refresh) {
     return { status: "cached", flavorProfile: bottle.flavorProfile ?? null };
   }
 
-  const tags = await generate({
+  const generated = await generate({
     name: bottle.name,
     distillery: bottle.distillery,
     category: bottle.category,
   });
+  const merged = mergeFlavorTags(existing, generated);
 
-  // Mark enriched either way, so a bottle the model can't place isn't re-tried
-  // on every open. Store null when nothing confident came back.
-  if (!hasAnyTags(tags)) {
+  // Record the attempt either way (a retry-cooldown for the sweep). Store null
+  // only when there's genuinely nothing — never wipe existing tags.
+  if (!hasAnyTags(merged)) {
     await ref.update({
       flavorProfile: null,
       flavorEnrichedAt: FieldValue.serverTimestamp(),
@@ -146,7 +201,7 @@ export async function applyEnrichment(
   }
 
   const flavorProfile = {
-    ...tags,
+    ...merged,
     source: "ai" as const,
     model: GROQ_MODEL,
     generatedAt: Timestamp.now(),
@@ -155,11 +210,16 @@ export async function applyEnrichment(
     flavorProfile,
     flavorEnrichedAt: FieldValue.serverTimestamp(),
   });
+  const status = refresh
+    ? "refreshed"
+    : hasAnyTags(existing)
+      ? "augmented"
+      : "generated";
   return {
-    status: refresh ? "refreshed" : "generated",
+    status,
     // Return the canonical tags for immediate use; the doc carries the full
     // profile (with the server timestamp) for listeners.
-    flavorProfile: { ...tags, source: "ai", model: GROQ_MODEL },
+    flavorProfile: { ...merged, source: "ai", model: GROQ_MODEL },
   };
 }
 
@@ -202,5 +262,130 @@ export const enrichBottleFlavor = onCall(
       logger.warn(`Flavor enrichment failed for ${bourbonId}`, err);
       throw new HttpsError("internal", "Couldn't generate flavor notes.");
     }
+  }
+);
+
+// --- Proactive backfill sweep (BB-185): bring inadequate catalog bottles up to
+// standard even before anyone logs them, so the seeded DB has solid notes. ---
+
+const SWEEP_LIMIT = 300; // catalog docs scanned per run (newest first)
+// Pacing to stay well under the free-tier ~6K TPM: a flavor prompt is ~600
+// tokens, so ~5 calls/min (12s) is comfortably safe.
+const FLAVOR_SWEEP_SPACING_MS = 12000;
+// Don't re-hit the model on a bottle it just couldn't place; retry only after
+// this cooldown (data/model may improve).
+const FLAVOR_RETRY_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000;
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
+function toMillis(v: unknown): number | null {
+  if (typeof v === "number") return v;
+  const t = v as { toMillis?: () => number } | null | undefined;
+  return typeof t?.toMillis === "function" ? t.toMillis() : null;
+}
+
+/**
+ * Whether the sweep should (re)enrich a bottle: only inadequate ones, and not
+ * ones attempted within the retry cooldown (avoids hammering hopeless bottles).
+ */
+export function shouldSweepEnrich(
+  bottle: { flavorProfile?: unknown; flavorEnrichedAt?: unknown },
+  nowMs: number,
+  cooldownMs: number
+): boolean {
+  if (isAdequateProfile(profileToTags(bottle.flavorProfile))) {
+    return false;
+  }
+  const attemptedMs = toMillis(bottle.flavorEnrichedAt);
+  if (attemptedMs != null && nowMs - attemptedMs < cooldownMs) {
+    return false;
+  }
+  return true;
+}
+
+/** Scan the newest catalog bottles and enrich the inadequate ones, paced. */
+async function sweepEnrichInadequate(
+  db: FirebaseFirestore.Firestore,
+  apiKey: string,
+  limit: number
+): Promise<{ scanned: number; enriched: number; skipped: number; rateLimited: boolean }> {
+  const snap = await db
+    .collection("bourbons")
+    .orderBy("createdAt", "desc")
+    .limit(limit)
+    .get();
+
+  const now = Date.now();
+  let enriched = 0;
+  let skipped = 0;
+  let rateLimited = false;
+  for (const doc of snap.docs) {
+    const data = doc.data();
+    if (!shouldSweepEnrich(data, now, FLAVOR_RETRY_COOLDOWN_MS)) {
+      skipped++;
+      continue;
+    }
+    try {
+      await applyEnrichment(doc.ref, data as never, false, (b) =>
+        generateFlavorTags(b, apiKey)
+      );
+      enriched++;
+    } catch (err) {
+      if (err instanceof RateLimitError) {
+        rateLimited = true;
+        break; // stop hammering a limited quota; the rest wait for next run
+      }
+      logger.warn(`Flavor sweep failed for ${doc.id}`, err);
+      skipped++;
+    }
+    await sleep(FLAVOR_SWEEP_SPACING_MS);
+  }
+  return { scanned: snap.size, enriched, skipped, rateLimited };
+}
+
+/** Hourly safety net: enrich inadequate catalog bottles (rate-paced, resumable). */
+export const sweepFlavorEnrichment = onSchedule(
+  {
+    schedule: "every 60 minutes",
+    region: "us-central1",
+    secrets: [GROQ_API_KEY],
+    timeoutSeconds: 540,
+  },
+  async () => {
+    const res = await sweepEnrichInadequate(
+      getFirestore(),
+      GROQ_API_KEY.value(),
+      SWEEP_LIMIT
+    );
+    logger.info(
+      `Flavor sweep: scanned ${res.scanned}, enriched ${res.enriched}` +
+        (res.rateLimited ? " (stopped: rate limited)." : ".")
+    );
+  }
+);
+
+/** Manual, bounded trigger for the same sweep (seeding / testing). Signed-in. */
+export const backfillFlavorEnrichment = onCall(
+  { region: "us-central1", secrets: [GROQ_API_KEY], timeoutSeconds: 540 },
+  async (request) => {
+    if (!request.auth?.uid) {
+      throw new HttpsError("unauthenticated", "Sign in to run the backfill.");
+    }
+    const requested = Number((request.data as { limit?: number })?.limit);
+    const limit = Math.min(
+      Math.max(Number.isFinite(requested) ? requested : 50, 1),
+      SWEEP_LIMIT
+    );
+    const res = await sweepEnrichInadequate(
+      getFirestore(),
+      GROQ_API_KEY.value(),
+      limit
+    );
+    logger.info(
+      `Flavor backfill: scanned ${res.scanned}, enriched ${res.enriched}` +
+        (res.rateLimited ? " (stopped: rate limited)." : ".")
+    );
+    return res;
   }
 );

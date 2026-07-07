@@ -5,7 +5,12 @@ import {
   FlavorTags,
   generateFlavorTags,
   hasAnyTags,
+  isAdequateProfile,
+  mergeFlavorTags,
+  profileToTags,
+  sameTags,
   sanitizeFlavorTags,
+  shouldSweepEnrich,
 } from "./flavor-enrichment";
 
 describe("sanitizeFlavorTags (BB-185)", () => {
@@ -46,50 +51,153 @@ describe("hasAnyTags", () => {
   });
 });
 
-describe("applyEnrichment (BB-185 enrich-once + write)", () => {
-  const tags: FlavorTags = { nose: ["Vanilla"], palate: ["Cherry"], finish: ["Oak"] };
+describe("isAdequateProfile (BB-185)", () => {
+  it("requires enough tags spread across enough stages", () => {
+    expect(
+      isAdequateProfile({
+        nose: ["Vanilla", "Oak", "Honey"],
+        palate: ["Cherry", "Corn"],
+        finish: [],
+      })
+    ).toBe(true); // 5 tags across 2 stages
+  });
+
+  it("rejects thin or single-stage profiles", () => {
+    expect(isAdequateProfile({ nose: ["Smoke", "Oak"], palate: [], finish: [] })).toBe(
+      false
+    ); // only 1 stage
+    expect(
+      isAdequateProfile({ nose: ["Vanilla"], palate: ["Cherry"], finish: ["Oak"] })
+    ).toBe(false); // 3 tags < 5
+    expect(isAdequateProfile({ nose: [], palate: [], finish: [] })).toBe(false);
+  });
+});
+
+describe("mergeFlavorTags / profileToTags / sameTags (BB-185)", () => {
+  it("unions per stage, existing first, deduped and capped at 6", () => {
+    const merged = mergeFlavorTags(
+      { nose: ["Vanilla", "Oak"], palate: ["Cherry"], finish: [] },
+      { nose: ["Oak", "Honey"], palate: ["Corn"], finish: ["Leather"] }
+    );
+    expect(merged.nose).toEqual(["Vanilla", "Oak", "Honey"]); // Oak deduped
+    expect(merged.palate).toEqual(["Cherry", "Corn"]);
+    expect(merged.finish).toEqual(["Leather"]);
+  });
+
+  it("caps a stage at six after merge", () => {
+    const merged = mergeFlavorTags(
+      { nose: ["Vanilla", "Oak", "Honey", "Corn", "Cherry"], palate: [], finish: [] },
+      { nose: ["Smoke", "Leather"], palate: [], finish: [] }
+    );
+    expect(merged.nose).toHaveLength(6);
+    expect(merged.nose).not.toContain("Leather"); // overflow dropped
+  });
+
+  it("reads tags out of a stored profile shape", () => {
+    expect(
+      profileToTags({ nose: ["Oak"], palate: ["Cherry"], source: "ai", model: "x" })
+    ).toEqual({ nose: ["Oak"], palate: ["Cherry"], finish: [] });
+    expect(profileToTags(null)).toEqual({ nose: [], palate: [], finish: [] });
+  });
+
+  it("sameTags detects a no-op merge", () => {
+    const t = { nose: ["Oak"], palate: [], finish: [] };
+    expect(sameTags(t, t)).toBe(true);
+    expect(sameTags(t, { nose: ["Oak", "Smoke"], palate: [], finish: [] })).toBe(false);
+  });
+});
+
+describe("shouldSweepEnrich (BB-185 proactive backfill)", () => {
+  const NOW = 1_000_000_000_000;
+  const COOLDOWN = 14 * 24 * 60 * 60 * 1000;
+  const adequate = {
+    nose: ["Vanilla", "Oak", "Honey"],
+    palate: ["Cherry", "Corn"],
+    finish: [],
+  };
+  const thin = { nose: ["Smoke"], palate: [], finish: [] };
+
+  it("skips a bottle with an adequate profile", () => {
+    expect(shouldSweepEnrich({ flavorProfile: adequate }, NOW, COOLDOWN)).toBe(false);
+  });
+
+  it("enriches an inadequate bottle never attempted", () => {
+    expect(shouldSweepEnrich({ flavorProfile: thin }, NOW, COOLDOWN)).toBe(true);
+    expect(shouldSweepEnrich({}, NOW, COOLDOWN)).toBe(true);
+  });
+
+  it("skips an inadequate bottle attempted within the cooldown", () => {
+    const at = { toMillis: () => NOW - 60_000 }; // 1 min ago
+    expect(
+      shouldSweepEnrich({ flavorProfile: thin, flavorEnrichedAt: at }, NOW, COOLDOWN)
+    ).toBe(false);
+  });
+
+  it("retries an inadequate bottle attempted before the cooldown", () => {
+    const at = { toMillis: () => NOW - COOLDOWN - 1 };
+    expect(
+      shouldSweepEnrich({ flavorProfile: thin, flavorEnrichedAt: at }, NOW, COOLDOWN)
+    ).toBe(true);
+  });
+});
+
+describe("applyEnrichment (BB-185 adequacy gate + merge)", () => {
+  const full: FlavorTags = {
+    nose: ["Vanilla", "Oak", "Honey"],
+    palate: ["Cherry", "Corn"],
+    finish: ["Leather"],
+  };
   const bottle = { name: "Buffalo Trace", distillery: "BT", category: "bourbon" };
 
-  it("returns the cached profile without generating when already enriched", async () => {
+  it("returns cached without generating when the existing profile is adequate", async () => {
     const ref = { update: jest.fn() };
     const generate = jest.fn();
     const res = await applyEnrichment(
       ref,
-      { ...bottle, flavorEnrichedAt: {}, flavorProfile: { nose: ["Corn"] } },
+      { ...bottle, flavorProfile: { ...full, source: "ai" } },
       false,
       generate
     );
     expect(res.status).toBe("cached");
-    expect(res.flavorProfile).toEqual({ nose: ["Corn"] });
     expect(generate).not.toHaveBeenCalled();
     expect(ref.update).not.toHaveBeenCalled();
   });
 
-  it("regenerates when refresh is requested despite an existing profile", async () => {
+  it("upgrades a thin existing profile by generating and MERGING", async () => {
     const ref = { update: jest.fn().mockResolvedValue(undefined) };
-    const generate = jest.fn().mockResolvedValue(tags);
-    const res = await applyEnrichment(ref, { ...bottle, flavorEnrichedAt: {} }, true, generate);
+    const res = await applyEnrichment(
+      ref,
+      { ...bottle, flavorProfile: { nose: ["Smoke"], palate: [], finish: [] } },
+      false,
+      async () => full
+    );
+    expect(res.status).toBe("augmented");
+    const written = ref.update.mock.calls[0][0].flavorProfile;
+    expect(written.nose).toEqual(["Smoke", "Vanilla", "Oak", "Honey"]); // seed kept
+    expect(written.palate).toEqual(["Cherry", "Corn"]);
+  });
+
+  it("generates fresh when there is no existing profile", async () => {
+    const ref = { update: jest.fn().mockResolvedValue(undefined) };
+    const res = await applyEnrichment(ref, bottle, false, async () => full);
+    expect(res.status).toBe("generated");
+    expect(ref.update.mock.calls[0][0].flavorProfile.nose).toEqual(full.nose);
+  });
+
+  it("regenerates on refresh even when adequate", async () => {
+    const ref = { update: jest.fn().mockResolvedValue(undefined) };
+    const generate = jest.fn().mockResolvedValue(full);
+    const res = await applyEnrichment(
+      ref,
+      { ...bottle, flavorProfile: { ...full, source: "ai" } },
+      true,
+      generate
+    );
     expect(generate).toHaveBeenCalledTimes(1);
     expect(res.status).toBe("refreshed");
-    expect(ref.update).toHaveBeenCalledTimes(1);
   });
 
-  it("stores a generated profile and marks the bottle enriched", async () => {
-    const ref = { update: jest.fn().mockResolvedValue(undefined) };
-    const res = await applyEnrichment(ref, bottle, false, async () => tags);
-    expect(res.status).toBe("generated");
-    expect(res.flavorProfile).toMatchObject({
-      nose: ["Vanilla"],
-      palate: ["Cherry"],
-      finish: ["Oak"],
-      source: "ai",
-    });
-    const written = ref.update.mock.calls[0][0];
-    expect(written.flavorProfile.nose).toEqual(["Vanilla"]);
-    expect(written.flavorEnrichedAt).toBeDefined();
-  });
-
-  it("marks enriched with a null profile when nothing confident comes back", async () => {
+  it("stores null (never wipes) when nothing confident comes back and nothing existed", async () => {
     const ref = { update: jest.fn().mockResolvedValue(undefined) };
     const res = await applyEnrichment(ref, bottle, false, async () => ({
       nose: [],
@@ -97,7 +205,6 @@ describe("applyEnrichment (BB-185 enrich-once + write)", () => {
       finish: [],
     }));
     expect(res.status).toBe("empty");
-    expect(res.flavorProfile).toBeNull();
     expect(ref.update.mock.calls[0][0].flavorProfile).toBeNull();
   });
 });

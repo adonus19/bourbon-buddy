@@ -22,11 +22,20 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 
 import { normalizeBottleName } from "../shared/normalize";
 import { buildModelText, fetchArticleBody } from "./article-text";
-import { articleFlavorSeed } from "./flavor-enrichment";
+import {
+  articleFlavorSeed,
+  mergeFlavorTags,
+  profileToTags,
+  sameTags,
+} from "./flavor-enrichment";
 
 // AI Flavor Enrichment (BB-185) — canonical-constrained tasting notes, cached
 // on /bourbons. Re-exported so the top-level barrel pulls it from "./ai".
-export { enrichBottleFlavor } from "./flavor-enrichment";
+export {
+  enrichBottleFlavor,
+  sweepFlavorEnrichment,
+  backfillFlavorEnrichment,
+} from "./flavor-enrichment";
 
 const GROQ_API_KEY = defineSecret("GROQ_API_KEY");
 
@@ -381,29 +390,30 @@ async function matchOrCreateCatalog(
 }
 
 /**
- * Seeds a catalog bottle's flavor profile from an article's tasting notes
- * (BB-185 feed a), respecting enrich-once: skips a bottle already enriched by
- * on-demand generation or a prior article, so sparse cues never clobber a fuller
- * profile. Reads the doc to check `flavorEnrichedAt` first (cheap, and only for
- * the rare review article that actually carries notes).
+ * Merges an article's tasting notes into a catalog bottle's flavor profile
+ * (BB-185 feed a). Accumulates rather than overwrites — multiple reviews build a
+ * consensus profile, and article cues never lock out or clobber a fuller feed-(b)
+ * profile. Best-effort; only runs for the rare review article that carries notes.
  */
 async function seedArticleFlavor(
   db: FirebaseFirestore.Firestore,
   bourbonId: string,
   rawFlavor: unknown
 ): Promise<void> {
-  const tags = articleFlavorSeed(rawFlavor);
-  if (!tags) {
+  const seed = articleFlavorSeed(rawFlavor);
+  if (!seed) {
     return;
   }
   const ref = db.collection("bourbons").doc(bourbonId);
   const snap = await ref.get();
-  if (snap.get("flavorEnrichedAt")) {
-    return; // already enriched — don't overwrite (feed b or a prior article)
+  const existing = profileToTags(snap.get("flavorProfile"));
+  const merged = mergeFlavorTags(existing, seed);
+  if (sameTags(existing, merged)) {
+    return; // the article added nothing new — skip a redundant write
   }
   await ref.update({
     flavorProfile: {
-      ...tags,
+      ...merged,
       source: "ai",
       model: GROQ_MODEL,
       generatedAt: Timestamp.now(),
