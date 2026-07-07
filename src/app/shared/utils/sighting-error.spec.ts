@@ -1,4 +1,7 @@
-import { sightingErrorMessage } from './sighting-error';
+import {
+  isRetryableSightingError,
+  sightingErrorMessage,
+} from './sighting-error';
 
 describe('sightingErrorMessage', () => {
   it('maps rate-limit and validation codes', () => {
@@ -23,5 +26,26 @@ describe('sightingErrorMessage', () => {
     expect(sightingErrorMessage(null)).toBe(
       "Couldn't save the sighting. Try again."
     );
+  });
+});
+
+describe('isRetryableSightingError (BB-182)', () => {
+  it('treats permanent, content-based rejections as non-retryable', () => {
+    for (const code of [
+      'functions/invalid-argument',
+      'functions/resource-exhausted',
+      'permission-denied',
+      'failed-precondition',
+      'not-found',
+    ]) {
+      expect(isRetryableSightingError({ code })).toBe(false);
+    }
+  });
+
+  it('treats offline/transient/unknown errors as retryable', () => {
+    expect(isRetryableSightingError({ code: 'functions/unavailable' })).toBe(true);
+    expect(isRetryableSightingError({ code: 'internal' })).toBe(true);
+    expect(isRetryableSightingError(new Error('network'))).toBe(true);
+    expect(isRetryableSightingError(null)).toBe(true);
   });
 });

@@ -30,11 +30,22 @@ export const logSighting = onCall({ region: "us-central1" }, async (request) => 
   const d = request.data as LogSightingData;
 
   const db = getFirestore();
-  const sightingRef = db.collection("sightings").doc();
+  // Idempotency (BB-182): when the client sends a clientId, key the doc on it so
+  // replaying a queued offline sighting hits the SAME doc — a re-send after a
+  // lost ack can't create a duplicate. Namespaced by uid so a client can't
+  // target another user's sighting id. No clientId → a fresh random id as before.
+  const sightingRef = v.clientId
+    ? db.collection("sightings").doc(`${uid}__${v.clientId}`)
+    : db.collection("sightings").doc();
   const limitRef = db.doc(`users/${uid}/rateLimits/sightings`);
   const today = new Date().toISOString().slice(0, 10);
 
-  await db.runTransaction(async (tx) => {
+  const alreadyExisted = await db.runTransaction(async (tx) => {
+    // All reads before any writes (Firestore transaction rule).
+    const existing = v.clientId ? await tx.get(sightingRef) : null;
+    if (existing?.exists) {
+      return true; // idempotent replay: don't re-write or re-count the limit
+    }
     const snap = await tx.get(limitRef);
     const data = snap.data();
     const count = data && data.day === today ? (data.count as number) : 0;
@@ -67,13 +78,17 @@ export const logSighting = onCall({ region: "us-central1" }, async (request) => 
       lat: v.lat,
       lng: v.lng,
       geohash,
+      clientId: v.clientId,
       markedStaleManually: false,
       visibility: v.visibility,
       createdAt: FieldValue.serverTimestamp(),
     });
+    return false;
   });
 
-  return { id: sightingRef.id };
+  // `deduped` lets the client distinguish a real create from an idempotent
+  // replay (both succeed and return the same id).
+  return { id: sightingRef.id, deduped: alreadyExisted };
 });
 
 export const cleanupStaleSightings = onSchedule(

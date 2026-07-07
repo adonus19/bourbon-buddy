@@ -13,7 +13,7 @@ jest.mock('@angular/fire/firestore', () => ({
   query: jest.fn((...a: unknown[]) => a),
   serverTimestamp: jest.fn(() => 'ts'),
   startAfter: jest.fn(() => 'startAfter'),
-  Timestamp: class {},
+  Timestamp: { fromMillis: jest.fn((ms: number) => ({ toMillis: () => ms })) },
   updateDoc: jest.fn(() => Promise.resolve()),
   where: jest.fn(() => 'where'),
 }));
@@ -26,6 +26,11 @@ import { Firestore, getDocs, updateDoc } from '@angular/fire/firestore';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../auth/auth.service';
 import { SightingService, SightingInput } from './sighting.service';
+import { SightingOutboxService } from './sighting-outbox.service';
+
+function setOnline(online: boolean): void {
+  Object.defineProperty(navigator, 'onLine', { configurable: true, value: online });
+}
 
 const asMock = (fn: unknown) => fn as jest.Mock;
 
@@ -43,8 +48,12 @@ describe('SightingService.add — best-price recompute (BB-161 race fix)', () =>
     notes: null,
   };
 
+  let outbox: SightingOutboxService;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    localStorage.clear();
+    setOnline(true);
     callableFn = jest.fn().mockResolvedValue({ data: { id: 's1' } });
     asMock(httpsCallable).mockReturnValue(callableFn);
     TestBed.configureTestingModule({
@@ -58,6 +67,7 @@ describe('SightingService.add — best-price recompute (BB-161 race fix)', () =>
         },
       ],
     });
+    outbox = TestBed.inject(SightingOutboxService);
     service = TestBed.inject(SightingService);
   });
 
@@ -95,6 +105,53 @@ describe('SightingService.add — best-price recompute (BB-161 race fix)', () =>
 
     await service.add('b1', 'Buffalo Trace', input, 'private');
 
+    expect(updateDoc).toHaveBeenCalledWith('entryRef', {
+      bestSightingPrice: 42,
+      updatedAt: 'ts',
+    });
+  });
+
+  it('queues the sighting and resolves when offline (BB-182)', async () => {
+    setOnline(false);
+    callableFn.mockRejectedValue({ code: 'functions/unavailable' });
+
+    await expect(
+      service.add('b1', 'Buffalo Trace', input, 'private')
+    ).resolves.toBeUndefined();
+
+    expect(outbox.pending()).toBe(1);
+    expect(outbox.items()[0].bourbonId).toBe('b1');
+    // Recompute never ran — the write didn't happen.
+    expect(updateDoc).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a permanent (validation) error and does not queue (BB-182)', async () => {
+    callableFn.mockRejectedValue({ code: 'functions/invalid-argument' });
+
+    await expect(
+      service.add('b1', 'Buffalo Trace', input, 'private')
+    ).rejects.toMatchObject({ code: 'functions/invalid-argument' });
+
+    expect(outbox.pending()).toBe(0);
+  });
+
+  it('replays a queued sighting through the outbox on flush (BB-182)', async () => {
+    // Seed a queued item, as if captured offline in a prior attempt.
+    setOnline(false);
+    callableFn.mockRejectedValueOnce({ code: 'functions/unavailable' });
+    await service.add('b1', 'Buffalo Trace', input, 'private');
+    expect(outbox.pending()).toBe(1);
+
+    // Back online: the callable now succeeds and the recompute runs.
+    setOnline(true);
+    callableFn.mockResolvedValue({ data: { id: 's1' } });
+    asMock(getDocs)
+      .mockResolvedValueOnce({ docs: [] })
+      .mockResolvedValueOnce({ docs: [{ ref: 'entryRef' }] });
+
+    await outbox.flush();
+
+    expect(outbox.pending()).toBe(0);
     expect(updateDoc).toHaveBeenCalledWith('entryRef', {
       bestSightingPrice: 42,
       updatedAt: 'ts',

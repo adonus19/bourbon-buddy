@@ -14,3 +14,23 @@ export function sightingErrorMessage(e: unknown): string {
   }
   return "Couldn't save the sighting. Try again.";
 }
+
+// The server rejected the sighting on its merits; replaying won't change the
+// outcome, so the offline outbox (BB-182) must discard rather than retry it.
+const PERMANENT_CODES = [
+  'resource-exhausted',
+  'invalid-argument',
+  'permission-denied',
+  'failed-precondition',
+  'not-found',
+];
+
+/**
+ * Whether a failed sighting send should be retried later (offline/transient) vs.
+ * dropped (a permanent, content-based rejection). Anything without a known
+ * permanent code — network errors, `unavailable`, `internal` — is retryable.
+ */
+export function isRetryableSightingError(e: unknown): boolean {
+  const code = (e as { code?: string })?.code ?? '';
+  return !PERMANENT_CODES.some((c) => code.includes(c));
+}
