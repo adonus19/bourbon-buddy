@@ -25,6 +25,12 @@ import { switchMap } from 'rxjs/operators';
 import { Sighting, SightingVisibility } from '../../models';
 import { AuthService } from '../auth/auth.service';
 import { bestNonStalePrice } from '../../shared/utils/sighting';
+import { isRetryableSightingError } from '../../shared/utils/sighting-error';
+import {
+  LogSightingPayload,
+  QueuedSighting,
+  SightingOutboxService,
+} from './sighting-outbox.service';
 
 /** Caller-supplied sighting fields; the service fills the rest. */
 export type SightingInput = Pick<
@@ -44,6 +50,13 @@ export class SightingService {
   private readonly firestore = inject(Firestore);
   private readonly functions = inject(Functions);
   private readonly auth = inject(AuthService);
+  private readonly outbox = inject(SightingOutboxService);
+
+  constructor() {
+    // Replay queued offline sightings through the same send path; registering
+    // also drains anything left over from a previous session (BB-182).
+    this.outbox.registerSender((item) => this.sendQueued(item));
+  }
 
   /** The current user's own sightings for a bottle, lowest price first. */
   sightingsForBottle(bourbonId: string): Observable<Sighting[]> {
@@ -68,6 +81,11 @@ export class SightingService {
    * Creates a sighting via the `logSighting` callable (BB-163) — server-side
    * validation + per-user daily rate limit; direct client writes to /sightings
    * are denied by the rules. Then recomputes the user's cached best price.
+   *
+   * Offline-first (BB-182): we try to send immediately; if that fails because
+   * we're offline/transient, the sighting is queued in the outbox and synced
+   * later (idempotently, via its clientId). A permanent rejection (validation /
+   * rate limit) is thrown so the form can show it.
    */
   async add(
     bourbonId: string,
@@ -76,12 +94,9 @@ export class SightingService {
     visibility: SightingVisibility = 'private',
     location: { lat: number; lng: number } | null = null
   ): Promise<void> {
-    const uid = this.requireUid();
-    const callable = httpsCallable<unknown, { id: string }>(
-      this.functions,
-      'logSighting'
-    );
-    const res = await callable({
+    this.requireUid(); // fail fast (and permanently) if not signed in
+    const payload: LogSightingPayload = {
+      clientId: this.newClientId(),
       bourbonId,
       bourbonName: bourbonName ?? null,
       storeName: input.storeName,
@@ -93,15 +108,61 @@ export class SightingService {
       visibility,
       lat: location?.lat ?? null,
       lng: location?.lng ?? null,
-    });
-    // Fold the just-created sighting into the recompute: the function's write
-    // may not be visible to our query index yet (cross-actor read-after-write),
-    // so passing it explicitly stops the card from missing a brand-new sighting.
-    await this.recomputeBestPrice(uid, bourbonId, {
+    };
+
+    try {
+      await this.sendSighting(payload);
+    } catch (err) {
+      if (isRetryableSightingError(err)) {
+        // Offline / transient — durably queue it and report success; the outbox
+        // replays it when connectivity returns.
+        await this.outbox.enqueue({
+          clientId: payload.clientId,
+          bourbonId,
+          payload,
+          queuedAt: Date.now(),
+        });
+        return;
+      }
+      throw err; // permanent — surface to the caller
+    }
+  }
+
+  /**
+   * Sends one sighting payload through the callable and recomputes best price.
+   * Throws on any failure (caller/outbox classify it). The recompute folds in
+   * the just-created sighting to beat the read-after-write index lag.
+   */
+  private async sendSighting(payload: LogSightingPayload): Promise<void> {
+    const uid = this.requireUid();
+    const callable = httpsCallable<LogSightingPayload, { id: string }>(
+      this.functions,
+      'logSighting'
+    );
+    const res = await callable(payload);
+    await this.recomputeBestPrice(uid, payload.bourbonId, {
       id: res.data?.id,
-      price: input.price,
-      sightingDate: input.sightingDate,
+      price: payload.price,
+      sightingDate: Timestamp.fromMillis(payload.sightingDateMillis),
     });
+  }
+
+  /** Outbox sender: never throws — maps failures to keep/drop for the queue. */
+  private async sendQueued(item: QueuedSighting): Promise<'sent' | 'retry' | 'drop'> {
+    try {
+      await this.sendSighting(item.payload);
+      return 'sent';
+    } catch (err) {
+      return isRetryableSightingError(err) ? 'retry' : 'drop';
+    }
+  }
+
+  /** Doc-id-safe idempotency key (matches the server's CLIENT_ID_RE). */
+  private newClientId(): string {
+    return (
+      globalThis.crypto?.randomUUID?.() ??
+      `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`
+    );
   }
 
   /** Max friends we fan a single feed query across (Firestore `in` cap). */
