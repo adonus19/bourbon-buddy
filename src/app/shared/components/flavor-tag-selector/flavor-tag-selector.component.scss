@@ -89,8 +89,9 @@
 }
 
 .flavor__more {
-  align-self: flex-start;
-  margin-top: 4px;
+  // Leads each stage so it's obvious more flavors are a tap away (BB-181 polish).
+  display: inline-block;
+  margin: 0 0 10px 2px;
   background: none;
   border: none;
   padding: 4px 2px;
