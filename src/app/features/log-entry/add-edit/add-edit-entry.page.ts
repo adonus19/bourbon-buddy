@@ -18,7 +18,10 @@ import {
   LogEntryInput,
   LogEntryService,
 } from '../../../core/services/log-entry.service';
-import { BourbonCatalogService } from '../../../core/services/bourbon-catalog.service';
+import {
+  BourbonCatalogService,
+  FlavorSuggestions,
+} from '../../../core/services/bourbon-catalog.service';
 import { BarcodeScannerService } from '../../../core/services/barcode-scanner.service';
 import { StorageService } from '../../../core/services/storage.service';
 import { WishlistService } from '../../../core/services/wishlist.service';
@@ -57,6 +60,15 @@ export class AddEditEntryPage {
     this.route.snapshot.queryParamMap.get('fromWishlist');
 
   saving = false;
+
+  // AI flavor auto-populate (BB-186): tags pre-filled from the catalog profile,
+  // tracked separately so the picker can mark them "suggested" vs user-chosen.
+  readonly suggestedFlavors = signal<FlavorSuggestions>({
+    nose: [],
+    palate: [],
+    finish: [],
+  });
+  readonly loadingSuggestions = signal(false);
 
   // Label photo: pending selection / removal applied on save.
   private photoFile: File | null = null;
@@ -197,6 +209,43 @@ export class AddEditEntryPage {
       subType: w.subType ?? null,
       personalNotes: w.externalTastingNotes ?? '',
     });
+    void this.autoPopulateFlavors(w.bourbonId);
+  }
+
+  /**
+   * Pre-select AI flavor suggestions for the chosen bottle (BB-186). Add-mode
+   * only, and never clobbers tags you've already entered. Best-effort: a
+   * failure/no-profile just leaves the picker empty.
+   */
+  private async autoPopulateFlavors(bourbonId: string): Promise<void> {
+    if (this.isEditMode || !bourbonId || this.hasAnyFlavorTags()) {
+      return;
+    }
+    this.loadingSuggestions.set(true);
+    try {
+      const s = await this.catalog.getFlavorSuggestions(bourbonId);
+      // Re-check after the await — the user may have started typing tags.
+      if (!s || this.hasAnyFlavorTags()) {
+        return;
+      }
+      this.form.patchValue({
+        noseTags: s.nose,
+        palateTags: s.palate,
+        finishTags: s.finish,
+      });
+      this.suggestedFlavors.set(s);
+    } finally {
+      this.loadingSuggestions.set(false);
+    }
+  }
+
+  private hasAnyFlavorTags(): boolean {
+    const c = this.form.controls;
+    return !!(
+      c.noseTags.value?.length ||
+      c.palateTags.value?.length ||
+      c.finishTags.value?.length
+    );
   }
 
   private patchFromEntry(e: LogEntry): void {
@@ -262,8 +311,10 @@ export class AddEditEntryPage {
   onNameInput(value: string): void {
     this.form.controls.bourbonName.setValue(value);
     this.form.controls.bourbonName.markAsDirty();
-    // Typing means we're no longer tied to a specific catalog doc.
+    // Typing means we're no longer tied to a specific catalog doc — drop the
+    // "suggested" marking (any pre-filled tags become your own to keep or clear).
     this.form.controls.bourbonId.setValue('');
+    this.suggestedFlavors.set({ nose: [], palate: [], finish: [] });
   }
 
   onBottleSelected(b: Bourbon): void {
@@ -279,6 +330,7 @@ export class AddEditEntryPage {
       proof: b.proof ?? null,
       series: b.series ?? '',
     });
+    void this.autoPopulateFlavors(b.id ?? '');
   }
 
   // BB-175/176: a scanned code with no catalog match yet, attached on save.

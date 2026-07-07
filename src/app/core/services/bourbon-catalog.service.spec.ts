@@ -20,6 +20,10 @@ jest.mock('@angular/fire/firestore', () => ({
     val,
   })),
 }));
+jest.mock('@angular/fire/functions', () => ({
+  Functions: class {},
+  httpsCallable: jest.fn(),
+}));
 
 import {
   Firestore,
@@ -27,6 +31,7 @@ import {
   updateDoc,
   where,
 } from '@angular/fire/firestore';
+import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../auth/auth.service';
 import { BourbonCatalogService } from './bourbon-catalog.service';
 
@@ -40,6 +45,7 @@ describe('BourbonCatalogService — UPC index (BB-175)', () => {
       providers: [
         BourbonCatalogService,
         { provide: Firestore, useValue: {} },
+        { provide: Functions, useValue: {} },
         { provide: AuthService, useValue: { snapshotUser: { uid: 'u1' } } },
       ],
     });
@@ -47,6 +53,51 @@ describe('BourbonCatalogService — UPC index (BB-175)', () => {
   });
 
   afterEach(() => jest.clearAllMocks());
+
+  describe('getFlavorSuggestions (BB-186)', () => {
+    const callWith = (data: unknown) => {
+      const callable = jest.fn().mockResolvedValue({ data });
+      asMock(httpsCallable).mockReturnValue(callable);
+      return callable;
+    };
+
+    it('returns the canonical tags from the enrichBottleFlavor callable', async () => {
+      const callable = callWith({
+        flavorProfile: { nose: ['Vanilla'], palate: ['Cherry'], finish: ['Oak'] },
+      });
+      const res = await service.getFlavorSuggestions('b1');
+      expect(callable).toHaveBeenCalledWith({ bourbonId: 'b1' });
+      expect(res).toEqual({ nose: ['Vanilla'], palate: ['Cherry'], finish: ['Oak'] });
+    });
+
+    it('fills missing stages with empty arrays', async () => {
+      callWith({ flavorProfile: { palate: ['Corn'] } });
+      expect(await service.getFlavorSuggestions('b1')).toEqual({
+        nose: [],
+        palate: ['Corn'],
+        finish: [],
+      });
+    });
+
+    it('returns null for an empty or absent profile', async () => {
+      callWith({ flavorProfile: null });
+      expect(await service.getFlavorSuggestions('b1')).toBeNull();
+      callWith({ flavorProfile: { nose: [], palate: [], finish: [] } });
+      expect(await service.getFlavorSuggestions('b1')).toBeNull();
+    });
+
+    it('returns null without calling out for a blank id', async () => {
+      const callable = callWith({ flavorProfile: { nose: ['Oak'] } });
+      expect(await service.getFlavorSuggestions('')).toBeNull();
+      expect(callable).not.toHaveBeenCalled();
+    });
+
+    it('swallows callable errors and returns null (never blocks logging)', async () => {
+      const callable = jest.fn().mockRejectedValue(new Error('offline'));
+      asMock(httpsCallable).mockReturnValue(callable);
+      expect(await service.getFlavorSuggestions('b1')).toBeNull();
+    });
+  });
 
   describe('findByUpc', () => {
     it('returns the matching bottle on a hit', async () => {
