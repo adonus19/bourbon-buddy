@@ -28,9 +28,13 @@ export {
   backfillArticleBottles,
 } from "./ai";
 
-// AI Flavor Enrichment (BB-185): on-demand, canonical-constrained tasting notes
-// cached on /bourbons (enrich-once).
-export { enrichBottleFlavor } from "./ai";
+// AI Flavor Enrichment (BB-185): on-demand callable + a proactive hourly sweep
+// (and manual backfill) that keep /bourbons flavor profiles adequate.
+export {
+  enrichBottleFlavor,
+  sweepFlavorEnrichment,
+  backfillFlavorEnrichment,
+} from "./ai";
 
 // Social graph (BB-101/102/103): request create, accept/decline, remove, block.
 export {
