@@ -78,8 +78,9 @@ describe('SightingService.add — best-price recompute (BB-161 race fix)', () =>
       // 2nd query: the user's wishlist entries for this bottle
       .mockResolvedValueOnce({ docs: [{ ref: 'entryRef' }] });
 
-    await service.add('b1', 'Buffalo Trace', input, 'private');
+    const result = await service.add('b1', 'Buffalo Trace', input, 'private');
 
+    expect(result).toBe('sent');
     expect(callableFn).toHaveBeenCalledTimes(1);
     expect(updateDoc).toHaveBeenCalledWith('entryRef', {
       bestSightingPrice: 42,
@@ -111,13 +112,13 @@ describe('SightingService.add — best-price recompute (BB-161 race fix)', () =>
     });
   });
 
-  it('queues the sighting and resolves when offline (BB-182)', async () => {
+  it('queues the sighting and resolves "queued" when offline (BB-182)', async () => {
     setOnline(false);
     callableFn.mockRejectedValue({ code: 'functions/unavailable' });
 
     await expect(
       service.add('b1', 'Buffalo Trace', input, 'private')
-    ).resolves.toBeUndefined();
+    ).resolves.toBe('queued');
 
     expect(outbox.pending()).toBe(1);
     expect(outbox.items()[0].bourbonId).toBe('b1');

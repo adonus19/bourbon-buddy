@@ -55,6 +55,8 @@
 </ion-header>
 
 <ion-content [fullscreen]="true">
+  <app-offline-sync-badge></app-offline-sync-badge>
+
   @if (!loaded()) {
     <app-list-skeleton [count]="6"></app-list-skeleton>
   } @else if (entries().length === 0) {

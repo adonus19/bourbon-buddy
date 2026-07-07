@@ -435,10 +435,15 @@ Hunt List match alerts (extends BB-112). Needs the geolocation + privacy design
 done up front.
 
 ### Iteration R4 — Palate & Reliability (~8 SP)
-**Stories:** BB-181, BB-182
+**Stories:** BB-181 ✅, BB-182 ✅
 **Goal:** Expand the flavor picker into a curated, tiered flavor wheel (BB-181 —
 the canonical taxonomy that R5 depends on) and add offline-first sighting capture
 so poor in-store signal never drops a find.
+**BB-182 note:** sightings are created through the `logSighting` **callable**, which
+Firestore's offline cache can't queue — so BB-182 uses an **explicit outbox**
+(`SightingOutboxService`, localStorage-backed) that replays on reconnect, made
+duplicate-safe by a client-generated `clientId` the server keys the doc on. A
+tappable banner (`OfflineSyncBadgeComponent`) surfaces the pending count.
 
 ### Iteration R5 — Guided Tasting & Catalog Intelligence (~8 SP)
 **Stories:** BB-185, BB-186

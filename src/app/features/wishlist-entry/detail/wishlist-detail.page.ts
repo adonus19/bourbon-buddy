@@ -160,13 +160,17 @@ export class WishlistDetailPage {
       notes: (data.notes ?? '').trim() || null,
     };
     try {
-      await this.sightingService.add(
+      const result = await this.sightingService.add(
         e.bourbonId,
         e.bourbonName,
         input,
         data.visibility === 'friends' ? 'friends' : 'private'
       );
-      await this.presentToast('Sighting logged. People are going to believe you.');
+      await this.presentToast(
+        result === 'queued'
+          ? "Saved offline — it'll sync when you're back online."
+          : 'Sighting logged. People are going to believe you.'
+      );
     } catch (err) {
       await this.presentToast(sightingErrorMessage(err));
     }

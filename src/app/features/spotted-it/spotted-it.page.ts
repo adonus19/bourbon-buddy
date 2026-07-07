@@ -184,7 +184,7 @@ export class SpottedItPage {
           series: null,
         }));
 
-      await this.sightings.add(
+      const result = await this.sightings.add(
         bourbonId,
         name,
         {
@@ -209,7 +209,11 @@ export class SpottedItPage {
         this.pendingUpc = null;
       }
 
-      await this.presentToast('Spotted it. Sighting logged.');
+      await this.presentToast(
+        result === 'queued'
+          ? "Saved offline — it'll sync when you're back online."
+          : 'Spotted it. Sighting logged.'
+      );
       await this.router.navigateByUrl('/tabs/hunt-list', { replaceUrl: true });
     } catch (err) {
       await this.presentToast(sightingErrorMessage(err));
