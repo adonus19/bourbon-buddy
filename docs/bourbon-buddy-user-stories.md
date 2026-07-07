@@ -1223,16 +1223,16 @@ controlled and legally safe (no verbatim third-party notes ever stored).
 
 ---
 
-### BB-182 — Offline-First Sighting Capture
+### BB-182 — Offline-First Sighting Capture ✅
 **As a** user, **I want** to log a sighting with no signal and have it sync later, **so that** poor in-store connectivity never loses a find.
 
 **AC:**
-- Sighting capture works offline: the entry is queued locally and syncs when connectivity returns (Firestore offline persistence and/or an explicit outbox)
-- UI reflects pending/synced state to the user
-- No duplicate sightings on reconnect
+- Sighting capture works offline: the entry is queued locally and syncs when connectivity returns (Firestore offline persistence and/or an explicit outbox) — ✅ **explicit outbox** (`SightingOutboxService`, localStorage), because sightings go through the `logSighting` callable, which the offline cache can't queue
+- UI reflects pending/synced state to the user — ✅ a "queued offline" toast on capture + a tappable `OfflineSyncBadgeComponent` banner (pending count) on the Hunt List
+- No duplicate sightings on reconnect — ✅ client-generated `clientId` keys the server doc (`${uid}__${clientId}`); a replay after a lost ack is idempotent
 - Scoped to the sighting path (broader offline support remains backlog)
 
-**SP:** 5
+**SP:** 5 — **shipped.** Delivered in 3 passes: (1) server idempotency + outbox service, (2) `SightingService.add()` wiring + retry classification, (3) UI badge/toast + docs.
 
 ---
 

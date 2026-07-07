@@ -1,0 +1,9 @@
+@if (pending() > 0) {
+  <button type="button" class="sync-badge" (click)="retry()">
+    <ion-icon name="cloud-offline-outline" aria-hidden="true"></ion-icon>
+    <span class="sync-badge__text">
+      {{ pending() }} sighting{{ pending() === 1 ? '' : 's' }} waiting to sync
+    </span>
+    <span class="sync-badge__action">Retry</span>
+  </button>
+}

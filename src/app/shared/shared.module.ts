@@ -16,6 +16,7 @@ import { PourFormComponent } from './components/pour-form/pour-form.component';
 import { ChipInputComponent } from './components/chip-input/chip-input.component';
 import { MetricCardComponent } from './components/metric-card/metric-card.component';
 import { ListSkeletonComponent } from './components/list-skeleton/list-skeleton.component';
+import { OfflineSyncBadgeComponent } from './components/offline-sync-badge/offline-sync-badge.component';
 import { InputHelpersDirective } from './directives/input-helpers.directive';
 
 /**
@@ -38,6 +39,7 @@ const COMPONENTS = [
   ChipInputComponent,
   MetricCardComponent,
   ListSkeletonComponent,
+  OfflineSyncBadgeComponent,
 ];
 
 @NgModule({

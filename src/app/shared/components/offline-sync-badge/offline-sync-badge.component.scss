@@ -1,0 +1,31 @@
+.sync-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 10px 16px;
+  background: var(--color-amber-dim);
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-amber-light);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+
+  ion-icon {
+    flex-shrink: 0;
+    font-size: 18px;
+  }
+
+  &__text {
+    flex: 1;
+  }
+
+  &__action {
+    flex-shrink: 0;
+    text-decoration: underline;
+  }
+}

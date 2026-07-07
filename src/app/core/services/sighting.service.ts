@@ -39,6 +39,12 @@ export type SightingInput = Pick<
 >;
 
 /**
+ * Outcome of `add` (BB-182): `sent` reached the server; `queued` was saved to
+ * the offline outbox and will sync later. Lets the caller tailor its toast.
+ */
+export type SightingAddResult = 'sent' | 'queued';
+
+/**
  * First-class, catalog-keyed sightings (BB-161): top-level `/sightings`,
  * keyed by `bourbonId`, decoupled from any wishlist. A wishlist entry's
  * sightings are a query by `bourbonId`. Each mutation recomputes the user's
@@ -93,7 +99,7 @@ export class SightingService {
     input: SightingInput,
     visibility: SightingVisibility = 'private',
     location: { lat: number; lng: number } | null = null
-  ): Promise<void> {
+  ): Promise<SightingAddResult> {
     this.requireUid(); // fail fast (and permanently) if not signed in
     const payload: LogSightingPayload = {
       clientId: this.newClientId(),
@@ -112,6 +118,7 @@ export class SightingService {
 
     try {
       await this.sendSighting(payload);
+      return 'sent';
     } catch (err) {
       if (isRetryableSightingError(err)) {
         // Offline / transient — durably queue it and report success; the outbox
@@ -122,7 +129,7 @@ export class SightingService {
           payload,
           queuedAt: Date.now(),
         });
-        return;
+        return 'queued';
       }
       throw err; // permanent — surface to the caller
     }
