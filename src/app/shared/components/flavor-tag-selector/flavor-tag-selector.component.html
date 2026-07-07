@@ -17,6 +17,15 @@
 
   @if (expanded()) {
     <div class="flavor__groups">
+      <button
+        type="button"
+        class="flavor__more"
+        (click)="toggleShowMore()"
+        [attr.aria-expanded]="showMore()"
+      >
+        {{ showMore() ? 'Show fewer flavors' : 'Show more flavors' }}
+      </button>
+
       @for (group of groups; track group.category) {
         @if (group.common.length || showMore()) {
           <div class="flavor__group">
@@ -48,15 +57,6 @@
           </div>
         }
       }
-
-      <button
-        type="button"
-        class="flavor__more"
-        (click)="toggleShowMore()"
-        [attr.aria-expanded]="showMore()"
-      >
-        {{ showMore() ? 'Show fewer flavors' : 'Show more flavors' }}
-      </button>
     </div>
   }
 </div>
