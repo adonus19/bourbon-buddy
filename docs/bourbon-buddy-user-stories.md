@@ -1276,7 +1276,7 @@ controlled and legally safe (no verbatim third-party notes ever stored).
 
 ## Epic 17: Fast Sighting Entry *(Post-Social)*
 
-### BB-187 — Nearby Retailer Picker
+### BB-187 — Nearby Retailer Picker ✅
 **As a** user logging a sighting, **I want** to tap a nearby store instead of typing it, **so that** capture is faster and store data is consistent.
 
 **Context:** the map tiles don't know where stores are, so this uses a Places/POI
@@ -1285,14 +1285,14 @@ called **server-side from a Cloud Function** to cache results and respect Overpa
 fair-use. First pass = Retailers only; Venues (bars/restaurants) are BB-189.
 
 **AC:**
-- A Cloud Function queries Overpass for retail POIs (`shop=alcohol/wine/supermarket/convenience`) within a small radius of the user's captured coordinates (BB-177)
-- Results are cached (by rounded coordinate / geohash prefix) to limit repeat Overpass calls
-- The sighting form shows a tappable list of nearby retailers; tapping one auto-fills store name + city/state
-- Manual entry always remains; the picker degrades silently if Overpass is unavailable or location isn't granted
+- A Cloud Function queries Overpass for retail POIs (`shop=alcohol/wine/supermarket/convenience`) within a small radius of the user's captured coordinates (BB-177) — ✅ `nearbyRetailers` callable, 2.5 km radius
+- Results are cached (by rounded coordinate / geohash prefix) to limit repeat Overpass calls — ✅ `/overpassCache/{geohash6}`, 7-day TTL, caches only successful responses
+- The sighting form shows a tappable list of nearby retailers; tapping one auto-fills store name + city/state — ✅ chip list on the spotted-it page under the location toggle; `selectStore` fills store (+ city/state when OSM has them)
+- Manual entry always remains; the picker degrades silently if Overpass is unavailable or location isn't granted — ✅ callable returns `[]` on failure; picker only shows when location is attached; "No nearby stores found" empty state
 - Retailers only this pass; bars/restaurants are BB-189
-- Stays within free usage (Overpass fair-use + caching); revisit at public-launch scale
+- Stays within free usage (Overpass fair-use + caching); revisit at public-launch scale — ✅ geohash-cell cache + TTL; keyless
 
-**SP:** 5
+**SP:** 5 — **shipped in 3 passes:** (1) `nearbyRetailers` Cloud Function (Overpass + geohash cache), (2) client picker on the spotted-it page, (3) empty state + tests. New callable — deploy with `deploy:functions` (keyless, no rules/index changes).
 
 ---
 

@@ -453,8 +453,8 @@ suggestions when logging a bottle (Untappd-style; you confirm/adjust). Reuses th
 Groq extraction infra (BB-130) + free-tier pacing.
 **Depends on:** BB-181 (canonical vocabulary).
 
-### Iteration R6 — Fast Sighting Entry (~5 SP)
-**Stories:** BB-187
+### Iteration R6 — Fast Sighting Entry (~5 SP) ✅
+**Stories:** BB-187 ✅
 **Goal:** Tap a nearby retailer to auto-fill store + city/state on a sighting,
 via an OpenStreetMap **Overpass** query run server-side (cached, fair-use). First
 pass = Retailers; Venues (bars/restaurants, BB-189) are backlog.

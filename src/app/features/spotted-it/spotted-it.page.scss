@@ -44,6 +44,43 @@
   color: var(--color-text-secondary);
 }
 
+.spot__stores {
+  margin-top: 10px;
+}
+
+.spot__stores-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+
+  ion-spinner {
+    width: 14px;
+    height: 14px;
+    color: var(--color-amber);
+  }
+}
+
+.spot__stores-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.spot__store-chip {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
 .spot__field {
   margin-bottom: 12px;
 }

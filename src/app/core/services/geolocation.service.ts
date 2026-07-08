@@ -1,4 +1,5 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
+import { Functions, httpsCallable } from '@angular/fire/functions';
 
 export interface Coordinates {
   lat: number;
@@ -6,6 +7,16 @@ export interface Coordinates {
 }
 
 export interface PlaceName {
+  city: string | null;
+  state: string | null;
+}
+
+/** A nearby retail POI from the Overpass-backed picker (BB-187). */
+export interface Retailer {
+  name: string;
+  lat: number;
+  lng: number;
+  kind: string;
   city: string | null;
   state: string | null;
 }
@@ -22,8 +33,27 @@ const REVERSE_GEOCODE_URL =
  */
 @Injectable({ providedIn: 'root' })
 export class GeolocationService {
+  private readonly functions = inject(Functions);
+
   isSupported(): boolean {
     return typeof navigator !== 'undefined' && !!navigator.geolocation;
+  }
+
+  /**
+   * Nearby retail stores for a coordinate (BB-187), via the `nearbyRetailers`
+   * callable (Overpass, geohash-cached server-side). Resolves to [] on any
+   * failure so the sighting form degrades to manual entry.
+   */
+  async nearbyRetailers(lat: number, lng: number): Promise<Retailer[]> {
+    try {
+      const callable = httpsCallable<
+        { lat: number; lng: number },
+        { retailers: Retailer[] }
+      >(this.functions, 'nearbyRetailers');
+      return (await callable({ lat, lng })).data?.retailers ?? [];
+    } catch {
+      return [];
+    }
   }
 
   getCurrentPosition(): Promise<Coordinates | null> {
