@@ -73,6 +73,13 @@
                 · {{ s.city }}{{ s.city && s.state ? ', ' : '' }}{{ s.state }}
               </span>
             }
+            @if (s.presenceVerified) {
+              <span
+                class="ffeed__onsite-tag"
+                title="The spotter's location was verified at this store"
+                >📍 on-site</span
+              >
+            }
           </p>
 
           @if (s.notes) {

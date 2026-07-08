@@ -13,6 +13,8 @@ export interface PlaceName {
 
 /** A nearby retail POI from the Overpass-backed picker (BB-187). */
 export interface Retailer {
+  // OSM element ref ("node/123"). Optional: pre-BB-191 cache entries lack it.
+  id?: string | null;
   name: string;
   lat: number;
   lng: number;

@@ -18,6 +18,13 @@ export function haversineMiles(a: LatLng, b: LatLng): number {
   return 2 * EARTH_RADIUS_MI * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
+const METERS_PER_MILE = 1609.344;
+
+/** Great-circle distance between two points, in meters. */
+export function haversineMeters(a: LatLng, b: LatLng): number {
+  return haversineMiles(a, b) * METERS_PER_MILE;
+}
+
 export const DEFAULT_RADIUS_MILES = 50;
 
 /**

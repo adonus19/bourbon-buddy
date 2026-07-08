@@ -98,7 +98,10 @@ export class SightingService {
     bourbonName: string | null,
     input: SightingInput,
     visibility: SightingVisibility = 'private',
-    location: { lat: number; lng: number } | null = null
+    location: { lat: number; lng: number } | null = null,
+    // The store picked from the nearby list (BB-191); lets the server attest
+    // the spotter was physically at the store ("Spotted on-site" badge).
+    store: { id?: string | null; lat: number; lng: number } | null = null
   ): Promise<SightingAddResult> {
     this.requireUid(); // fail fast (and permanently) if not signed in
     const payload: LogSightingPayload = {
@@ -114,6 +117,7 @@ export class SightingService {
       visibility,
       lat: location?.lat ?? null,
       lng: location?.lng ?? null,
+      store,
     };
 
     try {

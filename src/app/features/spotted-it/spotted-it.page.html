@@ -111,18 +111,28 @@
               <ion-spinner name="dots"></ion-spinner> Finding nearby stores…
             </p>
           } @else if (nearbyStores().length) {
-            <p class="spot__stores-hint">Nearby stores — tap to fill:</p>
+            <p class="spot__stores-hint">
+              Nearby stores — tap to fill and verify you're on-site:
+            </p>
             <div class="spot__stores-list">
               @for (store of nearbyStores(); track store.name) {
                 <button
                   type="button"
                   class="spot__store-chip"
+                  [class.spot__store-chip--selected]="
+                    selectedStore()?.name === store.name
+                  "
                   (click)="selectStore(store)"
                 >
                   {{ store.name }}
                 </button>
               }
             </div>
+            @if (selectedStore()?.name === form.controls.storeName.value) {
+              <p class="spot__stores-hint spot__stores-hint--verified">
+                📍 This sighting will carry the “Spotted on-site” badge.
+              </p>
+            }
           } @else {
             <p class="spot__stores-hint">
               No nearby stores found — just type the store name.

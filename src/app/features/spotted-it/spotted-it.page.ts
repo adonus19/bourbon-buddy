@@ -53,12 +53,18 @@ export class SpottedItPage {
   readonly loadingStores = signal(false);
   readonly storesLoaded = signal(false); // a lookup has completed (drives empty state)
 
+  // Presence attestation (BB-191): the store the user tapped in the picker.
+  // Sent with the sighting so the server can verify the user was actually
+  // there; save() drops it if the store name was hand-edited afterwards.
+  readonly selectedStore = signal<Retailer | null>(null);
+
   async onToggleLocation(enabled: boolean): Promise<void> {
     if (!enabled) {
       this.attachLocation.set(false);
       this.coords = null;
       this.nearbyStores.set([]);
       this.storesLoaded.set(false);
+      this.selectedStore.set(null);
       return;
     }
     this.locating.set(true);
@@ -115,6 +121,7 @@ export class SpottedItPage {
 
   /** Tap a nearby store to fill the store name (and city/state when OSM has them). */
   selectStore(store: Retailer): void {
+    this.selectedStore.set(store);
     const c = this.form.controls;
     c.storeName.setValue(store.name);
     c.storeName.markAsDirty();
@@ -124,6 +131,20 @@ export class SpottedItPage {
     if (store.state) {
       c.state.setValue(store.state);
     }
+  }
+
+  /**
+   * The picked store, but only while the form still matches it (BB-191). A
+   * hand-edited store name means the user is reporting somewhere else, so the
+   * pick — and with it the presence attestation — no longer applies.
+   */
+  private attestableStore(): Retailer | null {
+    const picked = this.selectedStore();
+    if (!picked || !this.attachLocation()) {
+      return null;
+    }
+    const typed = (this.form.controls.storeName.value ?? '').trim();
+    return typed === picked.name ? picked : null;
   }
 
   /** Deep-link fast path: /spotted/new?scan=1 (from the FAB) opens the camera. */
@@ -221,6 +242,7 @@ export class SpottedItPage {
           series: null,
         }));
 
+      const picked = this.attestableStore();
       const result = await this.sightings.add(
         bourbonId,
         name,
@@ -233,7 +255,8 @@ export class SpottedItPage {
           notes: this.strOrNull(v.notes),
         },
         v.visibility === 'friends' ? 'friends' : 'private',
-        this.attachLocation() ? this.coords : null
+        this.attachLocation() ? this.coords : null,
+        picked ? { id: picked.id ?? null, lat: picked.lat, lng: picked.lng } : null
       );
 
       // Best-effort: teach the UPC index (BB-175). Never fail the sighting for it.

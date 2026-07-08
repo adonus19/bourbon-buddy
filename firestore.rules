@@ -89,12 +89,17 @@ service cloud.firestore {
                       || (resource.data.visibility == 'friends'
                           && exists(/databases/$(database)/documents/users/$(resource.data.spotterUid)/friends/$(request.auth.uid))));
       allow create: if false;
+      // The owner may mark-stale / edit notes etc., but the trust-relevant
+      // fields are pinned: identity, price, dates, coordinates, and the
+      // server-derived presence attestation (BB-191) can never be rewritten.
       allow update: if isSignedIn()
                     && resource.data.spotterUid == request.auth.uid
                     && request.resource.data.spotterUid == resource.data.spotterUid
                     && request.resource.data.bourbonId == resource.data.bourbonId
                     && request.resource.data.price == resource.data.price
-                    && request.resource.data.createdAt == resource.data.createdAt;
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && !request.resource.data.diff(resource.data).affectedKeys()
+                        .hasAny(['presenceVerified', 'storePlaceId']);
       allow delete: if isSignedIn()
                     && resource.data.spotterUid == request.auth.uid;
     }
