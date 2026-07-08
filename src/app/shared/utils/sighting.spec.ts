@@ -1,9 +1,11 @@
 import { Timestamp } from '@angular/fire/firestore';
 import { Sighting } from '../../models';
 import {
+  DISPUTE_STALE_THRESHOLD,
   SIGHTING_AGING_DAYS,
   SIGHTING_STALE_DAYS,
   bestNonStalePrice,
+  isCommunityStale,
   isSightingStale,
   sightingFreshness,
 } from './sighting';
@@ -68,6 +70,51 @@ describe('sightingFreshness', () => {
 
   it('is stale when manually flagged regardless of date', () => {
     expect(sightingFreshness(sighting(0, 40, true), NOW)).toBe('stale');
+  });
+});
+
+describe('community trust signals (BB-194)', () => {
+  const ts = (daysAgo: number) =>
+    ({ toMillis: () => NOW - daysAgo * DAY }) as unknown as Timestamp;
+
+  it('a fresh in-person confirmation restarts the freshness clock', () => {
+    const s = {
+      ...sighting(SIGHTING_STALE_DAYS - 1, 40),
+      confirmCount: 1,
+      lastConfirmedAt: ts(1),
+    };
+    expect(sightingFreshness(s, NOW)).toBe('fresh');
+  });
+
+  it('an old confirmation does not outlive the window', () => {
+    const s = {
+      ...sighting(SIGHTING_STALE_DAYS + 10, 40),
+      confirmCount: 1,
+      lastConfirmedAt: ts(SIGHTING_STALE_DAYS + 5),
+    };
+    expect(sightingFreshness(s, NOW)).toBe('stale');
+  });
+
+  it('enough "gone" votes force stale even on a recent sighting', () => {
+    const s = { ...sighting(1, 40), disputeCount: DISPUTE_STALE_THRESHOLD };
+    expect(sightingFreshness(s, NOW)).toBe('stale');
+    expect(isCommunityStale(s)).toBe(true);
+  });
+
+  it('disputes must outnumber confirms to bury a sighting', () => {
+    const s = {
+      ...sighting(1, 40),
+      disputeCount: DISPUTE_STALE_THRESHOLD,
+      confirmCount: DISPUTE_STALE_THRESHOLD,
+      lastConfirmedAt: ts(0),
+    };
+    expect(isCommunityStale(s)).toBe(false);
+    expect(sightingFreshness(s, NOW)).toBe('fresh');
+  });
+
+  it('a lone dispute never buries a sighting', () => {
+    const s = { ...sighting(1, 40), disputeCount: 1 };
+    expect(sightingFreshness(s, NOW)).toBe('fresh');
   });
 });
 

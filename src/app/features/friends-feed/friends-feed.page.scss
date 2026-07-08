@@ -116,6 +116,66 @@
     opacity: 0.6;
   }
 
+  // Community trust chips (BB-194): in-person confirm/dispute tallies.
+  &__confirm-tag,
+  &__gone-tag {
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 10px;
+    border-radius: 4px;
+    padding: 1px 6px;
+    white-space: nowrap;
+  }
+
+  &__confirm-tag {
+    color: var(--color-success);
+    border: 1px solid var(--color-success);
+  }
+
+  &__gone-tag {
+    color: var(--color-error);
+    border: 1px solid var(--color-error);
+  }
+
+  // "At the store?" vote row (BB-194).
+  &__verify {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  &__verify-label {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+  }
+
+  &__verify-btn {
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-primary);
+    border-radius: 999px;
+    padding: 5px 12px;
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.5;
+    }
+
+    &--yes {
+      color: var(--color-success);
+      border-color: var(--color-success);
+    }
+
+    &--no {
+      color: var(--color-error);
+      border-color: var(--color-error);
+    }
+  }
+
   // Presence attestation (BB-191): green = location-verified at the store.
   &__onsite-tag {
     margin-left: 6px;

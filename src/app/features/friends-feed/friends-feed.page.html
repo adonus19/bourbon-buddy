@@ -90,12 +90,56 @@
             <span>{{ spotterName(s.spotterUid) }}</span>
             <span class="ffeed__dot">·</span>
             <span>{{ when(s) }}</span>
+            @if (s.confirmCount) {
+              <span
+                class="ffeed__confirm-tag"
+                title="Friends verified in person that it's still on the shelf"
+                >✓ {{ s.confirmCount }} still there</span
+              >
+            }
+            @if (s.disputeCount) {
+              <span
+                class="ffeed__gone-tag"
+                title="Friends reported in person that it's gone"
+                >✕ {{ s.disputeCount }} gone</span
+              >
+            }
             @if (fresh === 'aging') {
-              <span class="ffeed__aging-tag">aging</span>
+              <span
+                class="ffeed__aging-tag"
+                title="Trust signal: sighting is getting old — the bottle may be gone"
+                >aging</span
+              >
             } @else if (fresh === 'stale') {
-              <span class="ffeed__stale-tag">stale</span>
+              <span
+                class="ffeed__stale-tag"
+                title="Trust signal: old or reported gone — don't count on it"
+                >stale</span
+              >
             }
           </div>
+
+          @if (canVote(s)) {
+            <div class="ffeed__verify">
+              <span class="ffeed__verify-label">At the store?</span>
+              <button
+                type="button"
+                class="ffeed__verify-btn ffeed__verify-btn--yes"
+                [disabled]="voting() === s.id"
+                (click)="vote(s, 'confirm')"
+              >
+                ✓ Still there
+              </button>
+              <button
+                type="button"
+                class="ffeed__verify-btn ffeed__verify-btn--no"
+                [disabled]="voting() === s.id"
+                (click)="vote(s, 'dispute')"
+              >
+                ✕ Gone
+              </button>
+            </div>
+          }
         </div>
       }
     </div>

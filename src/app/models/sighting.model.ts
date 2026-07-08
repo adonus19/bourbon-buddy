@@ -31,6 +31,13 @@ export interface Sighting {
   // the nearby-retailer list. Powers the "Spotted on-site" trust badge.
   storePlaceId?: string | null;
   presenceVerified?: boolean;
+  // Community confirmation (BB-194). Denormalized by the confirmSighting
+  // callable (votes live in a server-only subcollection); pinned in rules.
+  // A confirm refreshes the freshness clock via lastConfirmedAt; enough
+  // disputes force the stale tier — see sightingFreshness().
+  confirmCount?: number;
+  disputeCount?: number;
+  lastConfirmedAt?: Timestamp | null;
   markedStaleManually: boolean;
   visibility: SightingVisibility;
   createdAt: Timestamp;

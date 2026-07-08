@@ -112,6 +112,20 @@
                           >📍 Spotted on-site</span
                         >
                       }
+                      @if (s.confirmCount) {
+                        <span
+                          class="sighting__confirm-tag"
+                          title="Friends verified in person that it's still on the shelf"
+                          >✓ {{ s.confirmCount }} still there</span
+                        >
+                      }
+                      @if (s.disputeCount) {
+                        <span
+                          class="sighting__gone-tag"
+                          title="Friends reported in person that it's gone"
+                          >✕ {{ s.disputeCount }} gone</span
+                        >
+                      }
                     </div>
                     <div class="sighting__meta">
                       {{ s.sightingDate.toDate() | date: 'mediumDate' }}

@@ -121,9 +121,12 @@ export const cleanupStaleSightings = onSchedule(
       if (snap.empty) {
         break;
       }
-      const batch = db.batch();
-      snap.docs.forEach((doc) => batch.delete(doc.ref));
-      await batch.commit();
+      // recursiveDelete (not a batch): each sighting may carry a `votes`
+      // subcollection (BB-194), and Firestore never cascades deletes — a plain
+      // doc delete would strand those vote docs forever.
+      for (const doc of snap.docs) {
+        await db.recursiveDelete(doc.ref);
+      }
       deleted += snap.size;
       if (snap.size < 400) {
         break;
