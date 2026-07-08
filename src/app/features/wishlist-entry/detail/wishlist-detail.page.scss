@@ -173,6 +173,28 @@
     }
   }
 
+  // Community trust chips (BB-194): in-person confirm/dispute tallies.
+  &__confirm-tag,
+  &__gone-tag {
+    margin-left: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 10px;
+    border-radius: 4px;
+    padding: 1px 6px;
+    white-space: nowrap;
+  }
+
+  &__confirm-tag {
+    color: var(--color-success);
+    border: 1px solid var(--color-success);
+  }
+
+  &__gone-tag {
+    color: var(--color-error);
+    border: 1px solid var(--color-error);
+  }
+
   // Presence attestation badge (BB-191): a trust marker, styled like the
   // freshness tags so the row reads as one "how much to trust this" cluster.
   &__onsite {

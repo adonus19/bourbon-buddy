@@ -19,6 +19,8 @@ export { onSightingCreated } from "./alerts";
 
 // Sighting guards (BB-163): rate-limited create callable + stale cleanup.
 export { logSighting, cleanupStaleSightings } from "./sightings";
+// Community confirmation (BB-194): presence-gated confirm/dispute votes.
+export { confirmSighting } from "./sightings/confirm";
 
 // Nearby Retailer Picker (BB-187): Overpass POI lookup, geohash-cached.
 export { nearbyRetailers } from "./places";

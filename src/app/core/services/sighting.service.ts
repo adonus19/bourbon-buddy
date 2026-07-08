@@ -24,6 +24,7 @@ import { switchMap } from 'rxjs/operators';
 
 import { Sighting, SightingVisibility } from '../../models';
 import { AuthService } from '../auth/auth.service';
+import { GeolocationService } from './geolocation.service';
 import { bestNonStalePrice } from '../../shared/utils/sighting';
 import { isRetryableSightingError } from '../../shared/utils/sighting-error';
 import {
@@ -57,6 +58,7 @@ export class SightingService {
   private readonly functions = inject(Functions);
   private readonly auth = inject(AuthService);
   private readonly outbox = inject(SightingOutboxService);
+  private readonly geo = inject(GeolocationService);
 
   constructor() {
     // Replay queued offline sightings through the same send path; registering
@@ -156,6 +158,27 @@ export class SightingService {
       price: payload.price,
       sightingDate: Timestamp.fromMillis(payload.sightingDateMillis),
     });
+  }
+
+  /**
+   * Vote on a friend's sighting (BB-194): "still there" or "gone". Requires
+   * being physically at the store — the device position is captured here and
+   * verified server-side against the sighting's coordinates, so votes can't be
+   * cast from the couch. Throws LOCATION_REQUIRED when no position is available.
+   */
+  async confirm(
+    sightingId: string,
+    verdict: 'confirm' | 'dispute'
+  ): Promise<{ verdict: string; changed: boolean }> {
+    const coords = await this.geo.getCurrentPosition();
+    if (!coords) {
+      throw new Error('LOCATION_REQUIRED');
+    }
+    const callable = httpsCallable<
+      { sightingId: string; verdict: string; lat: number; lng: number },
+      { verdict: string; changed: boolean }
+    >(this.functions, 'confirmSighting');
+    return (await callable({ sightingId, verdict, ...coords })).data;
   }
 
   /** Outbox sender: never throws — maps failures to keep/drop for the queue. */

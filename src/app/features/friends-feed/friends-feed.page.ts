@@ -4,8 +4,13 @@ import {
   InfiniteScrollCustomEvent,
   NavController,
   RefresherCustomEvent,
+  ToastController,
 } from '@ionic/angular';
-import { DocumentData, QueryDocumentSnapshot } from '@angular/fire/firestore';
+import {
+  DocumentData,
+  QueryDocumentSnapshot,
+  Timestamp,
+} from '@angular/fire/firestore';
 
 import {
   ACTIVE_WISHLIST_STATUSES,
@@ -42,6 +47,7 @@ export class FriendsFeedPage {
   private readonly wishlist = inject(WishlistService);
   private readonly router = inject(Router);
   private readonly nav = inject(NavController);
+  private readonly toast = inject(ToastController);
 
   private readonly PAGE = 20;
 
@@ -173,5 +179,72 @@ export class FriendsFeedPage {
     if (id) {
       void this.router.navigate(['/wishlist', id]);
     }
+  }
+
+  // --- Community confirmation (BB-194) ---
+
+  /** Sighting id with a vote in flight (disables its buttons). */
+  readonly voting = signal<string | null>(null);
+
+  /** Votes are only possible on sightings that carry a location to verify. */
+  canVote(s: Sighting): boolean {
+    return !!s.id && s.lat != null && s.lng != null;
+  }
+
+  async vote(s: Sighting, verdict: 'confirm' | 'dispute'): Promise<void> {
+    if (!s.id || this.voting()) {
+      return;
+    }
+    this.voting.set(s.id);
+    try {
+      const res = await this.sightings.confirm(s.id, verdict);
+      if (res.changed) {
+        this.applyVoteLocally(s.id, verdict);
+      }
+      await this.presentToast(
+        verdict === 'confirm'
+          ? 'Thanks — confirmed still on the shelf.'
+          : 'Thanks — marked as gone.'
+      );
+    } catch (err) {
+      await this.presentToast(this.voteErrorMessage(err));
+    } finally {
+      this.voting.set(null);
+    }
+  }
+
+  /**
+   * Optimistic count bump so the feed (one-shot reads, no listener) reflects
+   * the vote immediately; the next refresh loads the server's truth.
+   */
+  private applyVoteLocally(id: string, verdict: 'confirm' | 'dispute'): void {
+    this.items.update((cur) =>
+      cur.map((s) =>
+        s.id === id
+          ? {
+              ...s,
+              confirmCount: (s.confirmCount ?? 0) + (verdict === 'confirm' ? 1 : 0),
+              disputeCount: (s.disputeCount ?? 0) + (verdict === 'dispute' ? 1 : 0),
+              lastConfirmedAt:
+                verdict === 'confirm' ? Timestamp.now() : s.lastConfirmedAt,
+            }
+          : s
+      )
+    );
+  }
+
+  private voteErrorMessage(err: unknown): string {
+    if (err instanceof Error && err.message === 'LOCATION_REQUIRED') {
+      return 'Turn on location to confirm — votes only count from the store.';
+    }
+    const msg = (err as { message?: string })?.message;
+    return msg && msg.length < 120
+      ? msg
+      : "Couldn't record your vote. Try again.";
+  }
+
+  private async presentToast(message: string): Promise<void> {
+    const t = await this.toast.create({ message, duration: 2500, position: 'top' });
+    await t.present();
   }
 }
