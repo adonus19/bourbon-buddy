@@ -16,7 +16,11 @@ import { logger } from "firebase-functions/v2";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 
-import { consumeDailyLimit, requireAdmin } from "../shared/guards";
+import {
+  consumeDailyLimit,
+  ENFORCE_APP_CHECK,
+  requireAdmin,
+} from "../shared/guards";
 import { CANONICAL_FLAVOR_TAGS, matchCanonicalTags } from "./flavor-taxonomy";
 import { GROQ_API_KEY, GROQ_MODEL, RateLimitError, chatJson } from "./groq";
 
@@ -231,7 +235,11 @@ export async function applyEnrichment(
 const DAILY_REFRESH_LIMIT = 10;
 
 export const enrichBottleFlavor = onCall(
-  { region: "us-central1", secrets: [GROQ_API_KEY] },
+  {
+    region: "us-central1",
+    secrets: [GROQ_API_KEY],
+    enforceAppCheck: ENFORCE_APP_CHECK,
+  },
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid) {
@@ -384,7 +392,12 @@ export const sweepFlavorEnrichment = onSchedule(
 
 /** Manual, bounded trigger for the same sweep. Admin-only (BB-190). */
 export const backfillFlavorEnrichment = onCall(
-  { region: "us-central1", secrets: [GROQ_API_KEY], timeoutSeconds: 540 },
+  {
+    region: "us-central1",
+    secrets: [GROQ_API_KEY],
+    timeoutSeconds: 540,
+    enforceAppCheck: ENFORCE_APP_CHECK,
+  },
   async (request) => {
     requireAdmin(request);
     const requested = Number((request.data as { limit?: number })?.limit);

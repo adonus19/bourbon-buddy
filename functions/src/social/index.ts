@@ -13,6 +13,7 @@ import { logger } from "firebase-functions/v2";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 
+import { ENFORCE_APP_CHECK } from "../shared/guards";
 import { sendNotificationToUser } from "../notifications";
 
 const DAILY_REQUEST_LIMIT = 20;
@@ -22,7 +23,7 @@ interface SendFriendRequestData {
 }
 
 export const sendFriendRequest = onCall(
-  { region: "us-central1" },
+  { region: "us-central1", enforceAppCheck: ENFORCE_APP_CHECK },
   async (request) => {
     const fromUid = request.auth?.uid;
     if (!fromUid) {
@@ -158,7 +159,7 @@ function decrementFriendCount(
  * (an already-accepted request no-ops instead of double-counting).
  */
 export const respondToFriendRequest = onCall(
-  { region: "us-central1" },
+  { region: "us-central1", enforceAppCheck: ENFORCE_APP_CHECK },
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid) {
@@ -237,7 +238,7 @@ interface RemoveFriendData {
  * friends-only shared content.
  */
 export const removeFriend = onCall(
-  { region: "us-central1" },
+  { region: "us-central1", enforceAppCheck: ENFORCE_APP_CHECK },
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid) {
@@ -277,7 +278,9 @@ interface BlockUserData {
  * also stops future search/friending via the checks in searchByUsername and
  * sendFriendRequest. Unblock is a plain owner-side delete (no callable needed).
  */
-export const blockUser = onCall({ region: "us-central1" }, async (request) => {
+export const blockUser = onCall(
+  { region: "us-central1", enforceAppCheck: ENFORCE_APP_CHECK },
+  async (request) => {
   const uid = request.auth?.uid;
   if (!uid) {
     throw new HttpsError("unauthenticated", "Sign in to manage friends.");

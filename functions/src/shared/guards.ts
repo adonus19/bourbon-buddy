@@ -10,6 +10,14 @@
 import { FieldValue, Firestore } from "firebase-admin/firestore";
 import { CallableRequest, HttpsError } from "firebase-functions/v2/https";
 
+/**
+ * App Check enforcement (BB-121), one switch for every callable. Deploying with
+ * this true requires the console setup in docs/app-check-setup.md first —
+ * clients without a valid App Check token are rejected before our code runs.
+ * Flip to false only as an emergency escape hatch.
+ */
+export const ENFORCE_APP_CHECK = true;
+
 /** UTC day key, e.g. "2026-07-08" — same shape the inline limiters use. */
 export function todayKey(now: Date = new Date()): string {
   return now.toISOString().slice(0, 10);

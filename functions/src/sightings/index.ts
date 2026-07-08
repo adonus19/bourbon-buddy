@@ -16,12 +16,15 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 
 import { DAY_MS, LogSightingData, validate } from "./validate";
 import { encodeGeohash } from "../shared/geohash";
+import { ENFORCE_APP_CHECK } from "../shared/guards";
 
 const DAILY_SIGHTING_LIMIT = 40;
 // BB-171: sightings go stale at 30 days, so drop them at 30 rather than 90.
 const STALE_CLEANUP_DAYS = 30;
 
-export const logSighting = onCall({ region: "us-central1" }, async (request) => {
+export const logSighting = onCall(
+  { region: "us-central1", enforceAppCheck: ENFORCE_APP_CHECK },
+  async (request) => {
   const uid = request.auth?.uid;
   if (!uid) {
     throw new HttpsError("unauthenticated", "Sign in to log a sighting.");

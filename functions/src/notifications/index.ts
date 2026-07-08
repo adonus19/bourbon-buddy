@@ -13,6 +13,8 @@ import { logger } from "firebase-functions/v2";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 
+import { ENFORCE_APP_CHECK } from "../shared/guards";
+
 export type NotificationType =
   | "sightingMatch"
   | "priceAlert"
@@ -149,7 +151,7 @@ export const cleanupOldNotifications = onSchedule(
 );
 
 export const sendTestNotification = onCall(
-  { region: "us-central1" },
+  { region: "us-central1", enforceAppCheck: ENFORCE_APP_CHECK },
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid) {

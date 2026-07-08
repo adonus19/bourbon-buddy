@@ -20,7 +20,7 @@ import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 
-import { requireAdmin } from "../shared/guards";
+import { ENFORCE_APP_CHECK, requireAdmin } from "../shared/guards";
 import { normalizeBottleName } from "../shared/normalize";
 import { buildModelText, fetchArticleBody } from "./article-text";
 import {
@@ -138,7 +138,12 @@ export const extractBottlesFromArticle = onDocumentCreated(
 const REPROCESS_MAX_HOURS = 48; // forced-reprocess window ceiling
 
 export const backfillArticleBottles = onCall(
-  { region: "us-central1", secrets: [GROQ_API_KEY], timeoutSeconds: 540 },
+  {
+    region: "us-central1",
+    secrets: [GROQ_API_KEY],
+    timeoutSeconds: 540,
+    enforceAppCheck: ENFORCE_APP_CHECK,
+  },
   async (request) => {
     requireAdmin(request);
     const data = request.data as {

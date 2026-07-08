@@ -18,6 +18,9 @@ export const environment = {
   },
   vapidKey: 'REPLACE_WITH_PROD_VAPID_KEY',
   maptilerKey: 'REPLACE_WITH_PROD_MAPTILER_KEY',
+  // App Check (BB-121): reCAPTCHA v3 site key for the prod web app. Empty =
+  // App Check stays OFF client-side. See docs/app-check-setup.md.
+  recaptchaSiteKey: '',
   emulators: {
     auth: { host: 'localhost', port: 9099 },
     firestore: { host: 'localhost', port: 8080 },

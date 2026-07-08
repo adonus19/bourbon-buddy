@@ -12,7 +12,7 @@ import { logger } from "firebase-functions/v2";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 
 import { isValidLat, isValidLng } from "../shared/geohash";
-import { consumeDailyLimit } from "../shared/guards";
+import { consumeDailyLimit, ENFORCE_APP_CHECK } from "../shared/guards";
 import {
   buildOverpassQuery,
   CACHE_TTL_MS,
@@ -30,7 +30,7 @@ const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
 const DAILY_OVERPASS_LIMIT = 25;
 
 export const nearbyRetailers = onCall(
-  { region: "us-central1", timeoutSeconds: 30 },
+  { region: "us-central1", timeoutSeconds: 30, enforceAppCheck: ENFORCE_APP_CHECK },
   async (request) => {
     if (!request.auth?.uid) {
       throw new HttpsError("unauthenticated", "Sign in to find nearby stores.");
