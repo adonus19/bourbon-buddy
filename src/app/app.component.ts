@@ -1,5 +1,6 @@
 import { Component, OnInit, inject } from '@angular/core';
 
+import { AppUpdateService } from './core/services/app-update.service';
 import { InboxService } from './core/services/inbox.service';
 
 @Component({
@@ -10,8 +11,10 @@ import { InboxService } from './core/services/inbox.service';
 })
 export class AppComponent implements OnInit {
   private readonly inbox = inject(InboxService);
+  private readonly appUpdate = inject(AppUpdateService);
 
   ngOnInit(): void {
+    this.appUpdate.init();
     // Keep the OS app-icon badge in step with unread inbox items (BB-093):
     // sync on launch and whenever the app returns to the foreground.
     this.syncBadge();
