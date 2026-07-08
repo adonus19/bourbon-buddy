@@ -116,6 +116,19 @@
     opacity: 0.6;
   }
 
+  // Presence attestation (BB-191): green = location-verified at the store.
+  &__onsite-tag {
+    margin-left: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 10px;
+    color: var(--color-success);
+    border: 1px solid var(--color-success);
+    border-radius: 4px;
+    padding: 1px 6px;
+    white-space: nowrap;
+  }
+
   &__stale-tag,
   &__aging-tag {
     margin-left: auto;

@@ -30,6 +30,10 @@ export interface LogSightingPayload {
   visibility: string;
   lat: number | null;
   lng: number | null;
+  // The store picked from the nearby list (BB-191): OSM ref + coords. The
+  // server derives presenceVerified from this — clients never send that flag.
+  // Optional so queue items persisted before BB-191 still replay cleanly.
+  store?: { id?: string | null; lat: number; lng: number } | null;
 }
 
 /** A queued sighting: the callable payload plus what a post-send recompute needs. */

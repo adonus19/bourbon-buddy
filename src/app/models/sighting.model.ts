@@ -26,6 +26,11 @@ export interface Sighting {
   lat?: number | null;
   lng?: number | null;
   geohash?: string | null;
+  // Presence attestation (BB-191). Server-derived, never client-written: true
+  // when the spotter's device coords put them at the store they picked from
+  // the nearby-retailer list. Powers the "Spotted on-site" trust badge.
+  storePlaceId?: string | null;
+  presenceVerified?: boolean;
   markedStaleManually: boolean;
   visibility: SightingVisibility;
   createdAt: Timestamp;

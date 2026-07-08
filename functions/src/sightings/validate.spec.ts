@@ -116,4 +116,38 @@ describe("validate (logSighting input)", () => {
       expect(() => validate({ ...ok(), lat: 42.6 })).toThrow("location");
     });
   });
+
+  describe("picked store (BB-191 presence attestation)", () => {
+    it("defaults to null when absent", () => {
+      expect(validate(ok()).store).toBeNull();
+    });
+
+    it("accepts a picker store with OSM ref and coordinates", () => {
+      const v = validate({
+        ...ok(),
+        store: { id: "node/123456", lat: 38.25, lng: -85.75 },
+      });
+      expect(v.store).toEqual({ id: "node/123456", lat: 38.25, lng: -85.75 });
+    });
+
+    it("keeps coordinates but drops a malformed OSM ref", () => {
+      const v = validate({
+        ...ok(),
+        store: { id: "javascript:alert(1)", lat: 38.25, lng: -85.75 },
+      });
+      expect(v.store).toEqual({ id: null, lat: 38.25, lng: -85.75 });
+    });
+
+    it("degrades a store with bad coordinates to null (unattested)", () => {
+      expect(
+        validate({ ...ok(), store: { id: "node/1", lat: 999, lng: 0 } }).store
+      ).toBeNull();
+      expect(
+        validate({ ...ok(), store: { id: "node/1" } }).store
+      ).toBeNull();
+      expect(
+        validate({ ...ok(), store: "node/1" as never }).store
+      ).toBeNull();
+    });
+  });
 });

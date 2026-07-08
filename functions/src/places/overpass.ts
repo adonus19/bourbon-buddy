@@ -10,6 +10,9 @@ import { encodeGeohash } from "../shared/geohash";
 import { haversineMiles, LatLng } from "../shared/geo";
 
 export interface Retailer {
+  // OSM element ref ("node/123", "way/456") — provenance for presence
+  // attestation (BB-191). Optional: cache entries from before BB-191 lack it.
+  id?: string;
   name: string;
   lat: number;
   lng: number;
@@ -53,6 +56,8 @@ export function buildOverpassQuery(
 }
 
 interface OverpassElement {
+  type?: string;
+  id?: number;
   lat?: number;
   lon?: number;
   center?: { lat?: number; lon?: number };
@@ -88,6 +93,9 @@ export function parseOverpassRetailers(
     }
     seen.add(key);
     out.push({
+      ...(typeof el.type === "string" && typeof el.id === "number"
+        ? { id: `${el.type}/${el.id}` }
+        : {}),
       name,
       lat,
       lng,

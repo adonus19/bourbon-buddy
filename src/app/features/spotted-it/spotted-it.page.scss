@@ -79,6 +79,16 @@
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
+
+  // The picked store (BB-191) — the sighting will be presence-attested.
+  &--selected {
+    border-color: var(--color-success);
+    color: var(--color-success);
+  }
+}
+
+.spot__stores-hint--verified {
+  color: var(--color-success);
 }
 
 .spot__field {

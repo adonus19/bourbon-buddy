@@ -103,7 +103,16 @@
                         <span class="sighting__stale">May have moved on.</span>
                       }
                     </div>
-                    <div class="sighting__store">{{ s.storeName }}</div>
+                    <div class="sighting__store">
+                      {{ s.storeName }}
+                      @if (s.presenceVerified) {
+                        <span
+                          class="sighting__onsite"
+                          title="The spotter's location was verified at this store"
+                          >📍 Spotted on-site</span
+                        >
+                      }
+                    </div>
                     <div class="sighting__meta">
                       {{ s.sightingDate.toDate() | date: 'mediumDate' }}
                       @if (s.city || s.state) {

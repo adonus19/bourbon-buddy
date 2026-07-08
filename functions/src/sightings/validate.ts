@@ -28,6 +28,9 @@ export interface LogSightingData {
   // Client-generated idempotency key (BB-182): lets an offline sighting be
   // replayed on reconnect without creating a duplicate. Doc-id-safe charset.
   clientId?: string | null;
+  // The store picked from the nearby-retailer list (BB-191), if any: its OSM
+  // ref + coordinates, used server-side for presence attestation.
+  store?: { id?: string | null; lat?: number; lng?: number } | null;
 }
 
 export interface ValidatedSighting {
@@ -39,10 +42,14 @@ export interface ValidatedSighting {
   lat: number | null;
   lng: number | null;
   clientId: string | null;
+  store: { id: string | null; lat: number; lng: number } | null;
 }
 
 // Doc-id-safe idempotency key: a UUID or similar short token.
 export const CLIENT_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+
+// OSM element ref from the retailer picker, e.g. "node/123456".
+export const STORE_ID_RE = /^(node|way|relation)\/\d{1,16}$/;
 
 function bad(message: string): never {
   throw new HttpsError("invalid-argument", message);
@@ -100,6 +107,19 @@ export function validate(d: LogSightingData): ValidatedSighting {
     lng = d.lng;
   }
 
+  // Optional picked store (BB-191). Same posture as location: accept only a
+  // complete, well-formed value, otherwise store nothing — a malformed store
+  // silently degrades to "unattested" rather than failing the sighting.
+  let store: ValidatedSighting["store"] = null;
+  if (d.store != null && typeof d.store === "object") {
+    const s = d.store;
+    if (isValidLat(s.lat) && isValidLng(s.lng)) {
+      const id =
+        typeof s.id === "string" && STORE_ID_RE.test(s.id) ? s.id : null;
+      store = { id, lat: s.lat as number, lng: s.lng as number };
+    }
+  }
+
   return {
     bourbonId: d.bourbonId as string,
     storeName: d.storeName as string,
@@ -109,5 +129,6 @@ export function validate(d: LogSightingData): ValidatedSighting {
     lat,
     lng,
     clientId,
+    store,
   };
 }

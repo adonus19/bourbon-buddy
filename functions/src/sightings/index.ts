@@ -14,6 +14,7 @@ import { logger } from "firebase-functions/v2";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 
+import { isPresenceVerified } from "./presence";
 import { DAY_MS, LogSightingData, validate } from "./validate";
 import { encodeGeohash } from "../shared/geohash";
 import { ENFORCE_APP_CHECK } from "../shared/guards";
@@ -68,6 +69,14 @@ export const logSighting = onCall(
     const geohash =
       v.lat != null && v.lng != null ? encodeGeohash(v.lat, v.lng) : null;
 
+    // Presence attestation (BB-191): derived here, never accepted from the
+    // client. True only when the device coords put the spotter at the store
+    // they picked from the nearby list.
+    const presenceVerified = isPresenceVerified(
+      { lat: v.lat, lng: v.lng },
+      v.store
+    );
+
     tx.set(sightingRef, {
       bourbonId: v.bourbonId,
       bourbonName: d.bourbonName ?? null,
@@ -81,6 +90,8 @@ export const logSighting = onCall(
       lat: v.lat,
       lng: v.lng,
       geohash,
+      storePlaceId: v.store?.id ?? null,
+      presenceVerified,
       clientId: v.clientId,
       markedStaleManually: false,
       visibility: v.visibility,
