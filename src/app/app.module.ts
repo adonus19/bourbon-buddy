@@ -32,6 +32,7 @@ import {
   provideFunctions,
 } from '@angular/fire/functions';
 import { getMessaging, provideMessaging } from '@angular/fire/messaging';
+import { ServiceWorkerModule } from '@angular/service-worker';
 
 import { environment } from '../environments/environment';
 import { AppComponent } from './app.component';
@@ -39,7 +40,19 @@ import { AppRoutingModule } from './app-routing.module';
 
 @NgModule({
   declarations: [AppComponent],
-  imports: [BrowserModule, IonicModule.forRoot(), AppRoutingModule],
+  imports: [
+    BrowserModule,
+    IonicModule.forRoot(),
+    AppRoutingModule,
+    // App-shell caching (ngsw): instant repeat-visit paint + offline startup.
+    // Registered at scope '/', coexisting with firebase-messaging-sw.js which
+    // FCM registers at its own push scope. 'registerWhenStable' keeps SW setup
+    // off the critical launch path.
+    ServiceWorkerModule.register('ngsw-worker.js', {
+      enabled: environment.production,
+      registrationStrategy: 'registerWhenStable:30000',
+    }),
+  ],
   providers: [
     { provide: RouteReuseStrategy, useClass: IonicRouteStrategy },
     provideFirebaseApp(() => initializeApp(environment.firebase)),
