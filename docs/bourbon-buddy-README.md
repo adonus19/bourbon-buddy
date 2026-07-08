@@ -102,8 +102,8 @@ bourbon-buddy/
 **Value Score**
 `(rating / 5) × 100 / purchase_price`. Only shown when both rating and price exist. Stored as a field on the log entry document (denormalized) so it can be sorted on without a computed query.
 
-**Bottle Sighting Staleness**
-Any sighting older than 60 days is considered stale. Staleness is computed on read from `sightingDate`. Stale sightings remain visible but are visually de-emphasized. No background job needed — compute on read.
+**Bottle Sighting Staleness** (BB-171)
+Freshness has three tiers, computed on read from `sightingDate`, never stored: `fresh` (≤15 days), `aging` (15–30 days), `stale` (`markedStaleManually` or >30 days). Stale sightings remain visible but are visually de-emphasized. A weekly Cloud Function (`cleanupStaleSightings`) deletes sightings older than 30 days.
 
 **Wishlist → Log Conversion**
 "Found It — Log It" opens the Add Log Entry form pre-filled from the wishlist entry. On save, the wishlist entry gains `status: 'logged'` and is hidden from the active wishlist (archived, not deleted).
