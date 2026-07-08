@@ -20,6 +20,9 @@ export { onSightingCreated } from "./alerts";
 // Sighting guards (BB-163): rate-limited create callable + stale cleanup.
 export { logSighting, cleanupStaleSightings } from "./sightings";
 
+// Nearby Retailer Picker (BB-187): Overpass POI lookup, geohash-cached.
+export { nearbyRetailers } from "./places";
+
 // AI Find Bottles (BB-130): extract bottle mentions from new articles (cached),
 // a scheduled sweep for un-extracted/updated articles, plus a backfill callable.
 export {
