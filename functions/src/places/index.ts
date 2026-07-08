@@ -12,6 +12,7 @@ import { logger } from "firebase-functions/v2";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 
 import { isValidLat, isValidLng } from "../shared/geohash";
+import { consumeDailyLimit } from "../shared/guards";
 import {
   buildOverpassQuery,
   CACHE_TTL_MS,
@@ -22,6 +23,11 @@ import {
 } from "./overpass";
 
 const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
+
+// Cache hits are cheap (one read) and stay unmetered; this bounds how many
+// Overpass fetches (+ cache-doc writes) one user can trigger per day, so a
+// coordinate sweep can't run up the bill or our Overpass fair-use standing.
+const DAILY_OVERPASS_LIMIT = 25;
 
 export const nearbyRetailers = onCall(
   { region: "us-central1", timeoutSeconds: 30 },
@@ -46,7 +52,16 @@ export const nearbyRetailers = onCall(
       }
     }
 
-    // Miss/stale → query Overpass. Cache only a successful response (even if
+    // Miss/stale → this call is about to cost real money/goodwill; meter it.
+    await consumeDailyLimit(
+      db,
+      request.auth.uid,
+      "nearbyRetailers",
+      DAILY_OVERPASS_LIMIT,
+      "Daily store-lookup limit reached. Enter the store name manually."
+    );
+
+    // Query Overpass. Cache only a successful response (even if
     // empty — a genuinely barren cell); on failure, return empty WITHOUT caching
     // so a transient Overpass outage doesn't wedge the cell for a week.
     let retailers: Retailer[] = [];
