@@ -10,6 +10,11 @@ import {
   provideFirebaseApp,
 } from '@angular/fire/app';
 import {
+  initializeAppCheck,
+  provideAppCheck,
+  ReCaptchaV3Provider,
+} from '@angular/fire/app-check';
+import {
   connectAuthEmulator,
   getAuth,
   provideAuth,
@@ -56,6 +61,27 @@ import { AppRoutingModule } from './app-routing.module';
   providers: [
     { provide: RouteReuseStrategy, useClass: IonicRouteStrategy },
     provideFirebaseApp(() => initializeApp(environment.firebase)),
+    // App Check (BB-121): proves requests come from THIS app before they reach
+    // Firestore/Storage/Functions — the anti-abuse gate everything else builds
+    // on. Wired only once a reCAPTCHA site key is configured, so the app keeps
+    // working during initial setup (see docs/app-check-setup.md).
+    ...(environment.recaptchaSiteKey
+      ? [
+          provideAppCheck(() => {
+            if (!environment.production) {
+              // Dev builds mint a debug token (logged to the console on first
+              // run); register it under App Check → Apps → Debug tokens.
+              (
+                self as unknown as { FIREBASE_APPCHECK_DEBUG_TOKEN?: boolean }
+              ).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+            }
+            return initializeAppCheck(getApp(), {
+              provider: new ReCaptchaV3Provider(environment.recaptchaSiteKey),
+              isTokenAutoRefreshEnabled: true,
+            });
+          }),
+        ]
+      : []),
     provideAuth(() => {
       const auth = getAuth();
       if (environment.useEmulators) {

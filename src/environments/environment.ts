@@ -24,6 +24,10 @@ export const environment = {
   // MapTiler tile key for the sightings map (BB-179). Free tier at
   // maptiler.com → Account → Keys. The map shows a "needs a key" notice until set.
   maptilerKey: 'sZQiP80L1cqzNxP1VhXr',
+  // App Check (BB-121): reCAPTCHA v3 site key from Firebase Console →
+  // App Check → register the web app. Empty = App Check stays OFF client-side.
+  // Full setup steps (including the local debug token): docs/app-check-setup.md.
+  recaptchaSiteKey: '',
   emulators: {
     auth: { host: 'localhost', port: 9099 },
     firestore: { host: 'localhost', port: 8080 },
