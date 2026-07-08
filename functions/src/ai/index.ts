@@ -17,9 +17,10 @@ import { FieldValue, getFirestore, Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { defineSecret } from "firebase-functions/params";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
-import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 
+import { requireAdmin } from "../shared/guards";
 import { normalizeBottleName } from "../shared/normalize";
 import { buildModelText, fetchArticleBody } from "./article-text";
 import {
@@ -131,17 +132,15 @@ export const extractBottlesFromArticle = onDocumentCreated(
 
 /**
  * Bounded backfill / test tool: extract bottles for the most recent articles
- * that haven't been processed yet. Signed-in only and capped at 50 per call so
- * it can't run away. (Lock down or remove before a public launch.)
+ * that haven't been processed yet. Admin-only (BB-190): it burns Groq quota and
+ * catalog writes at will, so it's an operator tool, not a user feature.
  */
 const REPROCESS_MAX_HOURS = 48; // forced-reprocess window ceiling
 
 export const backfillArticleBottles = onCall(
   { region: "us-central1", secrets: [GROQ_API_KEY], timeoutSeconds: 540 },
   async (request) => {
-    if (!request.auth?.uid) {
-      throw new HttpsError("unauthenticated", "Sign in to run the backfill.");
-    }
+    requireAdmin(request);
     const data = request.data as {
       limit?: number;
       force?: boolean;

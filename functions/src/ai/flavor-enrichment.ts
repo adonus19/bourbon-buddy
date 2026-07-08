@@ -16,6 +16,7 @@ import { logger } from "firebase-functions/v2";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 
+import { consumeDailyLimit, requireAdmin } from "../shared/guards";
 import { CANONICAL_FLAVOR_TAGS, matchCanonicalTags } from "./flavor-taxonomy";
 import { GROQ_API_KEY, GROQ_MODEL, RateLimitError, chatJson } from "./groq";
 
@@ -223,10 +224,17 @@ export async function applyEnrichment(
   };
 }
 
+// A non-refresh call on an already-adequate bottle returns the cached profile,
+// so organic use is self-limiting. `refresh: true` forces a new Groq generation
+// + write every time — that's the loopable cost vector, so it gets a daily
+// per-user budget (BB-190).
+const DAILY_REFRESH_LIMIT = 10;
+
 export const enrichBottleFlavor = onCall(
   { region: "us-central1", secrets: [GROQ_API_KEY] },
   async (request) => {
-    if (!request.auth?.uid) {
+    const uid = request.auth?.uid;
+    if (!uid) {
       throw new HttpsError("unauthenticated", "Sign in to enrich a bottle.");
     }
     const data = request.data as { bourbonId?: string; refresh?: boolean };
@@ -237,6 +245,15 @@ export const enrichBottleFlavor = onCall(
     const refresh = data?.refresh === true;
 
     const db = getFirestore();
+    if (refresh) {
+      await consumeDailyLimit(
+        db,
+        uid,
+        "flavorRefresh",
+        DAILY_REFRESH_LIMIT,
+        "Daily flavor-refresh limit reached. Try again tomorrow."
+      );
+    }
     const ref = db.collection("bourbons").doc(bourbonId);
     const snap = await ref.get();
     if (!snap.exists) {
@@ -365,13 +382,11 @@ export const sweepFlavorEnrichment = onSchedule(
   }
 );
 
-/** Manual, bounded trigger for the same sweep (seeding / testing). Signed-in. */
+/** Manual, bounded trigger for the same sweep. Admin-only (BB-190). */
 export const backfillFlavorEnrichment = onCall(
   { region: "us-central1", secrets: [GROQ_API_KEY], timeoutSeconds: 540 },
   async (request) => {
-    if (!request.auth?.uid) {
-      throw new HttpsError("unauthenticated", "Sign in to run the backfill.");
-    }
+    requireAdmin(request);
     const requested = Number((request.data as { limit?: number })?.limit);
     const limit = Math.min(
       Math.max(Number.isFinite(requested) ? requested : 50, 1),
