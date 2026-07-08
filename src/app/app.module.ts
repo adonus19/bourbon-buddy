@@ -68,9 +68,14 @@ import { AppRoutingModule } from './app-routing.module';
     ...(environment.recaptchaSiteKey
       ? [
           provideAppCheck(() => {
-            if (!environment.production) {
-              // Dev builds mint a debug token (logged to the console on first
-              // run); register it under App Check → Apps → Debug tokens.
+            // Debug-token mode is keyed off the HOSTNAME, deliberately not
+            // environment.production: a deployed build made from the dev
+            // environment config would otherwise silently run App Check in
+            // debug mode in production, and every user's unregistered token
+            // would be rejected (the 2026-07 outage). Only true local dev
+            // mints a debug token — register it under App Check → Apps →
+            // Debug tokens (it's logged to the console on first run).
+            if (['localhost', '127.0.0.1'].includes(location.hostname)) {
               (
                 self as unknown as { FIREBASE_APPCHECK_DEBUG_TOKEN?: boolean }
               ).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
