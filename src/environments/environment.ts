@@ -27,7 +27,7 @@ export const environment = {
   // App Check (BB-121): reCAPTCHA v3 site key from Firebase Console →
   // App Check → register the web app. Empty = App Check stays OFF client-side.
   // Full setup steps (including the local debug token): docs/app-check-setup.md.
-  recaptchaSiteKey: '',
+  recaptchaSiteKey: '6Lfkl0otAAAAACERAMWW_7u-cXjH8168XEhhL73i',
   emulators: {
     auth: { host: 'localhost', port: 9099 },
     firestore: { host: 'localhost', port: 8080 },
