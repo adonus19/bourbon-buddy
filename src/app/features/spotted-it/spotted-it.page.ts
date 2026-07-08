@@ -12,6 +12,7 @@ import { BarcodeScannerService } from '../../core/services/barcode-scanner.servi
 import {
   Coordinates,
   GeolocationService,
+  Retailer,
 } from '../../core/services/geolocation.service';
 import { sightingErrorMessage } from '../../shared/utils/sighting-error';
 
@@ -47,10 +48,15 @@ export class SpottedItPage {
   readonly locating = signal(false);
   private coords: Coordinates | null = null;
 
+  // Nearby retailer picker (BB-187): populated from the captured coordinates.
+  readonly nearbyStores = signal<Retailer[]>([]);
+  readonly loadingStores = signal(false);
+
   async onToggleLocation(enabled: boolean): Promise<void> {
     if (!enabled) {
       this.attachLocation.set(false);
       this.coords = null;
+      this.nearbyStores.set([]);
       return;
     }
     this.locating.set(true);
@@ -61,6 +67,8 @@ export class SpottedItPage {
         this.attachLocation.set(true);
         // BB-183: fill City/State from the coords, non-blocking, never clobbering.
         void this.prefillCityState(coords);
+        // BB-187: offer nearby stores to tap instead of typing.
+        void this.loadNearbyStores(coords);
       } else {
         this.coords = null;
         this.attachLocation.set(false);
@@ -86,6 +94,31 @@ export class SpottedItPage {
     }
     if (place.state && !(state.value ?? '').trim()) {
       state.setValue(place.state);
+    }
+  }
+
+  /** Fetch tappable nearby stores for the captured coords (BB-187). */
+  private async loadNearbyStores(coords: Coordinates): Promise<void> {
+    this.loadingStores.set(true);
+    try {
+      this.nearbyStores.set(
+        await this.geo.nearbyRetailers(coords.lat, coords.lng)
+      );
+    } finally {
+      this.loadingStores.set(false);
+    }
+  }
+
+  /** Tap a nearby store to fill the store name (and city/state when OSM has them). */
+  selectStore(store: Retailer): void {
+    const c = this.form.controls;
+    c.storeName.setValue(store.name);
+    c.storeName.markAsDirty();
+    if (store.city) {
+      c.city.setValue(store.city);
+    }
+    if (store.state) {
+      c.state.setValue(store.state);
     }
   }
 

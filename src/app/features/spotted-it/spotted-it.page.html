@@ -103,6 +103,29 @@
           only the store and city.
         }
       </p>
+
+      @if (attachLocation() && (loadingStores() || nearbyStores().length)) {
+        <div class="spot__stores">
+          @if (loadingStores()) {
+            <p class="spot__stores-hint">
+              <ion-spinner name="dots"></ion-spinner> Finding nearby stores…
+            </p>
+          } @else {
+            <p class="spot__stores-hint">Nearby stores — tap to fill:</p>
+            <div class="spot__stores-list">
+              @for (store of nearbyStores(); track store.name) {
+                <button
+                  type="button"
+                  class="spot__store-chip"
+                  (click)="selectStore(store)"
+                >
+                  {{ store.name }}
+                </button>
+              }
+            </div>
+          }
+        </div>
+      }
     </div>
 
     <ion-textarea

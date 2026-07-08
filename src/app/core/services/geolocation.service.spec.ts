@@ -1,11 +1,25 @@
+import { TestBed } from '@angular/core/testing';
+
+jest.mock('@angular/fire/functions', () => ({
+  Functions: class {},
+  httpsCallable: jest.fn(),
+}));
+
+import { Functions, httpsCallable } from '@angular/fire/functions';
 import { GeolocationService } from './geolocation.service';
+
+const asMock = (fn: unknown) => fn as jest.Mock;
 
 describe('GeolocationService', () => {
   let service: GeolocationService;
   const original = Object.getOwnPropertyDescriptor(navigator, 'geolocation');
 
   beforeEach(() => {
-    service = new GeolocationService();
+    jest.clearAllMocks();
+    TestBed.configureTestingModule({
+      providers: [GeolocationService, { provide: Functions, useValue: {} }],
+    });
+    service = TestBed.inject(GeolocationService);
   });
 
   afterEach(() => {
@@ -96,6 +110,37 @@ describe('GeolocationService', () => {
     it('returns null when no place fields are present', async () => {
       mockFetch(() => Promise.resolve({ ok: true, json: () => Promise.resolve({}) }));
       await expect(service.reverseGeocode(0, 0)).resolves.toBeNull();
+    });
+  });
+
+  describe('nearbyRetailers (BB-187)', () => {
+    it('returns the retailers from the callable', async () => {
+      const callable = jest.fn().mockResolvedValue({
+        data: {
+          retailers: [
+            { name: 'Total Wine', lat: 1, lng: 2, kind: 'wine', city: null, state: null },
+          ],
+        },
+      });
+      asMock(httpsCallable).mockReturnValue(callable);
+
+      const out = await service.nearbyRetailers(42.5, -71.1);
+      expect(callable).toHaveBeenCalledWith({ lat: 42.5, lng: -71.1 });
+      expect(out.map((r) => r.name)).toEqual(['Total Wine']);
+    });
+
+    it('returns [] when the callable errors (degrades to manual entry)', async () => {
+      asMock(httpsCallable).mockReturnValue(
+        jest.fn().mockRejectedValue(new Error('offline'))
+      );
+      await expect(service.nearbyRetailers(1, 2)).resolves.toEqual([]);
+    });
+
+    it('returns [] when the response has no retailers', async () => {
+      asMock(httpsCallable).mockReturnValue(
+        jest.fn().mockResolvedValue({ data: {} })
+      );
+      await expect(service.nearbyRetailers(1, 2)).resolves.toEqual([]);
     });
   });
 });
