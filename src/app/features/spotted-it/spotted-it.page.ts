@@ -51,12 +51,14 @@ export class SpottedItPage {
   // Nearby retailer picker (BB-187): populated from the captured coordinates.
   readonly nearbyStores = signal<Retailer[]>([]);
   readonly loadingStores = signal(false);
+  readonly storesLoaded = signal(false); // a lookup has completed (drives empty state)
 
   async onToggleLocation(enabled: boolean): Promise<void> {
     if (!enabled) {
       this.attachLocation.set(false);
       this.coords = null;
       this.nearbyStores.set([]);
+      this.storesLoaded.set(false);
       return;
     }
     this.locating.set(true);
@@ -99,6 +101,7 @@ export class SpottedItPage {
 
   /** Fetch tappable nearby stores for the captured coords (BB-187). */
   private async loadNearbyStores(coords: Coordinates): Promise<void> {
+    this.storesLoaded.set(false);
     this.loadingStores.set(true);
     try {
       this.nearbyStores.set(
@@ -106,6 +109,7 @@ export class SpottedItPage {
       );
     } finally {
       this.loadingStores.set(false);
+      this.storesLoaded.set(true);
     }
   }
 

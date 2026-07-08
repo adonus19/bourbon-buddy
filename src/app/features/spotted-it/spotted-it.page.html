@@ -104,13 +104,13 @@
         }
       </p>
 
-      @if (attachLocation() && (loadingStores() || nearbyStores().length)) {
+      @if (attachLocation() && (loadingStores() || storesLoaded())) {
         <div class="spot__stores">
           @if (loadingStores()) {
             <p class="spot__stores-hint">
               <ion-spinner name="dots"></ion-spinner> Finding nearby stores…
             </p>
-          } @else {
+          } @else if (nearbyStores().length) {
             <p class="spot__stores-hint">Nearby stores — tap to fill:</p>
             <div class="spot__stores-list">
               @for (store of nearbyStores(); track store.name) {
@@ -123,6 +123,10 @@
                 </button>
               }
             </div>
+          } @else {
+            <p class="spot__stores-hint">
+              No nearby stores found — just type the store name.
+            </p>
           }
         </div>
       }
