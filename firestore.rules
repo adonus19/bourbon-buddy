@@ -26,9 +26,40 @@ service cloud.firestore {
     // counts) — never email/bio/log/wishlist. Owner-written, mirrored from the
     // private /users doc by UserService. friendCount is also written by the
     // friend callables via the Admin SDK (which bypasses these rules).
+    //
+    // Validated (BB-193) because this doc renders in OTHER users' UI: key
+    // allowlist + bounds, username shape matches the app's rules, and a claimed
+    // username must be backed by the caller's own /usernames reservation
+    // (getAfter: the claim transaction writes both docs atomically). friendCount
+    // is bounded, not pinned — the owner's mirror write includes it and the
+    // callables (Admin SDK) keep it honest.
     match /publicProfiles/{userId} {
+      function validPublicProfile() {
+        let d = request.resource.data;
+        return d.keys().hasOnly([
+            'displayName', 'username', 'usernameLower', 'avatarUrl',
+            'homeRegion', 'isDiscoverable', 'friendCount', 'updatedAt'
+          ])
+          && (d.displayName is string
+              && d.displayName.size() >= 1 && d.displayName.size() <= 60)
+          && (
+            (d.username == null && d.usernameLower == null)
+            || (d.username is string
+                && d.username.matches('^[a-zA-Z0-9_]{3,20}$')
+                && d.usernameLower == d.username.lower()
+                && getAfter(/databases/$(database)/documents/usernames/$(d.usernameLower)).data.uid == request.auth.uid)
+          )
+          && (d.avatarUrl == null
+              || (d.avatarUrl is string && d.avatarUrl.size() <= 500
+                  && d.avatarUrl.matches('https?://.*')))
+          && (d.homeRegion == null
+              || (d.homeRegion is string && d.homeRegion.size() <= 80))
+          && d.isDiscoverable is bool
+          && (d.friendCount is int && d.friendCount >= 0 && d.friendCount <= 100000)
+          && d.updatedAt is timestamp;
+      }
       allow read: if isSignedIn();
-      allow write: if isOwner(userId);
+      allow write: if isOwner(userId) && validPublicProfile();
     }
 
     // Username reservations (BB-100): one doc per claimed handle, ID = lowercased
@@ -37,8 +68,12 @@ service cloud.firestore {
     // delete only your own (releases the handle). Never updated in place.
     match /usernames/{usernameLower} {
       allow read: if isSignedIn();
+      // Handle format matches the app's rules (3-20, word chars, lowercased
+      // key) so junk/squat docs can't be minted outside the claim flow (BB-193).
       allow create: if isSignedIn()
-                    && request.resource.data.uid == request.auth.uid;
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.keys().hasOnly(['uid', 'createdAt'])
+                    && usernameLower.matches('^[a-z0-9_]{3,20}$');
       allow delete: if isSignedIn()
                     && resource.data.uid == request.auth.uid;
       allow update: if false;
@@ -47,19 +82,63 @@ service cloud.firestore {
     // Shared bourbon catalog: any signed-in user can read or create;
     // only the original creator may update their addition. No deletes.
     match /bourbons/{bourbonId} {
+      // Field allowlist + per-field bounds (BB-193): the catalog is shared, so
+      // no user may park unbounded/foreign data on it. (List ITEMS can't be
+      // validated in rules; lists are capped by count and docs by Firestore's
+      // 1 MiB limit.)
+      function validBourbonData() {
+        let d = request.resource.data;
+        return d.keys().hasOnly([
+            'name', 'nameLowercase', 'nameNormalized', 'aliases', 'canonicalId',
+            'distillery', 'bottler', 'category', 'subType', 'ageStatement',
+            'isNas', 'proof', 'msrp', 'series', 'upc', 'flavorProfile',
+            'flavorEnrichedAt', 'createdAt', 'createdByUserId'
+          ])
+          && (d.name is string && d.name.size() > 0 && d.name.size() <= 120)
+          && (!('nameLowercase' in d)
+              || (d.nameLowercase is string && d.nameLowercase.size() <= 160))
+          && (!('nameNormalized' in d)
+              || (d.nameNormalized is string && d.nameNormalized.size() <= 160))
+          && (!('aliases' in d) || (d.aliases is list && d.aliases.size() <= 20))
+          && (!('canonicalId' in d) || d.canonicalId == null
+              || (d.canonicalId is string && d.canonicalId.size() <= 128))
+          && (!('distillery' in d) || d.distillery == null
+              || (d.distillery is string && d.distillery.size() <= 120))
+          && (!('bottler' in d) || d.bottler == null
+              || (d.bottler is string && d.bottler.size() <= 120))
+          && (!('category' in d) || d.category == null
+              || (d.category is string && d.category.size() <= 40))
+          && (!('subType' in d) || d.subType == null
+              || (d.subType is string && d.subType.size() <= 40))
+          && (!('ageStatement' in d) || d.ageStatement == null
+              || d.ageStatement is number)
+          && (!('isNas' in d) || d.isNas is bool)
+          && (!('proof' in d) || d.proof == null || d.proof is number)
+          && (!('msrp' in d) || d.msrp == null || d.msrp is number)
+          && (!('series' in d) || d.series == null
+              || (d.series is string && d.series.size() <= 120))
+          && (!('upc' in d) || (d.upc is list && d.upc.size() <= 20))
+          && (!('flavorProfile' in d) || d.flavorProfile == null
+              || d.flavorProfile is map)
+          && (!('flavorEnrichedAt' in d) || d.flavorEnrichedAt == null
+              || d.flavorEnrichedAt is timestamp);
+      }
       allow read: if isSignedIn();
-      // Basic anti-spam validation (BB-163): a non-empty, bounded name.
       allow create: if isSignedIn()
                     && request.resource.data.createdByUserId == request.auth.uid
-                    && request.resource.data.name is string
-                    && request.resource.data.name.size() > 0
-                    && request.resource.data.name.size() <= 120;
-      // The creator may edit anything; any signed-in user may append to the
-      // crowdsourced UPC index (BB-175) — but ONLY the `upc` field, bounded, so
-      // scanning a bottle you (or the AI) didn't create still teaches the index.
+                    && validBourbonData();
+      // The creator may edit their addition (same bounds, and can't reassign
+      // authorship/backdate); any signed-in user may append to the crowdsourced
+      // UPC index (BB-175) — but ONLY the `upc` field, bounded, so scanning a
+      // bottle you (or the AI) didn't create still teaches the index.
       allow update: if isSignedIn()
                     && (
-                      resource.data.createdByUserId == request.auth.uid
+                      (
+                        resource.data.createdByUserId == request.auth.uid
+                        && validBourbonData()
+                        && !request.resource.data.diff(resource.data)
+                            .affectedKeys().hasAny(['createdByUserId', 'createdAt'])
+                      )
                       || (
                         request.resource.data.diff(resource.data)
                           .affectedKeys().hasOnly(['upc'])
@@ -89,17 +168,22 @@ service cloud.firestore {
                       || (resource.data.visibility == 'friends'
                           && exists(/databases/$(database)/documents/users/$(resource.data.spotterUid)/friends/$(request.auth.uid))));
       allow create: if false;
-      // The owner may mark-stale / edit notes etc., but the trust-relevant
-      // fields are pinned: identity, price, dates, coordinates, and the
-      // server-derived presence attestation (BB-191) can never be rewritten.
+      // Owner edits are allowlisted to the fields that are legitimately
+      // editable after the fact (BB-193). Everything trust-relevant — identity,
+      // bottle, price, store, dates, coordinates, and the server-derived
+      // presence attestation (BB-191) — is immutable once logged: re-dating or
+      // re-locating a sighting would forge freshness/trust signals.
       allow update: if isSignedIn()
                     && resource.data.spotterUid == request.auth.uid
-                    && request.resource.data.spotterUid == resource.data.spotterUid
-                    && request.resource.data.bourbonId == resource.data.bourbonId
-                    && request.resource.data.price == resource.data.price
-                    && request.resource.data.createdAt == resource.data.createdAt
-                    && !request.resource.data.diff(resource.data).affectedKeys()
-                        .hasAny(['presenceVerified', 'storePlaceId']);
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(['markedStaleManually', 'visibility', 'notes',
+                                  'city', 'state'])
+                    && request.resource.data.markedStaleManually is bool
+                    && (request.resource.data.visibility == 'private'
+                        || request.resource.data.visibility == 'friends')
+                    && (request.resource.data.notes == null
+                        || (request.resource.data.notes is string
+                            && request.resource.data.notes.size() <= 500));
       allow delete: if isSignedIn()
                     && resource.data.spotterUid == request.auth.uid;
     }
