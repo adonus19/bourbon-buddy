@@ -26,7 +26,9 @@ const db = admin.firestore();
 
 const APPLY = process.argv.includes("--apply");
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const GROQ_MODEL = "llama-3.1-8b-instant";
+// Classification is a one-time destructive decision, so use the strongest
+// free-tier model — the 8b extraction model over-flags real whiskeys.
+const GROQ_MODEL = "llama-3.3-70b-versatile";
 const CLASSIFY_BATCH = 40;
 const CALL_SPACING_MS = 3000; // free tier is 30 RPM; stay far under it
 const ARTICLE_SCRUB_LIMIT = 1000; // newest articles checked for dead chips
@@ -55,19 +57,29 @@ async function collectReferencedIds() {
 }
 
 /**
- * Asks the model which of the numbered product names are NOT whiskey.
- * Returns a Set of indices into `names`.
+ * Asks the model which of the numbered products are NOT whiskey. Each line
+ * carries the doc's distillery/category when known so the model isn't
+ * guessing from a bare name. Returns a Set of indices into `docs`.
  */
-async function classifyNonWhiskey(names) {
-  const numbered = names.map((n, i) => `${i}: ${n}`).join("\n");
+async function classifyNonWhiskey(docs) {
+  const numbered = docs
+    .map((d, i) => {
+      const parts = [d.get("name")];
+      if (d.get("distillery")) parts.push(`distillery: ${d.get("distillery")}`);
+      if (d.get("category")) parts.push(`category: ${d.get("category")}`);
+      return `${i}: ${parts.join(" | ")}`;
+    })
+    .join("\n");
   const system =
-    "You classify drink product names. Given a numbered list, reply ONLY " +
-    'with JSON: {"non_whiskey": [numbers]} listing every product that is NOT ' +
-    "a whiskey (bourbon, rye, wheat whiskey, Tennessee, American single malt, " +
-    "scotch, Irish, Japanese, or other world whiskies all COUNT as whiskey). " +
-    "Non-whiskey examples: tequila, mezcal, gin, vodka, rum, brandy, cognac, " +
-    "liqueurs, canned cocktails, beer, cider, wine, hard seltzer. If a name " +
-    "is ambiguous, treat it as whiskey (do NOT list it).";
+    "You classify drink products. Given a numbered list (name, sometimes " +
+    'distillery/category), reply ONLY with JSON: {"non_whiskey": [numbers]} ' +
+    "listing every product you are CERTAIN is not a whiskey (bourbon, rye, " +
+    "wheat whiskey, Tennessee, American single malt, scotch, Irish, Japanese, " +
+    "and world whiskies all COUNT as whiskey). Non-whiskey examples: tequila, " +
+    "mezcal, gin, vodka, rum, brandy, cognac, sherry, shochu, liqueurs, " +
+    "canned cocktails, beer, cider, wine, hard seltzer, soda. If a name is " +
+    "ambiguous or you do not recognize it, treat it as whiskey (do NOT list " +
+    "it) — false deletions are far worse than leftovers.";
 
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
@@ -93,7 +105,52 @@ async function classifyNonWhiskey(names) {
   const parsed = JSON.parse(body.choices?.[0]?.message?.content ?? "{}");
   const indices = Array.isArray(parsed.non_whiskey) ? parsed.non_whiskey : [];
   return new Set(
-    indices.filter((i) => Number.isInteger(i) && i >= 0 && i < names.length)
+    indices.filter((i) => Number.isInteger(i) && i >= 0 && i < docs.length)
+  );
+}
+
+// A name that says it's whiskey is never deleted, whatever the model thinks.
+const WHISKEY_WORDS = /whisk(e)?y|bourbon|\brye\b|scotch|single malt/i;
+
+/**
+ * Second opinion on the flagged docs only: asks the model the INVERSE
+ * question and rescues anything that is or might be a whiskey. One pass
+ * over-flags real bottles (Johnnie Walker 18 was on the first list), and a
+ * focused re-check catches those.
+ */
+async function rescueWhiskeys(docs) {
+  if (docs.length === 0) return new Set();
+  const numbered = docs.map((d, i) => `${i}: ${d.get("name")}`).join("\n");
+  const system =
+    "These drink products were flagged for deletion as non-whiskey. Reply " +
+    'ONLY with JSON: {"whiskey": [numbers]} listing every product that IS or ' +
+    "MIGHT BE a whiskey of any style (bourbon, rye, scotch, Irish, Japanese, " +
+    "Tennessee, single malt, world whisky). When in doubt, include it.";
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${GROQ_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      temperature: 0,
+      max_tokens: 512,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: numbered },
+      ],
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`Groq ${res.status}: ${await res.text()} — rerun later.`);
+  }
+  const body = await res.json();
+  const parsed = JSON.parse(body.choices?.[0]?.message?.content ?? "{}");
+  const indices = Array.isArray(parsed.whiskey) ? parsed.whiskey : [];
+  return new Set(
+    indices.filter((i) => Number.isInteger(i) && i >= 0 && i < docs.length)
   );
 }
 
@@ -143,14 +200,38 @@ async function main() {
     console.log(`  SKIP (referenced by a user): ${doc.get("name")}`);
   }
 
-  const toDelete = [];
+  const flagged = [];
   for (let i = 0; i < candidates.length; i += CLASSIFY_BATCH) {
     const batch = candidates.slice(i, i + CLASSIFY_BATCH);
-    const nonWhiskey = await classifyNonWhiskey(batch.map((d) => d.get("name")));
+    const nonWhiskey = await classifyNonWhiskey(batch);
     for (const idx of nonWhiskey) {
-      toDelete.push(batch[idx]);
+      flagged.push(batch[idx]);
     }
     if (i + CLASSIFY_BATCH < candidates.length) await sleep(CALL_SPACING_MS);
+  }
+
+  // Safety nets: a whiskey-sounding name is never deleted, and the model
+  // re-examines the rest with the inverse question before anything goes.
+  const toDelete = [];
+  const check = [];
+  for (const doc of flagged) {
+    if (WHISKEY_WORDS.test(doc.get("name") ?? "")) {
+      console.log(`  RESCUE (name says whiskey): ${doc.get("name")}`);
+    } else {
+      check.push(doc);
+    }
+  }
+  for (let i = 0; i < check.length; i += CLASSIFY_BATCH) {
+    const batch = check.slice(i, i + CLASSIFY_BATCH);
+    await sleep(CALL_SPACING_MS);
+    const rescued = await rescueWhiskeys(batch);
+    batch.forEach((doc, idx) => {
+      if (rescued.has(idx)) {
+        console.log(`  RESCUE (second opinion): ${doc.get("name")}`);
+      } else {
+        toDelete.push(doc);
+      }
+    });
   }
 
   console.log(`\n${toDelete.length} non-whiskey doc(s) identified:`);
