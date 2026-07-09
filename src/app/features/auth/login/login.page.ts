@@ -5,7 +5,6 @@ import {
   Validators,
 } from '@angular/forms';
 import { Router } from '@angular/router';
-import { User } from '@angular/fire/auth';
 
 import { AuthService } from '../../../core/auth/auth.service';
 import { authErrorMessage } from '../../../core/auth/auth-error';
@@ -47,23 +46,14 @@ export class LoginPage {
     }
   }
 
-  signInWithGoogle(): Promise<void> {
-    return this.socialSignIn(() => this.auth.signInWithGoogle());
-  }
-
-  signInWithFacebook(): Promise<void> {
-    return this.socialSignIn(() => this.auth.signInWithFacebook());
-  }
-
-  /** Shared flow for the federated providers: sign in, then land on /tabs. */
-  private async socialSignIn(run: () => Promise<User>): Promise<void> {
+  async signInWithGoogle(): Promise<void> {
     if (this.submitting) {
       return;
     }
     this.submitting = true;
     this.errorMessage = '';
     try {
-      await run();
+      await this.auth.signInWithGoogle();
       await this.router.navigateByUrl('/tabs', { replaceUrl: true });
     } catch (err) {
       this.errorMessage = authErrorMessage(err);
