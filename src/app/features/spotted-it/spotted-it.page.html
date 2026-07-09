@@ -38,53 +38,6 @@
     }
 
     <p class="eyebrow spot__section">Where & how much</p>
-    <ion-input
-      class="spot__field"
-      fill="solid"
-      label="Store / venue"
-      labelPlacement="stacked"
-      type="text"
-      formControlName="storeName"
-    ></ion-input>
-
-    <ion-input
-      class="spot__field"
-      fill="solid"
-      label="Price"
-      labelPlacement="stacked"
-      type="number"
-      inputmode="decimal"
-      formControlName="price"
-    ></ion-input>
-
-    <ion-input
-      class="spot__field"
-      fill="solid"
-      label="Date spotted"
-      labelPlacement="stacked"
-      type="date"
-      formControlName="sightingDate"
-    ></ion-input>
-
-    <div class="spot__row">
-      <ion-input
-        class="spot__field"
-        fill="solid"
-        label="City"
-        labelPlacement="stacked"
-        type="text"
-        formControlName="city"
-      ></ion-input>
-      <ion-input
-        class="spot__field"
-        fill="solid"
-        label="State"
-        labelPlacement="stacked"
-        type="text"
-        formControlName="state"
-      ></ion-input>
-    </div>
-
     <div class="spot__location">
       <ion-toggle
         [checked]="attachLocation()"
@@ -140,6 +93,53 @@
           }
         </div>
       }
+    </div>
+
+    <ion-input
+      class="spot__field"
+      fill="solid"
+      label="Store / venue"
+      labelPlacement="stacked"
+      type="text"
+      formControlName="storeName"
+    ></ion-input>
+
+    <ion-input
+      class="spot__field"
+      fill="solid"
+      label="Price"
+      labelPlacement="stacked"
+      type="number"
+      inputmode="decimal"
+      formControlName="price"
+    ></ion-input>
+
+    <ion-input
+      class="spot__field"
+      fill="solid"
+      label="Date spotted"
+      labelPlacement="stacked"
+      type="date"
+      formControlName="sightingDate"
+    ></ion-input>
+
+    <div class="spot__row">
+      <ion-input
+        class="spot__field"
+        fill="solid"
+        label="City"
+        labelPlacement="stacked"
+        type="text"
+        formControlName="city"
+      ></ion-input>
+      <ion-input
+        class="spot__field"
+        fill="solid"
+        label="State"
+        labelPlacement="stacked"
+        type="text"
+        formControlName="state"
+      ></ion-input>
     </div>
 
     <ion-textarea
