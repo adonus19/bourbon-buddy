@@ -16,6 +16,8 @@ export function authErrorMessage(error: unknown): string {
       return "Email or password didn't match.";
     case 'auth/email-already-in-use':
       return 'An account with that email already exists.';
+    case 'auth/account-exists-with-different-credential':
+      return 'You already have an account with that email — sign in the way you did before.';
     case 'auth/weak-password':
       return 'Password needs to be at least 8 characters.';
     case 'auth/too-many-requests':

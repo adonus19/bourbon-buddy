@@ -81,17 +81,8 @@
       class="auth-social-btn"
       expand="block"
       fill="outline"
-      (click)="providerNotReady('Apple')"
-    >
-      <ion-icon name="logo-apple" slot="start"></ion-icon>
-      Continue with Apple
-    </ion-button>
-
-    <ion-button
-      class="auth-social-btn"
-      expand="block"
-      fill="outline"
-      (click)="providerNotReady('Facebook')"
+      (click)="signInWithFacebook()"
+      [disabled]="submitting"
     >
       <ion-icon name="logo-facebook" slot="start"></ion-icon>
       Continue with Facebook
