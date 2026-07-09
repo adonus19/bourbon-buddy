@@ -46,4 +46,19 @@ describe("chatJson (Groq client)", () => {
     }) as unknown as typeof fetch;
     expect(await chatJson("key", "s", "u", 400)).toEqual({});
   });
+
+  it("sends temperature 0 by default and a per-call override (BB-196)", async () => {
+    const mock = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ choices: [{ message: { content: "{}" } }] }),
+    });
+    global.fetch = mock as unknown as typeof fetch;
+
+    await chatJson("key", "s", "u", 400);
+    expect(JSON.parse(mock.mock.calls[0][1].body).temperature).toBe(0);
+
+    await chatJson("key", "s", "u", 400, 0.4);
+    expect(JSON.parse(mock.mock.calls[1][1].body).temperature).toBe(0.4);
+  });
 });
