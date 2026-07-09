@@ -1,5 +1,5 @@
 import { Component, inject } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { FormBuilder, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { User } from '@angular/fire/auth';
 
@@ -17,7 +17,7 @@ export class RegisterPage {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
 
-  readonly form: FormGroup = this.fb.group({
+  readonly form = this.fb.group({
     displayName: ['', [Validators.required, Validators.maxLength(60)]],
     email: ['', [Validators.required, Validators.email]],
     // Firebase requires 6+, but the brief/AC specifies an 8-char minimum.
@@ -27,11 +27,6 @@ export class RegisterPage {
   submitting = false;
   errorMessage = '';
 
-  get passwordTooShort(): boolean {
-    const ctrl = this.form.get('password');
-    return !!ctrl && ctrl.touched && ctrl.hasError('minlength');
-  }
-
   async register(): Promise<void> {
     if (this.form.invalid || this.submitting) {
       this.form.markAllAsTouched();
@@ -40,8 +35,8 @@ export class RegisterPage {
     this.submitting = true;
     this.errorMessage = '';
     try {
-      const { email, password, displayName } = this.form.value;
-      await this.auth.register(email, password, displayName.trim());
+      const { email, password, displayName } = this.form.getRawValue();
+      await this.auth.register(email ?? '', password ?? '', (displayName ?? '').trim());
       await this.router.navigateByUrl('/tabs', { replaceUrl: true });
     } catch (err) {
       this.errorMessage = authErrorMessage(err);

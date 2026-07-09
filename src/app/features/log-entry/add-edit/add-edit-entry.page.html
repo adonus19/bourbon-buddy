@@ -30,6 +30,7 @@
 
     <app-bourbon-autocomplete
       [value]="form.controls.bourbonName.value ?? ''"
+      [required]="true"
       (valueChange)="onNameInput($event)"
       (selected)="onBottleSelected($event)"
     ></app-bourbon-autocomplete>

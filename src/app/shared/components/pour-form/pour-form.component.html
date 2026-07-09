@@ -21,11 +21,17 @@
     <ion-input
       class="pform__field"
       fill="solid"
-      label="Pour date"
       labelPlacement="stacked"
       type="date"
       formControlName="pourDate"
-    ></ion-input>
+    >
+      <span slot="label"
+        >Pour date <span class="required-mark" aria-hidden="true">*</span></span
+      >
+    </ion-input>
+    @if (form.controls.pourDate.touched && form.controls.pourDate.invalid) {
+      <div class="field-error">A pour date is required.</div>
+    }
 
     <ion-textarea
       class="pform__field"

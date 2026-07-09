@@ -2,7 +2,6 @@
   <ion-input
     class="autocomplete__input"
     fill="solid"
-    [label]="label()"
     labelPlacement="stacked"
     type="text"
     autocapitalize="words"
@@ -11,6 +10,9 @@
     (ionInput)="onInput($event)"
     (ionBlur)="hideResultsSoon()"
   >
+    <span slot="label">
+      {{ label() }}@if (required()) {<span class="required-mark" aria-hidden="true">&nbsp;*</span>}
+    </span>
     @if (searching()) {
       <ion-spinner slot="end" name="dots"></ion-spinner>
     }

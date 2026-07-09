@@ -17,27 +17,44 @@
       <ion-input
         class="auth-field"
         fill="solid"
-        label="Email"
         labelPlacement="stacked"
         type="email"
         inputmode="email"
         autocomplete="email"
         formControlName="email"
         placeholder="you@example.com"
-      ></ion-input>
+      >
+        <span slot="label"
+          >Email <span class="required-mark" aria-hidden="true">*</span></span
+        >
+      </ion-input>
+      @if (form.controls.email.touched && form.controls.email.invalid) {
+        <div class="field-error">
+          @if (form.controls.email.hasError('required')) {
+            Enter your email.
+          } @else {
+            That doesn't look like an email address.
+          }
+        </div>
+      }
 
       <ion-input
         class="auth-field"
         fill="solid"
-        label="Password"
         labelPlacement="stacked"
         type="password"
         autocomplete="current-password"
         formControlName="password"
         placeholder="Your password"
       >
+        <span slot="label"
+          >Password <span class="required-mark" aria-hidden="true">*</span></span
+        >
         <ion-input-password-toggle slot="end"></ion-input-password-toggle>
       </ion-input>
+      @if (form.controls.password.touched && form.controls.password.invalid) {
+        <div class="field-error">Enter your password.</div>
+      }
 
       <div class="login-forgot">
         <a class="auth-link" routerLink="/forgot-password">Forgot password?</a>

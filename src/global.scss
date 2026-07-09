@@ -58,6 +58,21 @@ h1, h2, h3, .font-display {
   color: var(--color-text-secondary);
 }
 
+/* Required-field marker — the * appended to a required input's label.
+ * Pair with `<span slot="label">Label <span class="required-mark">*</span></span>`. */
+.required-mark {
+  color: var(--color-error);
+  font-weight: 600;
+}
+
+/* Inline form validation message, shown under a field on invalid + touched. */
+.field-error {
+  color: var(--color-error);
+  font-size: 13px;
+  line-height: 1.35;
+  margin: -6px 2px 12px;
+}
+
 /* ----------------------------------------------------------------------------
  * Frosted glass surfaces — used with restraint (cards, modals, sheets)
  * ------------------------------------------------------------------------- */

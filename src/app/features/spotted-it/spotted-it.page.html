@@ -27,9 +27,15 @@
     </ion-button>
     <app-bourbon-autocomplete
       [value]="form.controls.bourbonName.value || ''"
+      [required]="true"
       (valueChange)="onNameInput($event)"
       (selected)="onBottleSelected($event)"
     ></app-bourbon-autocomplete>
+    @if (
+      form.controls.bourbonName.touched && form.controls.bourbonName.invalid
+    ) {
+      <div class="field-error">Pick or name a bottle.</div>
+    }
     @if (lookingUp()) {
       <div class="spot__lookup">
         <ion-spinner name="dots"></ion-spinner>
@@ -98,30 +104,50 @@
     <ion-input
       class="spot__field"
       fill="solid"
-      label="Store / venue"
       labelPlacement="stacked"
       type="text"
       formControlName="storeName"
-    ></ion-input>
+    >
+      <span slot="label"
+        >Store / venue <span class="required-mark" aria-hidden="true">*</span></span
+      >
+    </ion-input>
+    @if (form.controls.storeName.touched && form.controls.storeName.invalid) {
+      <div class="field-error">Where did you spot it?</div>
+    }
 
     <ion-input
       class="spot__field"
       fill="solid"
-      label="Price"
       labelPlacement="stacked"
       type="number"
       inputmode="decimal"
       formControlName="price"
-    ></ion-input>
+    >
+      <span slot="label"
+        >Price <span class="required-mark" aria-hidden="true">*</span></span
+      >
+    </ion-input>
+    @if (form.controls.price.touched && form.controls.price.invalid) {
+      <div class="field-error">How much was it?</div>
+    }
 
     <ion-input
       class="spot__field"
       fill="solid"
-      label="Date spotted"
       labelPlacement="stacked"
       type="date"
       formControlName="sightingDate"
-    ></ion-input>
+    >
+      <span slot="label"
+        >Date spotted <span class="required-mark" aria-hidden="true">*</span></span
+      >
+    </ion-input>
+    @if (
+      form.controls.sightingDate.touched && form.controls.sightingDate.invalid
+    ) {
+      <div class="field-error">When did you spot it?</div>
+    }
 
     <div class="spot__row">
       <ion-input

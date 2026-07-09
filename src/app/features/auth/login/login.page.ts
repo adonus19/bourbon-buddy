@@ -1,9 +1,5 @@
 import { Component, inject } from '@angular/core';
-import {
-  FormBuilder,
-  FormGroup,
-  Validators,
-} from '@angular/forms';
+import { FormBuilder, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { User } from '@angular/fire/auth';
 
@@ -21,7 +17,7 @@ export class LoginPage {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
 
-  readonly form: FormGroup = this.fb.group({
+  readonly form = this.fb.group({
     email: ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required]],
   });
@@ -37,8 +33,8 @@ export class LoginPage {
     this.submitting = true;
     this.errorMessage = '';
     try {
-      const { email, password } = this.form.value;
-      await this.auth.signIn(email, password);
+      const { email, password } = this.form.getRawValue();
+      await this.auth.signIn(email ?? '', password ?? '');
       await this.router.navigateByUrl('/tabs', { replaceUrl: true });
     } catch (err) {
       this.errorMessage = authErrorMessage(err);

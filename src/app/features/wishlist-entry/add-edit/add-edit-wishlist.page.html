@@ -16,6 +16,7 @@
 
     <app-bourbon-autocomplete
       [value]="form.controls.bourbonName.value ?? ''"
+      [required]="true"
       (valueChange)="onNameInput($event)"
       (selected)="onBottleSelected($event)"
     ></app-bourbon-autocomplete>
@@ -146,12 +147,18 @@
           <ion-input
             class="wform__field"
             fill="solid"
-            label="URL"
             labelPlacement="stacked"
             type="url"
             inputmode="url"
             formControlName="url"
-          ></ion-input>
+          >
+            <span slot="label"
+              >URL <span class="required-mark" aria-hidden="true">*</span></span
+            >
+          </ion-input>
+          @if (link.get('url')?.touched && link.get('url')?.invalid) {
+            <div class="wform__error">Add the link's URL.</div>
+          }
           <ion-input
             class="wform__field"
             fill="solid"

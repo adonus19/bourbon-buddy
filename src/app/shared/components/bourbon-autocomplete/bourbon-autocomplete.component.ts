@@ -29,6 +29,8 @@ export class BourbonAutocompleteComponent {
   readonly value = input<string>('');
   readonly label = input<string>('Bourbon / whiskey name');
   readonly placeholder = input<string>('Start typing a name…');
+  /** Show a required-field marker (*) in the label. */
+  readonly required = input<boolean>(false);
 
   readonly valueChange = output<string>();
   readonly selected = output<Bourbon>();
