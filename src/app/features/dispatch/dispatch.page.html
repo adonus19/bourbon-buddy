@@ -133,10 +133,13 @@
                         <button
                           class="article__chip"
                           type="button"
-                          (click)="addBottle(b, $event)"
+                          (click)="openBottle(b, $event)"
                         >
-                          <ion-icon name="add" aria-hidden="true"></ion-icon>
                           {{ b.name }}
+                          <ion-icon
+                            name="chevron-forward"
+                            aria-hidden="true"
+                          ></ion-icon>
                         </button>
                       }
                     </div>

@@ -1,0 +1,59 @@
+<div class="sheet">
+  <header class="sheet__head">
+    <div class="sheet__title">
+      <h2 class="sheet__name">{{ bottle.name }}</h2>
+      <div class="sheet__meta">
+        @if (categoryLabel(); as label) {
+          <span class="sheet__category" [style.--cat-accent]="categoryAccent()">
+            {{ label }}
+          </span>
+        }
+        @if (bottle.distillery) {
+          <span class="sheet__distillery">{{ bottle.distillery }}</span>
+        }
+      </div>
+    </div>
+    <button class="sheet__close" type="button" (click)="close()" aria-label="Close">
+      <ion-icon name="close" aria-hidden="true"></ion-icon>
+    </button>
+  </header>
+
+  @if (profile(); as p) {
+    <section class="sheet__flavor">
+      <span class="eyebrow">Flavor profile</span>
+      @if (p.nose.length) {
+        <p class="sheet__stage"><strong>Nose</strong> {{ p.nose.join(' · ') }}</p>
+      }
+      @if (p.palate.length) {
+        <p class="sheet__stage"><strong>Palate</strong> {{ p.palate.join(' · ') }}</p>
+      }
+      @if (p.finish.length) {
+        <p class="sheet__stage"><strong>Finish</strong> {{ p.finish.join(' · ') }}</p>
+      }
+    </section>
+  } @else if (loaded()) {
+    <p class="sheet__empty">No flavor profile for this bottle yet.</p>
+  }
+
+  @if (bottle.bourbonId) {
+    <app-similar-bottles [bourbonId]="bottle.bourbonId" />
+  }
+
+  <footer class="sheet__actions">
+    @if (onHuntList()) {
+      <div class="sheet__listed">
+        <ion-icon name="checkmark-circle" aria-hidden="true"></ion-icon>
+        Already on your hunt list
+      </div>
+    } @else {
+      <ion-button
+        expand="block"
+        (click)="addToHuntList()"
+        [disabled]="adding()"
+      >
+        <ion-icon slot="start" name="add" aria-hidden="true"></ion-icon>
+        Add to hunt list
+      </ion-button>
+    }
+  </footer>
+</div>
