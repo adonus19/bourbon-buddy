@@ -6,6 +6,7 @@ import { Timestamp } from '@angular/fire/firestore';
 export interface NotificationPrefs {
   sightingMatch: boolean; // a friend spots a bottle on your Hunt List (BB-112)
   priceAlert: boolean; // a wishlist bottle's price target is beaten
+  tasteMatch: boolean; // a friend spots a bottle matching your taste (BB-199)
   friendRequest: boolean; // someone sends you a friend request
   newsDigest: boolean; // periodic news digest
   pausedAll: boolean; // master pause
@@ -14,6 +15,7 @@ export interface NotificationPrefs {
 export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
   sightingMatch: false,
   priceAlert: false,
+  tasteMatch: false,
   friendRequest: false,
   newsDigest: false,
   pausedAll: false,
