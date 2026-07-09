@@ -17,6 +17,7 @@ import { ChipInputComponent } from './components/chip-input/chip-input.component
 import { MetricCardComponent } from './components/metric-card/metric-card.component';
 import { ListSkeletonComponent } from './components/list-skeleton/list-skeleton.component';
 import { OfflineSyncBadgeComponent } from './components/offline-sync-badge/offline-sync-badge.component';
+import { SimilarBottlesComponent } from './components/similar-bottles/similar-bottles.component';
 import { InputHelpersDirective } from './directives/input-helpers.directive';
 
 /**
@@ -40,6 +41,7 @@ const COMPONENTS = [
   MetricCardComponent,
   ListSkeletonComponent,
   OfflineSyncBadgeComponent,
+  SimilarBottlesComponent,
 ];
 
 @NgModule({

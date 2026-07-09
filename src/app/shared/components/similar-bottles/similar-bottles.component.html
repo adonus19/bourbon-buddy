@@ -1,0 +1,47 @@
+@if (neighbors().length) {
+  <section class="similar glass-surface">
+    <span class="eyebrow">Similar bottles</span>
+    <ul class="similar__list">
+      @for (b of neighbors(); track b.bourbonId) {
+        <li class="similar__row">
+          <div class="similar__info">
+            <div class="similar__head">
+              <span class="similar__name">{{ b.name }}</span>
+              @if (categoryLabel(b); as label) {
+                <span
+                  class="similar__category"
+                  [style.--cat-accent]="categoryAccent(b)"
+                  >{{ label }}</span
+                >
+              }
+              @if (cellarIds().has(b.bourbonId)) {
+                <span class="similar__owned">In your cellar</span>
+              }
+            </div>
+            @if (b.sharedTags.length) {
+              <p class="similar__shares">
+                Shares: {{ b.sharedTags.join(' · ') }}
+              </p>
+            }
+          </div>
+          @if (huntIds().has(b.bourbonId)) {
+            <ion-icon
+              class="similar__listed"
+              name="checkmark-circle"
+              aria-label="Already on your hunt list"
+            ></ion-icon>
+          } @else {
+            <button
+              class="similar__add"
+              type="button"
+              (click)="add(b)"
+              [attr.aria-label]="'Add ' + b.name + ' to your hunt list'"
+            >
+              <ion-icon name="add" aria-hidden="true"></ion-icon>
+            </button>
+          }
+        </li>
+      }
+    </ul>
+  </section>
+}

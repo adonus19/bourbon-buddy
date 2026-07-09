@@ -17,6 +17,19 @@ export interface FlavorProfile {
   generatedAt: Timestamp;
 }
 
+/**
+ * Precomputed "Similar bottles" neighbor (BB-197): cached on the catalog doc
+ * by the server whenever flavor profiles change; the client only reads it.
+ * `sharedTags` are the overlapping canonical flavor tags, palate-first — shown
+ * so every recommendation explains itself.
+ */
+export interface SimilarBottle {
+  bourbonId: string;
+  name: string;
+  category: BourbonCategory | null;
+  sharedTags: string[];
+}
+
 // Collection: /bourbons/{bourbonId}  — shared reference catalog.
 export interface Bourbon {
   id?: string;
@@ -37,6 +50,8 @@ export interface Bourbon {
   upc?: string[]; // crowdsourced UPC/EAN barcodes for scan lookup (BB-175)
   flavorProfile?: FlavorProfile | null; // AI-suggested tasting notes (BB-185)
   flavorEnrichedAt?: Timestamp | null; // set once enriched; gates re-enrichment
+  similarBottles?: SimilarBottle[]; // precomputed neighbors (BB-197), server-written
+  similarComputedAt?: Timestamp | null;
   createdAt: Timestamp;
   createdByUserId: string;
 }
