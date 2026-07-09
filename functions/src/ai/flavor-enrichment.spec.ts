@@ -2,11 +2,13 @@ import {
   applyEnrichment,
   articleFlavorSeed,
   buildFlavorPrompt,
+  FLAVOR_PROMPT_VERSION,
   FlavorTags,
   generateFlavorTags,
   hasAnyTags,
   isAdequateProfile,
   mergeFlavorTags,
+  needsPromptUpgrade,
   profileToTags,
   sameTags,
   sanitizeFlavorTags,
@@ -277,5 +279,91 @@ describe("buildFlavorPrompt", () => {
       "Bottle: Weller 12 | Distillery: Buffalo Trace | Category: wheat_whiskey"
     );
     expect(buildFlavorPrompt({ name: "Mystery" }).user).toBe("Bottle: Mystery");
+  });
+
+  it("includes the distinguishing fields when present (BB-196)", () => {
+    const { user } = buildFlavorPrompt({
+      name: "Russell's Reserve 13",
+      distillery: "Wild Turkey",
+      category: "bourbon",
+      subType: "Kentucky Straight",
+      proof: 114.8,
+      ageStatement: "13 years",
+      series: "Russell's Reserve",
+    });
+    expect(user).toBe(
+      "Bottle: Russell's Reserve 13 | Distillery: Wild Turkey | " +
+        "Category: bourbon | Type: Kentucky Straight | Proof: 114.8 | " +
+        "Age: 13 years | Series: Russell's Reserve"
+    );
+  });
+
+  it("asks the model for bottle-specific, non-generic notes (BB-196)", () => {
+    const { system } = buildFlavorPrompt({ name: "Buffalo Trace" });
+    expect(system.toLowerCase()).toContain("distinguish");
+  });
+});
+
+describe("BB-196 differentiation refresh", () => {
+  const full: FlavorTags = {
+    nose: ["Vanilla", "Oak", "Honey"],
+    palate: ["Cherry", "Corn"],
+    finish: ["Leather"],
+  };
+  const distinct: FlavorTags = {
+    nose: ["Rye Spice", "Mint"],
+    palate: ["Cinnamon", "Black Pepper"],
+    finish: ["Tobacco", "Dark Chocolate"],
+  };
+  const bottle = { name: "Sazerac Rye", distillery: "BT", category: "rye" };
+
+  it("refresh REPLACES the old profile instead of merging", async () => {
+    const ref = { update: jest.fn().mockResolvedValue(undefined) };
+    const res = await applyEnrichment(
+      ref,
+      { ...bottle, flavorProfile: { ...full, source: "ai" } },
+      true,
+      async () => distinct
+    );
+    expect(res.status).toBe("refreshed");
+    const written = ref.update.mock.calls[0][0].flavorProfile;
+    expect(written.nose).toEqual(distinct.nose); // old generic tags gone
+    expect(written.palate).toEqual(distinct.palate);
+    expect(written.finish).toEqual(distinct.finish);
+  });
+
+  it("a refresh that comes back empty keeps the existing profile", async () => {
+    const ref = { update: jest.fn().mockResolvedValue(undefined) };
+    const res = await applyEnrichment(
+      ref,
+      { ...bottle, flavorProfile: { ...full, source: "ai" } },
+      true,
+      async () => ({ nose: [], palate: [], finish: [] })
+    );
+    expect(res.status).toBe("cached");
+    expect(ref.update).not.toHaveBeenCalled(); // never wipe on a bad refresh
+  });
+
+  it("stamps promptVersion on every stored profile", async () => {
+    const ref = { update: jest.fn().mockResolvedValue(undefined) };
+    await applyEnrichment(ref, bottle, false, async () => distinct);
+    const written = ref.update.mock.calls[0][0].flavorProfile;
+    expect(written.promptVersion).toBe(FLAVOR_PROMPT_VERSION);
+  });
+
+  it("needsPromptUpgrade: true for version-less or stale profiles only", () => {
+    expect(needsPromptUpgrade({ flavorProfile: { ...full, source: "ai" } })).toBe(true);
+    expect(
+      needsPromptUpgrade({
+        flavorProfile: { ...full, promptVersion: FLAVOR_PROMPT_VERSION - 1 },
+      })
+    ).toBe(true);
+    expect(
+      needsPromptUpgrade({
+        flavorProfile: { ...full, promptVersion: FLAVOR_PROMPT_VERSION },
+      })
+    ).toBe(false);
+    expect(needsPromptUpgrade({ flavorProfile: null })).toBe(false);
+    expect(needsPromptUpgrade({})).toBe(false);
   });
 });

@@ -16,14 +16,17 @@ export class RateLimitError extends Error {
 }
 
 /**
- * Call Groq's chat completions expecting a JSON-object reply (temp 0, JSON mode)
- * and return the parsed object. Throws RateLimitError on 429, Error otherwise.
+ * Call Groq's chat completions expecting a JSON-object reply (JSON mode) and
+ * return the parsed object. Temperature defaults to 0 (deterministic
+ * extraction/classification); callers wanting varied output (BB-196 flavor
+ * differentiation) pass their own. Throws RateLimitError on 429, Error otherwise.
  */
 export async function chatJson(
   apiKey: string,
   system: string,
   user: string,
-  maxTokens: number
+  maxTokens: number,
+  temperature = 0
 ): Promise<Record<string, unknown>> {
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
@@ -33,7 +36,7 @@ export async function chatJson(
     },
     body: JSON.stringify({
       model: GROQ_MODEL,
-      temperature: 0,
+      temperature,
       max_tokens: maxTokens,
       response_format: { type: "json_object" },
       messages: [

@@ -398,11 +398,18 @@ async function seedArticleFlavor(
   if (sameTags(existing, merged)) {
     return; // the article added nothing new — skip a redundant write
   }
+  // Carry the generation prompt version through (BB-196) — an article seed
+  // augments a profile, it doesn't regenerate it, so the version must survive
+  // or the force sweep would re-upgrade this bottle forever.
+  const promptVersion = (
+    snap.get("flavorProfile") as { promptVersion?: unknown } | undefined
+  )?.promptVersion;
   await ref.update({
     flavorProfile: {
       ...merged,
       source: "ai",
       model: GROQ_MODEL,
+      ...(promptVersion !== undefined ? { promptVersion } : {}),
       generatedAt: Timestamp.now(),
     },
     flavorEnrichedAt: FieldValue.serverTimestamp(),
