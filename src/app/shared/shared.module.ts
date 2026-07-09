@@ -18,6 +18,7 @@ import { MetricCardComponent } from './components/metric-card/metric-card.compon
 import { ListSkeletonComponent } from './components/list-skeleton/list-skeleton.component';
 import { OfflineSyncBadgeComponent } from './components/offline-sync-badge/offline-sync-badge.component';
 import { SimilarBottlesComponent } from './components/similar-bottles/similar-bottles.component';
+import { BottlePreviewSheetComponent } from './components/bottle-preview-sheet/bottle-preview-sheet.component';
 import { InputHelpersDirective } from './directives/input-helpers.directive';
 
 /**
@@ -42,6 +43,7 @@ const COMPONENTS = [
   ListSkeletonComponent,
   OfflineSyncBadgeComponent,
   SimilarBottlesComponent,
+  BottlePreviewSheetComponent,
 ];
 
 @NgModule({
