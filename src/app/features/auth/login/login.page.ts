@@ -5,7 +5,7 @@ import {
   Validators,
 } from '@angular/forms';
 import { Router } from '@angular/router';
-import { ToastController } from '@ionic/angular';
+import { User } from '@angular/fire/auth';
 
 import { AuthService } from '../../../core/auth/auth.service';
 import { authErrorMessage } from '../../../core/auth/auth-error';
@@ -20,7 +20,6 @@ export class LoginPage {
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
-  private readonly toast = inject(ToastController);
 
   readonly form: FormGroup = this.fb.group({
     email: ['', [Validators.required, Validators.email]],
@@ -48,30 +47,28 @@ export class LoginPage {
     }
   }
 
-  async signInWithGoogle(): Promise<void> {
+  signInWithGoogle(): Promise<void> {
+    return this.socialSignIn(() => this.auth.signInWithGoogle());
+  }
+
+  signInWithFacebook(): Promise<void> {
+    return this.socialSignIn(() => this.auth.signInWithFacebook());
+  }
+
+  /** Shared flow for the federated providers: sign in, then land on /tabs. */
+  private async socialSignIn(run: () => Promise<User>): Promise<void> {
     if (this.submitting) {
       return;
     }
     this.submitting = true;
     this.errorMessage = '';
     try {
-      await this.auth.signInWithGoogle();
+      await run();
       await this.router.navigateByUrl('/tabs', { replaceUrl: true });
     } catch (err) {
       this.errorMessage = authErrorMessage(err);
     } finally {
       this.submitting = false;
     }
-  }
-
-  // Apple & Facebook providers are planned (BB-002) but not yet enabled in
-  // Firebase. The buttons are present for layout; tapping explains the status.
-  async providerNotReady(provider: string): Promise<void> {
-    const t = await this.toast.create({
-      message: `${provider} sign-in is coming soon.`,
-      duration: 2000,
-      position: 'top',
-    });
-    await t.present();
   }
 }

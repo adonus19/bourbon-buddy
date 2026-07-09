@@ -76,6 +76,30 @@
       </ion-button>
     </form>
 
+    <div class="auth-divider">or</div>
+
+    <ion-button
+      class="auth-social-btn"
+      expand="block"
+      fill="outline"
+      (click)="signInWithGoogle()"
+      [disabled]="submitting"
+    >
+      <ion-icon name="logo-google" slot="start"></ion-icon>
+      Continue with Google
+    </ion-button>
+
+    <ion-button
+      class="auth-social-btn"
+      expand="block"
+      fill="outline"
+      (click)="signInWithFacebook()"
+      [disabled]="submitting"
+    >
+      <ion-icon name="logo-facebook" slot="start"></ion-icon>
+      Continue with Facebook
+    </ion-button>
+
     <div class="auth-footer">
       Already have an account? <a routerLink="/login">Sign in</a>
     </div>

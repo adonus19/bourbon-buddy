@@ -2,6 +2,7 @@ import { Injectable, Signal, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import {
   Auth,
+  FacebookAuthProvider,
   GoogleAuthProvider,
   User,
   authState,
@@ -31,8 +32,9 @@ import { UserService } from '../services/user.service';
  * IMPORTANT: never read Firestore inside a `computed()` or `effect()`. Derive
  * from these already-loaded signals instead — that keeps reads bounded.
  *
- * Apple/Facebook are planned (BB-002) but not yet enabled in Firebase, so only
- * Email/Password and Google are wired.
+ * Wired providers: Email/Password, Google, and Facebook (BB-002). Each
+ * federated provider must also be enabled in the Firebase console for its
+ * popup to succeed. (Apple was dropped — it requires a paid developer account.)
  */
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -100,6 +102,13 @@ export class AuthService {
    */
   async signInWithGoogle(): Promise<User> {
     const cred = await signInWithPopup(this.auth, new GoogleAuthProvider());
+    await this.userService.ensureProfile(cred.user);
+    return cred.user;
+  }
+
+  /** Facebook sign-in via popup (same rationale as Google above). */
+  async signInWithFacebook(): Promise<User> {
+    const cred = await signInWithPopup(this.auth, new FacebookAuthProvider());
     await this.userService.ensureProfile(cred.user);
     return cred.user;
   }
