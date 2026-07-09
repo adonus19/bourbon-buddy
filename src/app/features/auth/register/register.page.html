@@ -15,43 +15,68 @@
       <ion-input
         class="auth-field"
         fill="solid"
-        label="Display name"
         labelPlacement="stacked"
         type="text"
         autocomplete="name"
         formControlName="displayName"
         placeholder="What should we call you?"
-      ></ion-input>
+      >
+        <span slot="label"
+          >Display name
+          <span class="required-mark" aria-hidden="true">*</span></span
+        >
+      </ion-input>
+      @if (
+        form.controls.displayName.touched && form.controls.displayName.invalid
+      ) {
+        <div class="field-error">Tell us what to call you.</div>
+      }
 
       <ion-input
         class="auth-field"
         fill="solid"
-        label="Email"
         labelPlacement="stacked"
         type="email"
         inputmode="email"
         autocomplete="email"
         formControlName="email"
         placeholder="you@example.com"
-      ></ion-input>
+      >
+        <span slot="label"
+          >Email <span class="required-mark" aria-hidden="true">*</span></span
+        >
+      </ion-input>
+      @if (form.controls.email.touched && form.controls.email.invalid) {
+        <div class="field-error">
+          @if (form.controls.email.hasError('required')) {
+            Enter your email.
+          } @else {
+            That doesn't look like an email address.
+          }
+        </div>
+      }
 
       <ion-input
         class="auth-field"
         fill="solid"
-        label="Password"
         labelPlacement="stacked"
         type="password"
         autocomplete="new-password"
         formControlName="password"
         placeholder="At least 8 characters"
       >
+        <span slot="label"
+          >Password <span class="required-mark" aria-hidden="true">*</span></span
+        >
         <ion-input-password-toggle slot="end"></ion-input-password-toggle>
       </ion-input>
-
-      @if (passwordTooShort && !errorMessage) {
-        <div class="auth-error">
-          <ion-icon name="alert-circle-outline"></ion-icon>
-          <span>Password needs to be at least 8 characters.</span>
+      @if (form.controls.password.touched && form.controls.password.invalid) {
+        <div class="field-error">
+          @if (form.controls.password.hasError('required')) {
+            Choose a password.
+          } @else {
+            Password needs to be at least 8 characters.
+          }
         </div>
       }
 

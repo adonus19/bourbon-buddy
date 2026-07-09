@@ -12,10 +12,13 @@
     <ion-input
       class="sform__field"
       fill="solid"
-      label="Store / venue"
       labelPlacement="stacked"
       formControlName="storeName"
-    ></ion-input>
+    >
+      <span slot="label"
+        >Store / venue <span class="required-mark" aria-hidden="true">*</span></span
+      >
+    </ion-input>
     @if (form.controls.storeName.touched && form.controls.storeName.invalid) {
       <div class="sform__error">Where did you spot it?</div>
     }
@@ -24,23 +27,35 @@
       <ion-input
         class="sform__field"
         fill="solid"
-        label="Price"
         labelPlacement="stacked"
         type="number"
         inputmode="decimal"
         formControlName="price"
-      ></ion-input>
+      >
+        <span slot="label"
+          >Price <span class="required-mark" aria-hidden="true">*</span></span
+        >
+      </ion-input>
       <ion-input
         class="sform__field"
         fill="solid"
-        label="Date seen"
         labelPlacement="stacked"
         type="date"
         formControlName="sightingDate"
-      ></ion-input>
+      >
+        <span slot="label"
+          >Date seen
+          <span class="required-mark" aria-hidden="true">*</span></span
+        >
+      </ion-input>
     </div>
     @if (form.controls.price.touched && form.controls.price.invalid) {
       <div class="sform__error">A price is required.</div>
+    }
+    @if (
+      form.controls.sightingDate.touched && form.controls.sightingDate.invalid
+    ) {
+      <div class="sform__error">When did you see it?</div>
     }
 
     <div class="sform__row">

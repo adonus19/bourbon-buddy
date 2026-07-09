@@ -24,13 +24,22 @@
       <ion-input
         class="profile__field"
         fill="solid"
-        label="Display name"
         labelPlacement="stacked"
         type="text"
         autocomplete="name"
         formControlName="displayName"
         placeholder="What should we call you?"
-      ></ion-input>
+      >
+        <span slot="label"
+          >Display name
+          <span class="required-mark" aria-hidden="true">*</span></span
+        >
+      </ion-input>
+      @if (
+        form.controls.displayName.touched && form.controls.displayName.invalid
+      ) {
+        <div class="field-error">Tell us what to call you.</div>
+      }
 
       <ion-textarea
         class="profile__field"
@@ -89,6 +98,20 @@
       >
         <span slot="start" class="profile__at">@</span>
       </ion-input>
+      @if (
+        usernameForm.controls.username.touched &&
+        usernameForm.controls.username.invalid
+      ) {
+        <div class="field-error">
+          @if (usernameForm.controls.username.hasError('pattern')) {
+            Letters, numbers, and underscores only.
+          } @else if (usernameForm.controls.username.hasError('minlength')) {
+            At least 3 characters.
+          } @else {
+            Keep it to 20 characters or fewer.
+          }
+        </div>
+      }
 
       <ion-button
         class="profile__save"
