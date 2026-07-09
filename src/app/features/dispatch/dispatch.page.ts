@@ -19,6 +19,7 @@ import {
   NewsArticle,
 } from '../../models';
 import { NewsService } from '../../core/services/news.service';
+import { TasteMatchService } from '../../core/services/taste-match.service';
 import { BottlePreviewSheetComponent } from '../../shared/components/bottle-preview-sheet/bottle-preview-sheet.component';
 import { relativeTime } from '../../shared/utils/relative-time';
 import { isWatched, passesPrefs } from '../../shared/utils/news-filter';
@@ -38,6 +39,7 @@ type Segment = 'feed' | 'read' | 'saved';
 })
 export class DispatchPage implements ViewWillEnter {
   private readonly news = inject(NewsService);
+  private readonly tasteMatch = inject(TasteMatchService);
   private readonly modalCtrl = inject(ModalController);
   private readonly toast = inject(ToastController);
   private readonly cdr = inject(ChangeDetectorRef);
@@ -133,6 +135,11 @@ export class DispatchPage implements ViewWillEnter {
         void this.news.setState(a.id, 'read');
       }
     }
+  }
+
+  /** Taste Match badge on a chip (BB-199), from tags denormalized at extraction. */
+  isTasteMatch(b: MentionedBottle): boolean {
+    return this.tasteMatch.matches(b.flavor).matched;
   }
 
   /**

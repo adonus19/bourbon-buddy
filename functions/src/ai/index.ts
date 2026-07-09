@@ -71,6 +71,9 @@ interface MentionedBottle {
   bourbonId: string | null;
   distillery: string | null;
   category: string | null;
+  // Catalog flavor tags at extraction time (BB-199): lets feed chips show the
+  // Taste Match badge without a per-chip read. Null when no profile exists yet.
+  flavor: { nose: string[]; palate: string[]; finish: string[] } | null;
 }
 
 /** Thrown when the model returns 429 so callers can back off / stop early. */
@@ -296,14 +299,20 @@ async function processArticle(
     // parseExtractionResponse (BB-195).
     const category = raw.category;
     const distillery = raw.distillery?.trim() || null;
-    const bourbonId = await matchOrCreateCatalog(db, key, name, distillery, category);
-    bottles.push({ name, bourbonId, distillery, category });
+    const match = await matchOrCreateCatalog(db, key, name, distillery, category);
+    bottles.push({
+      name,
+      bourbonId: match.id,
+      distillery,
+      category,
+      flavor: match.flavorTags,
+    });
     // Feed (a), BB-185: seed the bottle's catalog flavor profile from any
     // tasting notes in the article. Best-effort — never fail extraction for it.
     try {
-      await seedArticleFlavor(db, bourbonId, raw.flavor);
+      await seedArticleFlavor(db, match.id, raw.flavor);
     } catch (err) {
-      logger.warn(`Flavor seed failed for ${bourbonId}`, err);
+      logger.warn(`Flavor seed failed for ${match.id}`, err);
     }
     if (bottles.length >= MAX_BOTTLES) {
       break;
@@ -317,14 +326,27 @@ async function processArticle(
   return bottles.length;
 }
 
-/** Finds an existing catalog bottleId for a normalized name, or null. */
+/**
+ * Finds (or creates) the catalog entry for a normalized name. Returns the id
+ * plus the matched doc's flavor tags (BB-199): they're denormalized onto the
+ * article's `mentionedBottles` so feed chips can show the Taste Match badge
+ * without per-chip reads. Freshly created bottles have no profile yet.
+ */
 async function matchOrCreateCatalog(
   db: FirebaseFirestore.Firestore,
   key: string,
   name: string,
   distillery: string | null,
   category: string | null
-): Promise<string> {
+): Promise<{ id: string; flavorTags: ReturnType<typeof profileToTags> | null }> {
+  const fromDoc = (
+    doc: FirebaseFirestore.QueryDocumentSnapshot
+  ): { id: string; flavorTags: ReturnType<typeof profileToTags> | null } => {
+    const tags = profileToTags(doc.get("flavorProfile"));
+    const hasAny = tags.nose.length + tags.palate.length + tags.finish.length > 0;
+    return { id: doc.id, flavorTags: hasAny ? tags : null };
+  };
+
   // Match an existing catalog entry (same order the client findOrCreate uses).
   const byName = await db
     .collection("bourbons")
@@ -332,7 +354,7 @@ async function matchOrCreateCatalog(
     .limit(1)
     .get();
   if (!byName.empty) {
-    return byName.docs[0].id;
+    return fromDoc(byName.docs[0]);
   }
   const byAlias = await db
     .collection("bourbons")
@@ -340,7 +362,7 @@ async function matchOrCreateCatalog(
     .limit(1)
     .get();
   if (!byAlias.empty) {
-    return byAlias.docs[0].id;
+    return fromDoc(byAlias.docs[0]);
   }
   const nameLowercase = name.toLowerCase();
   const byLower = await db
@@ -349,7 +371,7 @@ async function matchOrCreateCatalog(
     .limit(1)
     .get();
   if (!byLower.empty) {
-    return byLower.docs[0].id;
+    return fromDoc(byLower.docs[0]);
   }
 
   // No match — create the shared catalog entry from the AI-sourced fields so the
@@ -373,7 +395,7 @@ async function matchOrCreateCatalog(
     createdAt: FieldValue.serverTimestamp(),
     createdByUserId: "system:ai",
   });
-  return created.id;
+  return { id: created.id, flavorTags: null };
 }
 
 /**

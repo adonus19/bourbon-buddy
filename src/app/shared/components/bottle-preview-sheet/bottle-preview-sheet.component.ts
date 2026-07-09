@@ -7,6 +7,7 @@ import {
   MentionedBottle,
 } from '../../../models';
 import { BourbonCatalogService } from '../../../core/services/bourbon-catalog.service';
+import { TasteMatchService } from '../../../core/services/taste-match.service';
 import { WishlistService } from '../../../core/services/wishlist.service';
 import { CATEGORY_DISPLAY } from '../../constants/category-display';
 
@@ -26,6 +27,7 @@ import { CATEGORY_DISPLAY } from '../../constants/category-display';
 export class BottlePreviewSheetComponent {
   private readonly catalog = inject(BourbonCatalogService);
   private readonly wishlist = inject(WishlistService);
+  private readonly tasteMatch = inject(TasteMatchService);
   private readonly modalCtrl = inject(ModalController);
   private readonly toastCtrl = inject(ToastController);
 
@@ -50,6 +52,9 @@ export class BottlePreviewSheetComponent {
   });
 
   readonly profile = computed(() => this.catalogBottle()?.flavorProfile ?? null);
+
+  /** Taste Match badge (BB-199): shared taste tags, strongest first. */
+  readonly taste = computed(() => this.tasteMatch.matches(this.profile()));
 
   ionViewWillEnter(): void {
     void this.load();

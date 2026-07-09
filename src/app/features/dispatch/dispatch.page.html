@@ -132,9 +132,16 @@
                       @for (b of a.mentionedBottles; track b.name) {
                         <button
                           class="article__chip"
+                          [class.article__chip--taste]="isTasteMatch(b)"
                           type="button"
                           (click)="openBottle(b, $event)"
                         >
+                          @if (isTasteMatch(b)) {
+                            <ion-icon
+                              name="sparkles"
+                              aria-label="Matches your taste"
+                            ></ion-icon>
+                          }
                           {{ b.name }}
                           <ion-icon
                             name="chevron-forward"

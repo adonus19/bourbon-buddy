@@ -65,6 +65,11 @@
               <ion-icon name="bookmark"></ion-icon>
               On your hunt list — view
             </button>
+          } @else if (tasteTags(s).length) {
+            <div class="ffeed__taste">
+              <ion-icon name="sparkles" aria-hidden="true"></ion-icon>
+              Matches your taste · {{ tasteTags(s).slice(0, 3).join(' · ') }}
+            </div>
           }
 
           <p class="ffeed__store">

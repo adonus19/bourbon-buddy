@@ -7,6 +7,9 @@ export interface MentionedBottle {
   bourbonId?: string | null; // catalog match, or null if not yet in /bourbons
   distillery?: string | null; // AI-inferred, to pre-fill the hunt-list entry
   category?: BourbonCategory | null; // AI-inferred (validated against the enum)
+  // Catalog flavor tags denormalized at extraction (BB-199) so chips can show
+  // the Taste Match badge without a read. Absent on pre-BB-199 articles.
+  flavor?: { nose: string[]; palate: string[]; finish: string[] } | null;
 }
 
 // Collection: /newsArticles/{articleId}  (document ID = URL-derived hash)

@@ -41,6 +41,10 @@ export {
   backfillFlavorEnrichment,
 } from "./ai";
 
+// Taste Match (BB-199): per-user taste vector maintained on the profile doc
+// from their own high-rated tasting tags; powers badges + sighting alerts.
+export { onLogEntryWrittenUpdateTaste } from "./taste";
+
 // Social graph (BB-101/102/103): request create, accept/decline, remove, block.
 export {
   sendFriendRequest,
