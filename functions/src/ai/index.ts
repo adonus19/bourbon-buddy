@@ -24,6 +24,11 @@ import { ENFORCE_APP_CHECK, requireAdmin } from "../shared/guards";
 import { normalizeBottleName } from "../shared/normalize";
 import { buildModelText, fetchArticleBody } from "./article-text";
 import {
+  EXTRACTION_SYSTEM_PROMPT,
+  ExtractedBottle,
+  parseExtractionResponse,
+} from "./extraction";
+import {
   articleFlavorSeed,
   mergeFlavorTags,
   profileToTags,
@@ -61,34 +66,11 @@ const BACKFILL_SPACING_MS = 18000;
 const SWEEP_LIMIT = 200; // recent articles scanned per scheduled sweep
 const RATE_LIMITED = -2; // processArticle sentinel: hit the model rate limit
 
-// Category values must match the app's BourbonCategory enum; anything else the
-// model returns is dropped to null so it never pollutes the hunt-list form.
-const VALID_CATEGORIES = new Set([
-  "bourbon",
-  "rye",
-  "wheat_whiskey",
-  "tennessee",
-  "american_other",
-  "scotch",
-  "irish",
-  "japanese",
-  "world_other",
-]);
-
 interface MentionedBottle {
   name: string;
   bourbonId: string | null;
   distillery: string | null;
   category: string | null;
-}
-
-interface ExtractedBottle {
-  name: string;
-  distillery: string | null;
-  category: string | null;
-  // Raw flavor cues the article attributes to this bottle (BB-185 feed a);
-  // mapped to canonical tags server-side. Absent/empty for non-review articles.
-  flavor?: unknown;
 }
 
 /** Thrown when the model returns 429 so callers can back off / stop early. */
@@ -310,8 +292,9 @@ async function processArticle(
       continue;
     }
     seen.add(key);
-    const category =
-      raw.category && VALID_CATEGORIES.has(raw.category) ? raw.category : null;
+    // Category + whiskey-only validation already happened in
+    // parseExtractionResponse (BB-195).
+    const category = raw.category;
     const distillery = raw.distillery?.trim() || null;
     const bourbonId = await matchOrCreateCatalog(db, key, name, distillery, category);
     bottles.push({ name, bourbonId, distillery, category });
@@ -438,25 +421,6 @@ async function extractBottleNames(
   text: string,
   apiKey: string
 ): Promise<ExtractedBottle[]> {
-  const system =
-    "You extract whiskey/bourbon PRODUCT mentions from a news snippet. Reply " +
-    "ONLY with JSON: {\"bottles\": [{\"name\": string, \"distillery\": " +
-    "string|null, \"category\": string|null, \"flavor\": {\"nose\": string[], " +
-    "\"palate\": string[], \"finish\": string[]}}]}. " +
-    "name: the specific product (release/expression/bottling) as written, e.g. " +
-    "\"Weller 12 Year\" or \"E.H. Taylor Small Batch\". " +
-    "distillery: the producing distillery or brand owner if you are confident, " +
-    "else null. " +
-    "category: exactly one of bourbon, rye, wheat_whiskey, tennessee, " +
-    "american_other, scotch, irish, japanese, world_other — or null if unsure. " +
-    "flavor: ONLY if the article gives tasting notes for this bottle, the flavor " +
-    "words it uses per stage (e.g. vanilla, oak, cherry, smoke). MOST articles " +
-    "are announcements with NO tasting notes — for those use empty arrays. Never " +
-    "invent flavors. " +
-    "Include specific products only; exclude bare distillery/brand names, " +
-    "generic terms (bourbon, rye), people, places, and events. Do NOT include " +
-    "price or invent details. No duplicates. If none, use an empty array.";
-
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -469,7 +433,7 @@ async function extractBottleNames(
       max_tokens: 768,
       response_format: { type: "json_object" },
       messages: [
-        { role: "system", content: system },
+        { role: "system", content: EXTRACTION_SYSTEM_PROMPT },
         { role: "user", content: `TEXT:\n${text}` },
       ],
     }),
@@ -485,19 +449,5 @@ async function extractBottleNames(
     choices?: { message?: { content?: string } }[];
   };
   const content = body.choices?.[0]?.message?.content ?? "{}";
-  const parsed = JSON.parse(content) as { bottles?: unknown };
-  if (!Array.isArray(parsed.bottles)) {
-    return [];
-  }
-  return parsed.bottles
-    .filter((b): b is Record<string, unknown> => !!b && typeof b === "object")
-    .map((b) => ({
-      name: typeof b["name"] === "string" ? (b["name"] as string) : "",
-      distillery:
-        typeof b["distillery"] === "string" ? (b["distillery"] as string) : null,
-      category:
-        typeof b["category"] === "string" ? (b["category"] as string) : null,
-      flavor: b["flavor"] ?? null,
-    }))
-    .filter((b) => b.name.trim().length > 0);
+  return parseExtractionResponse(content);
 }
