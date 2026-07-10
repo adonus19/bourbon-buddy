@@ -1,0 +1,132 @@
+:host {
+  display: block;
+}
+
+.bh {
+  &__summary {
+    margin: 4px 0 12px;
+    font-size: 14px;
+    color: var(--color-text-primary);
+  }
+
+  &__dot {
+    color: var(--color-border-bright);
+  }
+
+  &__trend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 12px;
+    font-size: 14px;
+  }
+
+  &__trend-label {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+  }
+
+  &__price {
+    color: var(--color-text-primary);
+  }
+
+  &__arrow {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+  }
+
+  &__delta {
+    margin-left: 4px;
+    font-size: 12px;
+    font-weight: 600;
+
+    &.up {
+      color: var(--color-danger, #e5484d);
+    }
+    &.down {
+      color: var(--color-success, #46a758);
+    }
+  }
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-input);
+    text-decoration: none;
+    color: inherit;
+  }
+
+  &__row-date {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+  }
+
+  &__row-barrel {
+    font-size: 13px;
+    color: var(--color-text-primary);
+  }
+
+  &__row-status {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+
+    &.killed {
+      color: var(--color-text-tertiary, var(--color-text-secondary));
+    }
+  }
+
+  &__row-chevron {
+    margin-left: auto;
+    font-size: 16px;
+    color: var(--color-text-secondary);
+  }
+
+  &__subhead {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
+
+  &__barrel.fav {
+    border-color: var(--color-amber-light);
+  }
+
+  &__barrel-ribbon {
+    font-size: 16px;
+    color: var(--color-amber-light);
+  }
+
+  &__barrel-rating {
+    font-size: 13px;
+    color: var(--color-text-primary);
+  }
+
+  &__fav-tag {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-amber-light);
+  }
+
+  &__single {
+    margin: 4px 0 8px;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+  }
+
+  &__buy {
+    margin-top: 4px;
+    margin-inline-start: -8px;
+  }
+}

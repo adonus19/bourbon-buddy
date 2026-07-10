@@ -171,6 +171,13 @@
         }
       </div>
 
+      <div class="section">
+        <app-bottle-history
+          [bourbonId]="e.bourbonId"
+          [currentEntryId]="entryId"
+        ></app-bottle-history>
+      </div>
+
       @if (hasBottleDetails()) {
         <div class="section">
           <p class="eyebrow">Bottle details</p>
@@ -180,6 +187,7 @@
             @if (e.series) {<span class="kv__row">{{ e.series }}</span>}
             @if (e.batchNumber) {<span class="kv__row">Batch {{ e.batchNumber }}</span>}
             @if (e.barrelNumber) {<span class="kv__row">Barrel {{ e.barrelNumber }}</span>}
+            @if (e.barrelLabel) {<span class="kv__row">{{ e.barrelLabel }}</span>}
           </div>
           @if (mashBill(e).length) {
             <p class="detail__meta">Mash bill: {{ mashBill(e).join(' · ') }}</p>

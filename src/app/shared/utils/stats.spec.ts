@@ -49,6 +49,17 @@ describe('computeSummary', () => {
     expect(computeSummary([entry({ rating: null })]).avgRating).toBeNull();
     expect(computeSummary([]).totalBourbons).toBe(0);
   });
+
+  it('counts open and killed owned bottles (BB-194)', () => {
+    const s = computeSummary([
+      entry({ entryType: 'bottle_purchased', bottleStatus: 'open' }),
+      entry({ entryType: 'bottle_purchased', bottleStatus: 'finished' }),
+      entry({ entryType: 'gift_received', bottleRemainingPct: 0 }), // legacy → finished
+      entry({ entryType: 'drink' }), // non-owned → neither
+    ]);
+    expect(s.openBottles).toBe(1);
+    expect(s.killedBottles).toBe(2);
+  });
 });
 
 describe('ratingDistribution', () => {

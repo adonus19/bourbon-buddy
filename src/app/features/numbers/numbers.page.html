@@ -44,6 +44,16 @@
           [value]="avg()"
           label="Average rating"
         ></app-metric-card>
+        <app-metric-card
+          icon="wine-outline"
+          [value]="summary().openBottles + ''"
+          label="On the shelf"
+        ></app-metric-card>
+        <app-metric-card
+          icon="skull-outline"
+          [value]="summary().killedBottles + ''"
+          label="Bottles killed"
+        ></app-metric-card>
       </div>
 
       <!-- Rating distribution -->

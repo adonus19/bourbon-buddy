@@ -1,6 +1,7 @@
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule } from '@angular/forms';
+import { RouterModule } from '@angular/router';
 import { IonicModule } from '@ionic/angular';
 
 import { ComingSoonComponent } from './components/coming-soon/coming-soon.component';
@@ -18,6 +19,7 @@ import { MetricCardComponent } from './components/metric-card/metric-card.compon
 import { ListSkeletonComponent } from './components/list-skeleton/list-skeleton.component';
 import { OfflineSyncBadgeComponent } from './components/offline-sync-badge/offline-sync-badge.component';
 import { SimilarBottlesComponent } from './components/similar-bottles/similar-bottles.component';
+import { BottleHistoryComponent } from './components/bottle-history/bottle-history.component';
 import { BottlePreviewSheetComponent } from './components/bottle-preview-sheet/bottle-preview-sheet.component';
 import { InputHelpersDirective } from './directives/input-helpers.directive';
 
@@ -43,12 +45,13 @@ const COMPONENTS = [
   ListSkeletonComponent,
   OfflineSyncBadgeComponent,
   SimilarBottlesComponent,
+  BottleHistoryComponent,
   BottlePreviewSheetComponent,
 ];
 
 @NgModule({
   declarations: COMPONENTS,
-  imports: [CommonModule, ReactiveFormsModule, IonicModule],
+  imports: [CommonModule, ReactiveFormsModule, RouterModule, IonicModule],
   exports: COMPONENTS,
 })
 export class SharedModule {}

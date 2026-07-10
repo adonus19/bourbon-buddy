@@ -1,7 +1,7 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { FormBuilder, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { ToastController } from '@ionic/angular';
+import { AlertController, ToastController } from '@ionic/angular';
 import { Timestamp } from '@angular/fire/firestore';
 
 import {
@@ -45,6 +45,7 @@ export class AddEditEntryPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastController);
+  private readonly alertCtrl = inject(AlertController);
 
   // Edit mode when the route carries an :id (entry/:id/edit); else add mode.
   readonly editId =
@@ -59,6 +60,11 @@ export class AddEditEntryPage {
   // entry and archives it (status: 'logged') on save.
   readonly fromWishlistId =
     this.route.snapshot.queryParamMap.get('fromWishlist');
+
+  // "Buy Again" (BB-193): /entry/new?buyAgainFrom={id} clones a prior bottle's
+  // identity + spec into a fresh purchase instance, linked via repurchaseOfEntryId.
+  readonly buyAgainFromId = this.route.snapshot.queryParamMap.get('buyAgainFrom');
+  private repurchaseOfEntryId: string | null = null;
 
   saving = false;
 
@@ -135,6 +141,7 @@ export class AddEditEntryPage {
     mashBillMalt: [null as number | null],
     batchNumber: [''],
     barrelNumber: [''],
+    barrelLabel: [''],
     series: [''],
     // How you got it
     entryType: ['drink'],
@@ -166,6 +173,13 @@ export class AddEditEntryPage {
     () => this.entryTypeValue() === 'bottle_purchased'
   );
 
+  // Reactive view of subType so the template can reveal the barrel-label
+  // (store-pick) field only for single barrels (BB-195).
+  private readonly subTypeValue = signal(this.form.controls.subType.value);
+  readonly isSingleBarrel = computed(
+    () => this.subTypeValue() === 'single_barrel'
+  );
+
   // In edit mode, the entry comes from the cached entries signal; patch the
   // form once it's available (and only once, so we don't clobber edits).
   private readonly editEntry = this.editId
@@ -175,10 +189,17 @@ export class AddEditEntryPage {
     !this.editId && this.fromWishlistId
       ? this.wishlist.selectById(this.fromWishlistId)
       : null;
+  private readonly sourceRebuy =
+    !this.editId && this.buyAgainFromId
+      ? this.logService.selectById(this.buyAgainFromId)
+      : null;
 
   constructor() {
     this.form.controls.entryType.valueChanges.subscribe((v) =>
       this.entryTypeValue.set(v)
+    );
+    this.form.controls.subType.valueChanges.subscribe((v) =>
+      this.subTypeValue.set(v)
     );
 
     if (this.editEntry) {
@@ -197,7 +218,86 @@ export class AddEditEntryPage {
           this.prefillFromWishlist(w);
         }
       });
+    } else if (this.sourceRebuy) {
+      effect(() => {
+        const e = this.sourceRebuy?.();
+        if (e && !this.patched) {
+          this.patched = true;
+          void this.prefillFromRebuy(e);
+        }
+      });
     }
+  }
+
+  /**
+   * "Buy Again" (BB-193): clone a prior bottle's identity + spec into a fresh
+   * purchase instance. Experience fields reset (new dates, full, blank
+   * price/rating, empty pour log); prior tags carry as *suggested* starting
+   * points; a single-barrel rebuy never silently copies the barrel identity.
+   */
+  private async prefillFromRebuy(e: LogEntry): Promise<void> {
+    const today = new Date().toISOString().slice(0, 10);
+    this.form.patchValue({
+      bourbonName: e.bourbonName,
+      bourbonId: e.bourbonId,
+      distillery: e.distillery ?? '',
+      bottler: e.bottler ?? '',
+      category: e.category,
+      subType: e.subType ?? null,
+      ageStatement: e.ageStatement ?? null,
+      isNas: e.isNas,
+      proof: e.proof ?? null,
+      mashBillCorn: e.mashBillCorn ?? null,
+      mashBillRye: e.mashBillRye ?? null,
+      mashBillWheat: e.mashBillWheat ?? null,
+      mashBillMalt: e.mashBillMalt ?? null,
+      series: e.series ?? '',
+      entryType: 'bottle_purchased',
+      purchaseDate: today,
+      entryDate: today,
+      bottleRemainingPct: 100,
+    });
+    this.repurchaseOfEntryId = e.id ?? null;
+
+    if (e.subType === 'single_barrel' && (e.barrelNumber || e.barrelLabel)) {
+      const sameBarrel = await this.askSameBarrel(e);
+      if (sameBarrel) {
+        this.form.patchValue({
+          barrelNumber: e.barrelNumber ?? '',
+          barrelLabel: e.barrelLabel ?? '',
+        });
+      }
+    }
+
+    const next: FlavorSuggestions = {
+      nose: e.noseTags ?? [],
+      palate: e.palateTags ?? [],
+      finish: e.finishTags ?? [],
+    };
+    this.form.patchValue({
+      noseTags: next.nose,
+      palateTags: next.palate,
+      finishTags: next.finish,
+    });
+    this.suggestedFlavors.set(next);
+  }
+
+  /** Ask whether a single-barrel rebuy is the same pick or a new barrel. */
+  private async askSameBarrel(e: LogEntry): Promise<boolean> {
+    const pick =
+      e.barrelLabel ||
+      (e.barrelNumber ? `Barrel ${e.barrelNumber}` : 'the same pick');
+    const alert = await this.alertCtrl.create({
+      header: 'Same barrel?',
+      message: `Single barrels vary bottle to bottle. Is this the same pick (${pick}) or a new one?`,
+      buttons: [
+        { text: 'New barrel', role: 'cancel' },
+        { text: 'Same pick', role: 'confirm' },
+      ],
+    });
+    await alert.present();
+    const { role } = await alert.onDidDismiss();
+    return role === 'confirm';
   }
 
   /** Pre-fill the add-log form from a wishlist entry ("Found It — Log It"). */
@@ -278,6 +378,7 @@ export class AddEditEntryPage {
       mashBillMalt: e.mashBillMalt ?? null,
       batchNumber: e.batchNumber ?? '',
       barrelNumber: e.barrelNumber ?? '',
+      barrelLabel: e.barrelLabel ?? '',
       series: e.series ?? '',
       entryType: e.entryType,
       didNotPurchase: e.didNotPurchase,
@@ -299,6 +400,8 @@ export class AddEditEntryPage {
       entryDate: this.tsToDateStr(e.entryDate),
     });
     this.entryTypeValue.set(e.entryType);
+    this.subTypeValue.set(e.subType ?? null);
+    this.repurchaseOfEntryId = e.repurchaseOfEntryId ?? null;
     if (e.isNas) {
       this.form.controls.ageStatement.disable();
     }
@@ -471,6 +574,7 @@ export class AddEditEntryPage {
         mashBillMalt: this.numOrNull(v.mashBillMalt),
         batchNumber: this.strOrNull(v.batchNumber),
         barrelNumber: this.strOrNull(v.barrelNumber),
+        barrelLabel: this.strOrNull(v.barrelLabel),
         series: this.strOrNull(v.series),
         entryType,
         didNotPurchase: v.didNotPurchase ?? false,
@@ -482,6 +586,7 @@ export class AddEditEntryPage {
         bottleSizeMl: this.numOrNull(v.bottleSizeMl),
         bottleRemainingPct,
         bottleStatus,
+        repurchaseOfEntryId: this.repurchaseOfEntryId,
         rating: this.numOrNull(v.rating),
         wouldBuyAgain: (v.wouldBuyAgain as WouldBuyAgain | null) ?? null,
         noseNotes: this.strOrNull(v.noseNotes),

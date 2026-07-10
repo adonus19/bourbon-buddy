@@ -3,7 +3,10 @@ import { TestBed } from '@angular/core/testing';
 import { ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 
-jest.mock('@ionic/angular', () => ({ ToastController: class {} }));
+jest.mock('@ionic/angular', () => ({
+  ToastController: class {},
+  AlertController: class {},
+}));
 jest.mock('@angular/fire/firestore', () => ({
   Firestore: class {},
   collection: jest.fn(),
@@ -28,7 +31,7 @@ jest.mock('@angular/fire/functions', () => ({
 jest.mock('@angular/fire/auth', () => ({ Auth: class {} }));
 jest.mock('@angular/fire/storage', () => ({ Storage: class {} }));
 
-import { ToastController } from '@ionic/angular';
+import { AlertController, ToastController } from '@ionic/angular';
 import { AddEditEntryPage } from './add-edit-entry.page';
 import { LogEntryService } from '../../../core/services/log-entry.service';
 import { BourbonCatalogService } from '../../../core/services/bourbon-catalog.service';
@@ -65,6 +68,15 @@ function configure(opts: {
         provide: ToastController,
         useValue: { create: async () => ({ present: async () => undefined }) },
       },
+      {
+        provide: AlertController,
+        useValue: {
+          create: async () => ({
+            present: async () => undefined,
+            onDidDismiss: async () => ({ role: 'cancel' }),
+          }),
+        },
+      },
     ],
   });
   return TestBed.createComponent(AddEditEntryPage).componentInstance;
@@ -73,6 +85,7 @@ function configure(opts: {
 // Reach the private auto-populate method + form under test.
 interface Testable {
   autoPopulateFlavors(id: string): Promise<void>;
+  prefillFromRebuy(e: unknown): Promise<void>;
   suggestedFlavors(): { nose: string[]; palate: string[]; finish: string[] };
   form: {
     controls: Record<string, { value: unknown; setValue: (v: unknown) => void }>;
@@ -153,5 +166,62 @@ describe('AddEditEntryPage — flavor auto-populate (BB-186)', () => {
 
     await c.autoPopulateFlavors('b1');
     expect(catalog.getFlavorSuggestions).not.toHaveBeenCalled();
+  });
+});
+
+describe('AddEditEntryPage — Buy Again (BB-193)', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  const source = {
+    id: 'e-prev',
+    bourbonName: "Blanton's",
+    bourbonId: 'b1',
+    distillery: 'Buffalo Trace',
+    category: 'bourbon',
+    subType: 'single_barrel',
+    proof: 93,
+    barrelNumber: '42',
+    barrelLabel: 'Total Wine Pick',
+    isNas: false,
+    purchasePrice: 65,
+    rating: 4.5,
+    noseTags: ['Vanilla'],
+    palateTags: ['Cherry'],
+    finishTags: [],
+    bottleRemainingPct: 0,
+    bottleStatus: 'finished',
+  };
+
+  it('clones identity/spec, resets experience, and carries tags as suggested', async () => {
+    const c = testable(configure({ catalog: { getFlavorSuggestions: jest.fn() } }));
+
+    await c.prefillFromRebuy(source);
+
+    // Identity + spec copied
+    expect(c.form.controls['bourbonName'].value).toBe("Blanton's");
+    expect(c.form.controls['bourbonId'].value).toBe('b1');
+    expect(c.form.controls['proof'].value).toBe(93);
+    // Experience reset — fresh purchased bottle, blank price/rating
+    expect(c.form.controls['entryType'].value).toBe('bottle_purchased');
+    expect(c.form.controls['bottleRemainingPct'].value).toBe(100);
+    expect(c.form.controls['purchasePrice'].value).toBeNull();
+    expect(c.form.controls['rating'].value).toBeNull();
+    // Prior tags become suggested starting points
+    expect(c.form.controls['noseTags'].value).toEqual(['Vanilla']);
+    expect(c.suggestedFlavors()).toEqual({
+      nose: ['Vanilla'],
+      palate: ['Cherry'],
+      finish: [],
+    });
+  });
+
+  it('does NOT copy the barrel identity on a single-barrel rebuy (prompt → New barrel)', async () => {
+    // The AlertController mock resolves role 'cancel' → treated as "New barrel".
+    const c = testable(configure({ catalog: { getFlavorSuggestions: jest.fn() } }));
+
+    await c.prefillFromRebuy(source);
+
+    expect(c.form.controls['barrelNumber'].value).toBe('');
+    expect(c.form.controls['barrelLabel'].value).toBe('');
   });
 });
