@@ -1,6 +1,7 @@
 import { LogEntry } from '../../models';
 import { BourbonCategory } from '../../models';
 import { CATEGORY_DISPLAY } from '../constants/category-display';
+import { deriveBottleStatus } from './bottle-lifecycle';
 
 /** Headline numbers for the top of the stats page. */
 export interface SummaryStats {
@@ -8,6 +9,8 @@ export interface SummaryStats {
   totalDistilleries: number;
   totalSpent: number;
   avgRating: number | null;
+  openBottles: number; // owned bottles still on the shelf (BB-194)
+  killedBottles: number; // owned bottles finished/killed (BB-194)
 }
 
 export interface RatingBin {
@@ -44,6 +47,8 @@ export function computeSummary(entries: LogEntry[]): SummaryStats {
   let spent = 0;
   let ratingSum = 0;
   let ratingCount = 0;
+  let openBottles = 0;
+  let killedBottles = 0;
 
   for (const e of entries) {
     if (e.distillery) {
@@ -56,6 +61,12 @@ export function computeSummary(entries: LogEntry[]): SummaryStats {
       ratingSum += e.rating;
       ratingCount += 1;
     }
+    const status = deriveBottleStatus(e);
+    if (status === 'open') {
+      openBottles += 1;
+    } else if (status === 'finished') {
+      killedBottles += 1;
+    }
   }
 
   return {
@@ -63,6 +74,8 @@ export function computeSummary(entries: LogEntry[]): SummaryStats {
     totalDistilleries: distilleries.size,
     totalSpent: spent,
     avgRating: ratingCount ? ratingSum / ratingCount : null,
+    openBottles,
+    killedBottles,
   };
 }
 

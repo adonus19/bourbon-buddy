@@ -169,16 +169,13 @@
             </ion-button>
           }
         }
+      </div>
 
-        <ion-button
-          class="buy-again"
-          fill="clear"
-          size="small"
-          (click)="buyAgain()"
-        >
-          <ion-icon name="repeat-outline" slot="start"></ion-icon>
-          Buy again
-        </ion-button>
+      <div class="section">
+        <app-bottle-history
+          [bourbonId]="e.bourbonId"
+          [currentEntryId]="entryId"
+        ></app-bottle-history>
       </div>
 
       @if (hasBottleDetails()) {

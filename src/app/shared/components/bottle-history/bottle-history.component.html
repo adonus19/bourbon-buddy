@@ -1,0 +1,77 @@
+@if (history().count >= 1) {
+  <div class="bh">
+    <p class="eyebrow">Your history</p>
+
+    <p class="bh__summary">
+      Logged {{ history().count }}×
+      @if (history().avgRating !== null) {
+        <span class="bh__dot">·</span> avg {{ history().avgRating }}★
+      }
+      @if (history().openCount) {
+        <span class="bh__dot">·</span> {{ history().openCount }} open
+      }
+      @if (history().finishedCount) {
+        <span class="bh__dot">·</span> {{ history().finishedCount }} killed
+      }
+    </p>
+
+    @if (hasSiblings()) {
+      @if (history().priceTrend.length >= 2) {
+        <div class="bh__trend">
+          <span class="bh__trend-label">Paid</span>
+          @for (p of history().priceTrend; track $index) {
+            <span class="bh__price">${{ p.price }}</span>
+            @if (!$last) {
+              <ion-icon name="arrow-forward" class="bh__arrow"></ion-icon>
+            }
+          }
+          @if (priceDelta(); as d) {
+            @if (d !== 0) {
+              <span class="bh__delta" [class.up]="d > 0" [class.down]="d < 0">
+                {{ d > 0 ? '+' : '−' }}${{ d > 0 ? d : -d }}
+              </span>
+            }
+          }
+        </div>
+      }
+
+      <div class="bh__list">
+        @for (e of others(); track e.id) {
+          <a class="bh__row" [routerLink]="['/entry', e.id]">
+            <span class="bh__row-date">
+              {{ e.entryDate.toDate() | date: 'MMM yyyy' }}
+            </span>
+            @if (barrelLabel(e); as bl) {
+              <span class="bh__row-barrel">{{ bl }}</span>
+            }
+            @if (e.rating != null) {
+              <app-rating-widget
+                [rating]="e.rating"
+                [size]="13"
+              ></app-rating-widget>
+            }
+            @if (statusLabel(e); as s) {
+              <span class="bh__row-status" [class.killed]="s === 'Killed'">
+                {{ s }}
+              </span>
+            }
+            <ion-icon name="chevron-forward" class="bh__row-chevron"></ion-icon>
+          </a>
+        }
+      </div>
+    } @else {
+      <p class="bh__single">Your first bottle. Buy it again when it's gone.</p>
+    }
+
+    <ion-button
+      class="bh__buy"
+      fill="clear"
+      size="small"
+      [routerLink]="['/entry/new']"
+      [queryParams]="{ buyAgainFrom: currentEntryId() }"
+    >
+      <ion-icon name="repeat-outline" slot="start"></ion-icon>
+      Buy again
+    </ion-button>
+  </div>
+}
