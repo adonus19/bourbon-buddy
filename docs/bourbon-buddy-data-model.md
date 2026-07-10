@@ -130,7 +130,7 @@ bottle instance / tasting event** (the `/bourbons` catalog holds the *product*).
 `bottleStatus` (`open` | `finished`) is the only stored lifecycle state and applies
 only to **owned** bottles (`entryType ∈ {bottle_purchased, gift_received}`); it is
 `null` for drinks/samples/virtual tastings. The three Cellar views are **derived on
-read**, never stored, via a pure `deriveBottleView(entry)` function:
+read**, never stored, via pure `deriveBottleStatus(entry)` + `matchesCellarView(entry, view)` functions:
 - **Shelf** = owned && `bottleStatus === 'open'`
 - **Graveyard** = owned && `bottleStatus === 'finished'`
 - **Journal** = every entry (full history)

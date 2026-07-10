@@ -56,6 +56,26 @@
       }
     </ion-toolbar>
   }
+
+  @if (entries().length) {
+    <ion-toolbar>
+      <ion-segment
+        class="cellar-segment"
+        [value]="view()"
+        (ionChange)="setView($any($event.detail.value))"
+      >
+        <ion-segment-button value="shelf">
+          <ion-label>Shelf</ion-label>
+        </ion-segment-button>
+        <ion-segment-button value="journal">
+          <ion-label>Journal</ion-label>
+        </ion-segment-button>
+        <ion-segment-button value="graveyard">
+          <ion-label>Graveyard</ion-label>
+        </ion-segment-button>
+      </ion-segment>
+    </ion-toolbar>
+  }
 </ion-header>
 
 <ion-content [fullscreen]="true">
@@ -71,11 +91,41 @@
       </ion-button>
     </div>
   } @else if (visibleEntries().length === 0) {
-    <div class="cellar-empty">
-      <ion-icon name="search-outline" aria-hidden="true"></ion-icon>
-      <h2 class="cellar-empty__title">Nothing matches.</h2>
-      <p class="cellar-empty__sub">Try loosening your search or filters.</p>
-    </div>
+    @if (hasQuery()) {
+      <div class="cellar-empty">
+        <ion-icon name="search-outline" aria-hidden="true"></ion-icon>
+        <h2 class="cellar-empty__title">Nothing matches.</h2>
+        <p class="cellar-empty__sub">Try loosening your search or filters.</p>
+      </div>
+    } @else {
+      @switch (view()) {
+        @case ('shelf') {
+          <div class="cellar-empty">
+            <ion-icon name="wine-outline" aria-hidden="true"></ion-icon>
+            <h2 class="cellar-empty__title">No open bottles.</h2>
+            <p class="cellar-empty__sub">
+              Everything you've tried lives in the Journal.
+            </p>
+            <ion-button
+              class="cellar-empty__cta"
+              fill="clear"
+              (click)="setView('journal')"
+            >
+              View Journal
+            </ion-button>
+          </div>
+        }
+        @case ('graveyard') {
+          <div class="cellar-empty">
+            <ion-icon name="skull-outline" aria-hidden="true"></ion-icon>
+            <h2 class="cellar-empty__title">No dead soldiers yet.</h2>
+            <p class="cellar-empty__sub">
+              Kill a bottle when it's empty and it'll rest here.
+            </p>
+          </div>
+        }
+      }
+    }
   } @else {
     <div class="cellar-sortbar">
       <span>Sorted by {{ sortLabel() }}</span>
@@ -87,10 +137,28 @@
 
     <div class="cellar-list">
       @for (e of visibleEntries(); track e.id) {
-        <app-log-entry-card
-          [entry]="e"
-          [routerLink]="['/entry', e.id]"
-        ></app-log-entry-card>
+        <ion-item-sliding>
+          <ion-item
+            class="cellar-item"
+            [routerLink]="['/entry', e.id]"
+            [detail]="false"
+            lines="none"
+            button
+          >
+            <app-log-entry-card [entry]="e"></app-log-entry-card>
+          </ion-item>
+          @if (view() === 'shelf') {
+            <ion-item-options side="end">
+              <ion-item-option
+                color="dark"
+                (click)="killFromList(e)"
+                aria-label="Kill bottle"
+              >
+                <ion-icon slot="icon-only" name="skull-outline"></ion-icon>
+              </ion-item-option>
+            </ion-item-options>
+          }
+        </ion-item-sliding>
       }
     </div>
   }

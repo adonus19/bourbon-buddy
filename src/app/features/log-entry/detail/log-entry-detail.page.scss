@@ -133,16 +133,20 @@ app-similar-bottles {
   margin: 8px 0 0;
 }
 
-.remaining {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.remaining,
+.killed {
   width: 100%;
   margin-top: 12px;
   padding: 10px 12px;
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-input);
+}
+
+.remaining {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   cursor: pointer;
 
   &__label {
@@ -160,6 +164,35 @@ app-similar-bottles {
     ion-icon {
       font-size: 14px;
     }
+  }
+}
+
+.kill-btn {
+  margin-top: 8px;
+}
+
+.killed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+
+  &__badge {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
+
+  &__date,
+  &__ttk {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+  }
+
+  &__reopen {
+    margin-left: auto;
+    --padding-start: 8px;
+    --padding-end: 8px;
   }
 }
 

@@ -8,12 +8,17 @@ import {
 import {
   ActionSheetController,
   ModalController,
+  ToastController,
   ViewWillEnter,
 } from '@ionic/angular';
 
 import { LogEntry } from '../../models';
 import { LogEntryService } from '../../core/services/log-entry.service';
 import { InboxService } from '../../core/services/inbox.service';
+import {
+  CellarView,
+  matchesCellarView,
+} from '../../shared/utils/bottle-lifecycle';
 import {
   EMPTY_LOG_FILTER,
   LogFilter,
@@ -44,6 +49,7 @@ export class CellarPage implements ViewWillEnter {
   private readonly logService = inject(LogEntryService);
   private readonly actionSheet = inject(ActionSheetController);
   private readonly modalCtrl = inject(ModalController);
+  private readonly toast = inject(ToastController);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly inbox = inject(InboxService);
 
@@ -60,12 +66,22 @@ export class CellarPage implements ViewWillEnter {
   readonly filterActive = computed(() => isFilterActive(this.filter()));
   readonly chips = computed(() => activeChips(this.filter()));
 
-  /** Search + filter applied on top of the current sort. */
+  /** Which Cellar segment is showing. Shelf (what you own, open) is the default. */
+  readonly view = signal<CellarView>('shelf');
+
+  /** True when a search term or filter is narrowing the list. */
+  readonly hasQuery = computed(
+    () => this.search().trim().length > 0 || this.filterActive()
+  );
+
+  /** Segment + search + filter applied on top of the current sort. */
   readonly visibleEntries = computed<LogEntry[]>(() => {
     const term = this.search();
     const f = this.filter();
+    const v = this.view();
     return this.sortedEntries().filter(
-      (e) => matchesSearch(e, term) && matchesFilter(e, f)
+      (e) =>
+        matchesCellarView(e, v) && matchesSearch(e, term) && matchesFilter(e, f)
     );
   });
 
@@ -112,6 +128,43 @@ export class CellarPage implements ViewWillEnter {
       ],
     });
     await sheet.present();
+  }
+
+  setView(value: CellarView): void {
+    this.view.set(value);
+  }
+
+  /** Swipe action: kill a bottle straight from the Shelf, with an Undo toast. */
+  async killFromList(e: LogEntry): Promise<void> {
+    if (!e.id) {
+      return;
+    }
+    const id = e.id;
+    const prevPct = e.bottleRemainingPct ?? null;
+    try {
+      await this.logService.killBottle(id);
+      const t = await this.toast.create({
+        message: `${e.bourbonName} killed. 🪦`,
+        duration: 3500,
+        position: 'bottom',
+        buttons: [
+          {
+            text: 'Undo',
+            handler: () => {
+              void this.logService.reopenBottle(id, prevPct);
+            },
+          },
+        ],
+      });
+      await t.present();
+    } catch {
+      const t = await this.toast.create({
+        message: "Couldn't update. Try again.",
+        duration: 2000,
+        position: 'bottom',
+      });
+      await t.present();
+    }
   }
 
   onSearchInput(value: string): void {

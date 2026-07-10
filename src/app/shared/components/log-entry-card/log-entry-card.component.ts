@@ -5,6 +5,10 @@ import {
   CATEGORY_DISPLAY,
   ENTRY_TYPE_LABELS,
 } from '../../constants/category-display';
+import {
+  deriveBottleStatus,
+  timeToKillDays,
+} from '../../utils/bottle-lifecycle';
 
 /**
  * The log-entry list card (Cellar). Presentational only — the parent supplies
@@ -32,4 +36,18 @@ export class LogEntryCardComponent {
   readonly lastPouredAt = computed(
     () => this.entry().lastPouredAt?.toDate() ?? null
   );
+
+  /** Lifecycle status of an owned bottle; null for non-owned entries. */
+  readonly bottleStatus = computed(() => deriveBottleStatus(this.entry()));
+  readonly isKilled = computed(() => this.bottleStatus() === 'finished');
+
+  /** Fill % for the meter — only for an open owned bottle with a known level. */
+  readonly fillPct = computed(() => {
+    if (this.bottleStatus() !== 'open') {
+      return null;
+    }
+    return this.entry().bottleRemainingPct ?? null;
+  });
+
+  readonly timeToKill = computed(() => timeToKillDays(this.entry()));
 }
