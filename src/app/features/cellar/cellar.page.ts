@@ -15,6 +15,10 @@ import { LogEntry } from '../../models';
 import { LogEntryService } from '../../core/services/log-entry.service';
 import { InboxService } from '../../core/services/inbox.service';
 import {
+  CellarView,
+  matchesCellarView,
+} from '../../shared/utils/bottle-lifecycle';
+import {
   EMPTY_LOG_FILTER,
   LogFilter,
   activeChips,
@@ -60,12 +64,22 @@ export class CellarPage implements ViewWillEnter {
   readonly filterActive = computed(() => isFilterActive(this.filter()));
   readonly chips = computed(() => activeChips(this.filter()));
 
-  /** Search + filter applied on top of the current sort. */
+  /** Which Cellar segment is showing. Shelf (what you own, open) is the default. */
+  readonly view = signal<CellarView>('shelf');
+
+  /** True when a search term or filter is narrowing the list. */
+  readonly hasQuery = computed(
+    () => this.search().trim().length > 0 || this.filterActive()
+  );
+
+  /** Segment + search + filter applied on top of the current sort. */
   readonly visibleEntries = computed<LogEntry[]>(() => {
     const term = this.search();
     const f = this.filter();
+    const v = this.view();
     return this.sortedEntries().filter(
-      (e) => matchesSearch(e, term) && matchesFilter(e, f)
+      (e) =>
+        matchesCellarView(e, v) && matchesSearch(e, term) && matchesFilter(e, f)
     );
   });
 
@@ -112,6 +126,10 @@ export class CellarPage implements ViewWillEnter {
       ],
     });
     await sheet.present();
+  }
+
+  setView(value: CellarView): void {
+    this.view.set(value);
   }
 
   onSearchInput(value: string): void {

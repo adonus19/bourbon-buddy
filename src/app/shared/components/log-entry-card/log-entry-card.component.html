@@ -36,5 +36,28 @@
         </span>
       }
     </div>
+
+    @if (fillPct() !== null) {
+      <div
+        class="card__fill"
+        [attr.aria-label]="'Bottle ' + fillPct() + '% full'"
+      >
+        <span class="card__fill-track">
+          <span class="card__fill-level" [style.width.%]="fillPct()"></span>
+        </span>
+        <span class="card__fill-pct">{{ fillPct() }}%</span>
+      </div>
+    } @else if (isKilled()) {
+      <div class="card__killed">
+        <span>🪦 Killed</span>
+        @if (timeToKill() !== null) {
+          <span class="card__dot">·</span>
+          <span>
+            lasted {{ timeToKill() }}
+            {{ timeToKill() === 1 ? 'day' : 'days' }}
+          </span>
+        }
+      </div>
+    }
   </div>
 </div>
