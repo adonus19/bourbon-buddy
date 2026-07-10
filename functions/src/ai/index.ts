@@ -30,6 +30,7 @@ import {
 } from "./extraction";
 import {
   articleFlavorSeed,
+  FlavorTags,
   mergeFlavorTags,
   profileToTags,
   sameTags,
@@ -64,6 +65,9 @@ const BACKFILL_MAX = 60;
 // path isn't paced — a lone 429 there is deferred to the sweep on purpose.)
 const BACKFILL_SPACING_MS = 18000;
 const SWEEP_LIMIT = 200; // recent articles scanned per scheduled sweep
+// Chip-flavor refresh: articles scanned per run, and Firestore's getAll batch cap.
+const FLAVOR_REFRESH_LIMIT = 150;
+const GET_ALL_CHUNK = 100;
 const RATE_LIMITED = -2; // processArticle sentinel: hit the model rate limit
 
 interface MentionedBottle {
@@ -190,6 +194,98 @@ export const sweepArticleBottles = onSchedule(
 );
 
 /**
+ * Keeps chip flavor tags in step with the catalog (BB-199).
+ *
+ * `mentionedBottles[].flavor` is denormalized at extraction time so feed chips
+ * can show the Taste Match badge without a per-chip read. But most article
+ * bottles are *created* by that extraction and only get a profile later, when
+ * the enrichment sweep reaches them — so their cached flavor stays null and the
+ * badge never appears. This backfills it: recent articles only, catalog reads
+ * deduped by bourbonId, and a write only when a chip actually gained tags.
+ * No model calls, so it's free of the Groq pacing the extraction sweeps need.
+ */
+export const refreshArticleBottleFlavor = onSchedule(
+  {
+    schedule: "every 6 hours",
+    region: "us-central1",
+    timeoutSeconds: 300,
+  },
+  async () => {
+    const res = await refreshChipFlavor(getFirestore(), FLAVOR_REFRESH_LIMIT);
+    logger.info(
+      `Chip flavor refresh: scanned ${res.scanned}, updated ${res.updated} ` +
+        `article(s) from ${res.bottlesRead} catalog read(s).`
+    );
+  }
+);
+
+/** True when a profile carries at least one tag in any stage. */
+function hasTags(tags: FlavorTags | null | undefined): boolean {
+  return !!tags && tags.nose.length + tags.palate.length + tags.finish.length > 0;
+}
+
+/**
+ * Patches null `flavor` entries on recent articles' `mentionedBottles` from the
+ * catalog. Returns counters for the log line. Never throws per-article.
+ */
+async function refreshChipFlavor(
+  db: FirebaseFirestore.Firestore,
+  limit: number
+): Promise<{ scanned: number; updated: number; bottlesRead: number }> {
+  const snap = await db
+    .collection("newsArticles")
+    .orderBy("fetchedAt", "desc")
+    .limit(limit)
+    .get();
+
+  // One catalog read per distinct bottle across the whole scan, not per chip.
+  const missing = new Set<string>();
+  for (const doc of snap.docs) {
+    const bottles = (doc.get("mentionedBottles") as MentionedBottle[]) ?? [];
+    for (const b of bottles) {
+      if (b.bourbonId && !hasTags(b.flavor)) {
+        missing.add(b.bourbonId);
+      }
+    }
+  }
+  if (!missing.size) {
+    return { scanned: snap.size, updated: 0, bottlesRead: 0 };
+  }
+
+  const ids = [...missing];
+  const refs = ids.map((id) => db.collection("bourbons").doc(id));
+  const found = new Map<string, FlavorTags>();
+  for (let i = 0; i < refs.length; i += GET_ALL_CHUNK) {
+    const docs = await db.getAll(...refs.slice(i, i + GET_ALL_CHUNK));
+    for (const doc of docs) {
+      const tags = profileToTags(doc.get("flavorProfile"));
+      if (hasTags(tags)) {
+        found.set(doc.id, tags);
+      }
+    }
+  }
+
+  let updated = 0;
+  for (const doc of snap.docs) {
+    const bottles = (doc.get("mentionedBottles") as MentionedBottle[]) ?? [];
+    let changed = false;
+    const next = bottles.map((b) => {
+      const tags = b.bourbonId && !hasTags(b.flavor) ? found.get(b.bourbonId) : undefined;
+      if (!tags) {
+        return b;
+      }
+      changed = true;
+      return { ...b, flavor: tags };
+    });
+    if (changed) {
+      await doc.ref.update({ mentionedBottles: next });
+      updated++;
+    }
+  }
+  return { scanned: snap.size, updated, bottlesRead: ids.length };
+}
+
+/**
  * Scans the most-recently-fetched articles and extracts bottles for any that
  * lack `bottlesExtractedAt`, pacing calls and stopping early on a rate limit.
  */
@@ -300,20 +396,23 @@ async function processArticle(
     const category = raw.category;
     const distillery = raw.distillery?.trim() || null;
     const match = await matchOrCreateCatalog(db, key, name, distillery, category);
+    // Feed (a), BB-185: seed the bottle's catalog flavor profile from any
+    // tasting notes in the article. Best-effort — never fail extraction for it.
+    // Seeded before the chip is built so a bottle first created here still
+    // carries flavor tags for the Taste Match badge (BB-199).
+    let seeded: FlavorTags | null = null;
+    try {
+      seeded = await seedArticleFlavor(db, match.id, raw.flavor);
+    } catch (err) {
+      logger.warn(`Flavor seed failed for ${match.id}`, err);
+    }
     bottles.push({
       name,
       bourbonId: match.id,
       distillery,
       category,
-      flavor: match.flavorTags,
+      flavor: seeded ?? match.flavorTags,
     });
-    // Feed (a), BB-185: seed the bottle's catalog flavor profile from any
-    // tasting notes in the article. Best-effort — never fail extraction for it.
-    try {
-      await seedArticleFlavor(db, match.id, raw.flavor);
-    } catch (err) {
-      logger.warn(`Flavor seed failed for ${match.id}`, err);
-    }
     if (bottles.length >= MAX_BOTTLES) {
       break;
     }
@@ -408,17 +507,17 @@ async function seedArticleFlavor(
   db: FirebaseFirestore.Firestore,
   bourbonId: string,
   rawFlavor: unknown
-): Promise<void> {
+): Promise<FlavorTags | null> {
   const seed = articleFlavorSeed(rawFlavor);
   if (!seed) {
-    return;
+    return null;
   }
   const ref = db.collection("bourbons").doc(bourbonId);
   const snap = await ref.get();
   const existing = profileToTags(snap.get("flavorProfile"));
   const merged = mergeFlavorTags(existing, seed);
   if (sameTags(existing, merged)) {
-    return; // the article added nothing new — skip a redundant write
+    return hasTags(existing) ? existing : null; // nothing new — skip the write
   }
   // Carry the generation prompt version through (BB-196) — an article seed
   // augments a profile, it doesn't regenerate it, so the version must survive
@@ -436,6 +535,7 @@ async function seedArticleFlavor(
     },
     flavorEnrichedAt: FieldValue.serverTimestamp(),
   });
+  return merged;
 }
 
 /**
