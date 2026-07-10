@@ -23,6 +23,7 @@ import { onDocumentWritten } from "firebase-functions/v2/firestore";
 
 import { sendNotificationToUser } from "../notifications";
 import { withinAlertRadius } from "../shared/geo";
+import { matchTaste, TasteVector } from "../taste/taste-vector";
 
 const ACTIVE_STATUSES = [
   "actively_looking",
@@ -86,7 +87,12 @@ export const onSightingCreated = onDocumentWritten(
         store,
         bottleName,
         locSuffix(sighting),
-        { lat: sighting.lat, lng: sighting.lng }
+        { lat: sighting.lat, lng: sighting.lng },
+        (sighting.flavorTags as {
+          nose: string[];
+          palate: string[];
+          finish: string[];
+        } | null) ?? null
       );
     }
   }
@@ -129,7 +135,13 @@ async function personalPriceAlerts(
   }
 }
 
-/** Friends who have this bottle on their active hunt list get a match alert. */
+/**
+ * Friends who have this bottle on their active hunt list get a match alert;
+ * friends who DON'T but whose taste vector matches the sighting's flavor tags
+ * get a Taste Match alert instead (BB-199). One notification per sighting per
+ * recipient — the hunt-list match is the stronger signal and takes precedence,
+ * and the shared alertRecipients marker keeps the two types from stacking.
+ */
 async function friendMatchAlerts(
   db: FirebaseFirestore.Firestore,
   sightingId: string,
@@ -139,7 +151,8 @@ async function friendMatchAlerts(
   store: string,
   bottleName: string,
   loc: string,
-  coords: { lat?: unknown; lng?: unknown }
+  coords: { lat?: unknown; lng?: unknown },
+  flavorTags: { nose: string[]; palate: string[]; finish: string[] } | null
 ): Promise<void> {
   const friendsSnap = await db.collection(`users/${spotterUid}/friends`).get();
   if (friendsSnap.empty) {
@@ -161,47 +174,79 @@ async function friendMatchAlerts(
     const match = entries.docs.find((d) =>
       ACTIVE_STATUSES.includes(d.data().status as string)
     );
+
+    // Without a hunt-list match, a taste match (from the vector maintained on
+    // the profile doc) is the only reason to keep going for this friend.
+    let tasteTags: string[] = [];
+    let recipient: FirebaseFirestore.DocumentData | null = null;
     if (!match) {
-      continue;
+      if (!flavorTags) {
+        continue; // pre-BB-199 sighting or unprofiled bottle
+      }
+      recipient = (await db.doc(`users/${recipientUid}`).get()).data() ?? {};
+      const taste = matchTaste(
+        (recipient.tasteVector as TasteVector | undefined) ?? null,
+        flavorTags
+      );
+      if (!taste.matched) {
+        continue;
+      }
+      tasteTags = taste.tags;
     }
 
     // Proximity filter (BB-180): drop silently when the recipient set a base
     // location and this sighting is beyond their radius. Fails open — no base
     // location or no sighting coords means we still deliver.
-    const recipient =
-      (await db.doc(`users/${recipientUid}`).get()).data() ?? {};
+    if (!recipient) {
+      recipient = (await db.doc(`users/${recipientUid}`).get()).data() ?? {};
+    }
     if (!withinAlertRadius(coords, recipient)) {
       continue;
     }
 
-    // At-most-once per (sighting, recipient); re-alert only on a real drop.
+    // At-most-once per (sighting, recipient); re-alert only on a real drop —
+    // and only for hunt-list matches (a taste hint never re-fires).
     const markerRef = db.doc(
       `sightings/${sightingId}/alertRecipients/${recipientUid}`
     );
     const marker = await markerRef.get();
     if (marker.exists) {
       const lastPrice = marker.get("lastPrice") as number;
-      if (!(price <= lastPrice * (1 - PRICE_DROP_PCT))) {
+      if (!match || !(price <= lastPrice * (1 - PRICE_DROP_PCT))) {
         continue;
       }
     }
 
-    const sent = await sendNotificationToUser(
-      recipientUid,
-      {
-        title: `${spotterName} spotted a bottle you want 🥃`,
-        body: `${bottleName} — $${price} at ${store}${loc}`,
-        link: `/wishlist/${match.id}`,
-        data: { type: "sightingMatch", sightingId, entryId: match.id },
-      },
-      "sightingMatch"
-    );
+    const sent = match
+      ? await sendNotificationToUser(
+          recipientUid,
+          {
+            title: `${spotterName} spotted a bottle you want 🥃`,
+            body: `${bottleName} — $${price} at ${store}${loc}`,
+            link: `/wishlist/${match.id}`,
+            data: { type: "sightingMatch", sightingId, entryId: match.id },
+          },
+          "sightingMatch"
+        )
+      : await sendNotificationToUser(
+          recipientUid,
+          {
+            title: `${spotterName} spotted a bottle you might love ✨`,
+            body:
+              `${bottleName} matches your taste (${tasteTags
+                .slice(0, 3)
+                .join(", ")}) — $${price} at ${store}${loc}`,
+            link: `/tabs/social/feed`,
+            data: { type: "tasteMatch", sightingId },
+          },
+          "tasteMatch"
+        );
     await markerRef.set({
       lastPrice: price,
       sentAt: FieldValue.serverTimestamp(),
     });
     logger.info(
-      `Match alert ${sightingId} -> ${recipientUid}: ${sent} device(s).`
+      `${match ? "Match" : "Taste"} alert ${sightingId} -> ${recipientUid}: ${sent} device(s).`
     );
   }
 }
