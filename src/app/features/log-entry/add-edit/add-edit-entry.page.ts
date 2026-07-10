@@ -11,6 +11,7 @@ import {
   EntryType,
   FinishLength,
   LogEntry,
+  OWNED_ENTRY_TYPES,
   WishlistEntry,
   WouldBuyAgain,
 } from '../../../models';
@@ -442,6 +443,18 @@ export class AddEditEntryPage {
           series: this.strOrNull(v.series),
         }));
 
+      const entryType = (v.entryType as EntryType) ?? 'drink';
+      const bottleRemainingPct = this.isPurchasedBottle()
+        ? this.numOrNull(v.bottleRemainingPct)
+        : null;
+      // Owned bottles carry an explicit lifecycle status (BB-191); a fresh entry
+      // marked Empty is born finished. finishedAt is stamped later, on Kill.
+      const bottleStatus = OWNED_ENTRY_TYPES.includes(entryType)
+        ? bottleRemainingPct === 0
+          ? 'finished'
+          : 'open'
+        : null;
+
       const baseInput: Omit<LogEntryInput, 'labelPhotoUrl'> = {
         bourbonId,
         bourbonName: name,
@@ -459,7 +472,7 @@ export class AddEditEntryPage {
         batchNumber: this.strOrNull(v.batchNumber),
         barrelNumber: this.strOrNull(v.barrelNumber),
         series: this.strOrNull(v.series),
-        entryType: (v.entryType as EntryType) ?? 'drink',
+        entryType,
         didNotPurchase: v.didNotPurchase ?? false,
         purchasePrice: v.didNotPurchase ? null : this.numOrNull(v.purchasePrice),
         purchaseLocation: v.didNotPurchase
@@ -467,9 +480,8 @@ export class AddEditEntryPage {
           : this.strOrNull(v.purchaseLocation),
         purchaseDate: this.toTimestamp(v.purchaseDate),
         bottleSizeMl: this.numOrNull(v.bottleSizeMl),
-        bottleRemainingPct: this.isPurchasedBottle()
-          ? this.numOrNull(v.bottleRemainingPct)
-          : null,
+        bottleRemainingPct,
+        bottleStatus,
         rating: this.numOrNull(v.rating),
         wouldBuyAgain: (v.wouldBuyAgain as WouldBuyAgain | null) ?? null,
         noseNotes: this.strOrNull(v.noseNotes),

@@ -113,6 +113,35 @@ export class LogEntryService {
     });
   }
 
+  /**
+   * Kills a bottle (BB-191): moves it to the Graveyard. Sets the lifecycle
+   * status, empties the fill level, and stamps the kill date for time-to-kill.
+   */
+  async killBottle(id: string): Promise<void> {
+    const uid = this.requireUid();
+    await updateDoc(this.entryDocRef(uid, id), {
+      bottleStatus: 'finished',
+      bottleRemainingPct: 0,
+      finishedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  }
+
+  /**
+   * Brings a killed bottle back to the Shelf (undo). Clears the kill date and
+   * sets the fill level to `pct` (null → "Set level", so an accidental kill
+   * doesn't leave an "Empty" bottle sitting on the shelf).
+   */
+  async reopenBottle(id: string, pct: number | null = null): Promise<void> {
+    const uid = this.requireUid();
+    await updateDoc(this.entryDocRef(uid, id), {
+      bottleStatus: 'open',
+      finishedAt: null,
+      bottleRemainingPct: pct,
+      updatedAt: serverTimestamp(),
+    });
+  }
+
   async remove(id: string): Promise<void> {
     const uid = this.requireUid();
     await deleteDoc(this.entryDocRef(uid, id));

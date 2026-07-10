@@ -22,6 +22,11 @@ import {
   ENTRY_TYPE_LABELS,
 } from '../../../shared/constants/category-display';
 import { valueScoreLabel } from '../../../shared/utils/value-score';
+import {
+  deriveBottleStatus,
+  isOwnedBottle,
+  timeToKillDays,
+} from '../../../shared/utils/bottle-lifecycle';
 import { PourFormComponent } from '../../../shared/components/pour-form/pour-form.component';
 
 @Component({
@@ -62,6 +67,20 @@ export class LogEntryDetailPage {
   readonly isPurchasedBottle = computed(
     () => this.entry()?.entryType === 'bottle_purchased'
   );
+
+  /** Owned bottles (purchased or gifted) carry the fill-level / kill lifecycle. */
+  readonly ownedBottle = computed(() => {
+    const e = this.entry();
+    return e ? isOwnedBottle(e) : false;
+  });
+  readonly isKilled = computed(() => {
+    const e = this.entry();
+    return e ? deriveBottleStatus(e) === 'finished' : false;
+  });
+  readonly timeToKill = computed(() => {
+    const e = this.entry();
+    return e ? timeToKillDays(e) : null;
+  });
 
   // One pour-sessions listener for the viewed entry (oldest first).
   readonly pours = toSignal(this.pourService.sessionsFor(this.entryId), {
@@ -188,13 +207,63 @@ export class LogEntryDetailPage {
         ...this.remainingOptions.map((o) => ({
           text: o.label,
           handler: () => {
-            void this.logService.setBottleRemaining(this.entryId, o.value);
+            void this.applyRemaining(o.value);
           },
         })),
         { text: 'Cancel', role: 'cancel' as const },
       ],
     });
     await sheet.present();
+  }
+
+  /** Route a remaining-level choice: Empty → kill; a level on a dead bottle → reopen. */
+  private async applyRemaining(pct: number): Promise<void> {
+    if (pct === 0) {
+      await this.confirmKill();
+      return;
+    }
+    if (this.isKilled()) {
+      await this.reopen(pct);
+      return;
+    }
+    await this.logService.setBottleRemaining(this.entryId, pct);
+  }
+
+  async confirmKill(): Promise<void> {
+    const alert = await this.alertCtrl.create({
+      header: 'Kill this bottle? 🪦',
+      message: 'It moves to your Graveyard — your rating and notes stay put.',
+      buttons: [
+        { text: 'Not yet', role: 'cancel' },
+        {
+          text: 'Kill it',
+          role: 'destructive',
+          handler: () => {
+            void this.doKill();
+          },
+        },
+      ],
+    });
+    await alert.present();
+  }
+
+  private async doKill(): Promise<void> {
+    try {
+      await this.logService.killBottle(this.entryId);
+      await this.presentToast('Bottle killed. 🪦');
+    } catch {
+      await this.presentToast("Couldn't update. Try again.");
+    }
+  }
+
+  /** Bring a killed bottle back to the Shelf. `pct` sets the restored fill level. */
+  async reopen(pct: number | null = null): Promise<void> {
+    try {
+      await this.logService.reopenBottle(this.entryId, pct);
+      await this.presentToast('Back on the shelf.');
+    } catch {
+      await this.presentToast("Couldn't update. Try again.");
+    }
   }
 
   async confirmDelete(): Promise<void> {

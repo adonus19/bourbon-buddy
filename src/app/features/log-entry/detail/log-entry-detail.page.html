@@ -121,18 +121,53 @@
             Logged {{ e.entryDate.toDate() | date: 'mediumDate' }}
           }
         </p>
-        @if (isPurchasedBottle()) {
-          <button
-            type="button"
-            class="remaining"
-            (click)="changeBottleRemaining()"
-          >
-            <span class="remaining__label">Bottle remaining</span>
-            <span class="remaining__value">
-              {{ remainingLabel(e.bottleRemainingPct) }}
-              <ion-icon name="chevron-down-outline"></ion-icon>
-            </span>
-          </button>
+        @if (ownedBottle()) {
+          @if (isKilled()) {
+            <div class="killed">
+              <span class="killed__badge">🪦 Killed</span>
+              @if (e.finishedAt) {
+                <span class="killed__date">
+                  {{ e.finishedAt.toDate() | date: 'mediumDate' }}
+                </span>
+              }
+              @if (timeToKill() !== null) {
+                <span class="killed__ttk">
+                  Lasted {{ timeToKill() }}
+                  {{ timeToKill() === 1 ? 'day' : 'days' }}
+                </span>
+              }
+              <ion-button
+                class="killed__reopen"
+                fill="clear"
+                size="small"
+                (click)="reopen()"
+              >
+                Reopen
+              </ion-button>
+            </div>
+          } @else {
+            <button
+              type="button"
+              class="remaining"
+              (click)="changeBottleRemaining()"
+            >
+              <span class="remaining__label">Bottle remaining</span>
+              <span class="remaining__value">
+                {{ remainingLabel(e.bottleRemainingPct) }}
+                <ion-icon name="chevron-down-outline"></ion-icon>
+              </span>
+            </button>
+            <ion-button
+              class="kill-btn"
+              fill="outline"
+              size="small"
+              color="medium"
+              (click)="confirmKill()"
+            >
+              <ion-icon name="skull-outline" slot="start"></ion-icon>
+              Kill it
+            </ion-button>
+          }
         }
       </div>
 
