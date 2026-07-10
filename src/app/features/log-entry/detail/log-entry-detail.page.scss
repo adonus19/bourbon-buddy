@@ -97,6 +97,15 @@
   border-top: 1px solid var(--color-border);
 }
 
+// Similar Bottles is a shared component with its own internal padding, so it
+// isn't a `.section`; give it the same separation from the preceding section
+// (e.g. Pours) rather than letting it butt right up against it.
+app-similar-bottles {
+  display: block;
+  margin-top: 24px;
+  border-top: 1px solid var(--color-border);
+}
+
 .detail__section-head {
   display: flex;
   align-items: center;
