@@ -1307,7 +1307,7 @@ fair-use. First pass = Retailers only; Venues (bars/restaurants) are BB-189.
 > **Cellar model:** one explicit lifecycle field + derived views. `entryType`
 > already encodes ownership, so we add only the genuinely-new state
 > (`bottleStatus: 'open' | 'finished'`, owned bottles only) and derive the rest
-> with a pure `deriveBottleView(entry)` function (unit-tested, mirrors
+> with pure `deriveBottleStatus` + `matchesCellarView` functions (unit-tested, mirror
 > `ACTIVE_WISHLIST_STATUSES`):
 > - **Shelf** = owned && `bottleStatus === 'open'` — what you physically have open
 > - **Graveyard** = owned && `bottleStatus === 'finished'` — killed bottles (kept)
@@ -1332,8 +1332,8 @@ I've killed.
 a scoped story. Extends BB-020's `bottleRemainingPct`; **no schema fork.**
 
 **AC:**
-- Add `bottleStatus` (`open`/`finished`) + `finishedAt`; a `deriveBottleView(entry)`
-  pure function drives all views and falls back to `bottleRemainingPct` for legacy
+- Add `bottleStatus` (`open`/`finished`) + `finishedAt`; a
+  `deriveBottleStatus(entry)` pure function (with `matchesCellarView`) drives all views and falls back to `bottleRemainingPct` for legacy
   entries (no migration/backfill).
 - Fill level is visible on the **Cellar list card** for owned bottles (not just
   detail) — a compact meter/label from `bottleRemainingPct`.
@@ -1357,7 +1357,7 @@ now" vs "everything I've tried."
 
 **AC:**
 - Ionic segment on the Cellar: **Shelf** (default), **Journal**, **Graveyard**,
-  derived from the `entries` signal via `deriveBottleView` — no new Firestore
+  derived from the `entries` signal via `matchesCellarView` — no new Firestore
   reads/listeners.
 - Existing sort, filter chips, and search apply within the active segment.
 - Each segment has its own empty state (e.g. Shelf empty → "No open bottles —

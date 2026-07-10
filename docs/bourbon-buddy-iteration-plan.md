@@ -468,7 +468,7 @@ time-to-kill stat), and the Cellar splits into **Shelf / Journal / Graveyard**
 segments. Core model change: a `logEntry` is a **physical bottle instance**;
 `/bourbons` is the **product**. Adds one explicit lifecycle field
 (`bottleStatus`) + `finishedAt`; everything else derives from the existing
-`entries` signal via a unit-tested `deriveBottleView` pure function — **no
+`entries` signal via unit-tested `deriveBottleStatus` / `matchesCellarView` pure functions — **no
 migration, no new listeners/indexes** (legacy entries fall back to
 `bottleRemainingPct`).
 

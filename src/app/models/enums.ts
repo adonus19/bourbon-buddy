@@ -29,6 +29,18 @@ export type EntryType =
   | 'sample_split'
   | 'virtual_tasting';
 
+/**
+ * Lifecycle of a physically-owned bottle (BB-191). Only meaningful for owned
+ * entries (see {@link OWNED_ENTRY_TYPES}); `null` for drinks/samples/virtual.
+ */
+export type BottleStatus = 'open' | 'finished';
+
+/** Entry types that represent a bottle the user physically owns. */
+export const OWNED_ENTRY_TYPES: EntryType[] = [
+  'bottle_purchased',
+  'gift_received',
+];
+
 export type WouldBuyAgain = 'yes' | 'no' | 'maybe';
 
 export type FinishLength = 'short' | 'medium' | 'long';

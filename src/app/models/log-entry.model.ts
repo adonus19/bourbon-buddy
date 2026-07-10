@@ -1,5 +1,6 @@
 import { Timestamp } from '@angular/fire/firestore';
 import {
+  BottleStatus,
   BourbonCategory,
   BourbonSubType,
   EntryType,
@@ -29,6 +30,7 @@ export interface LogEntry {
   mashBillMalt?: number | null;
   batchNumber?: string | null;
   barrelNumber?: string | null;
+  barrelLabel?: string | null; // store-pick label, e.g. "Total Wine Pick" (BB-195)
   series?: string | null;
 
   // Purchase / experience
@@ -39,6 +41,11 @@ export interface LogEntry {
   purchaseDate?: Timestamp | null;
   bottleSizeMl?: number | null; // 50, 200, 375, 750, 1000, 1750
   bottleRemainingPct?: number | null; // 100, 75, 50, 25, 0
+
+  // Bottle lifecycle (BB-191) — owned bottles only; null/absent for non-owned.
+  bottleStatus?: BottleStatus | null; // 'open' | 'finished'
+  finishedAt?: Timestamp | null; // "kill" date; enables time-to-kill
+  repurchaseOfEntryId?: string | null; // lineage to the prior instance on a rebuy (BB-193)
 
   // Ratings and notes
   rating?: number | null; // 0.5 – 5.0, half-step increments
