@@ -1296,7 +1296,7 @@ fair-use. First pass = Retailers only; Venues (bars/restaurants) are BB-189.
 
 ---
 
-## Epic 18: Bottle Lifecycle, Rebuys & Barrel Variance *(Post-Social)*
+## Epic 18: Bottle Lifecycle, Rebuys & Barrel Variance ✅ *(Post-Social — shipped R7/R8)*
 
 > Answers three real cellar scenarios that the current model handles only
 > implicitly: a bottle is **finished** (empty), a bottle is **bought again**, and
@@ -1323,7 +1323,7 @@ fair-use. First pass = Retailers only; Venues (bars/restaurants) are BB-189.
 > **Iterations:** R7 (BB-191, BB-192), R8 (BB-193, BB-194, BB-195). R8 depends on
 > R7's `bottleStatus`.
 
-### BB-191 — Bottle Fill-Level, Kill & Graveyard *(promoted from backlog)*
+### BB-191 — Bottle Fill-Level, Kill & Graveyard ✅ *(promoted from backlog)*
 **As a** user, **I want** to see how full my open bottles are and mark one dead when
 it's empty, **so that** I know what I'm running low on and keep a record of what
 I've killed.
@@ -1346,11 +1346,11 @@ a scoped story. Extends BB-020's `bottleRemainingPct`; **no schema fork.**
   (`purchaseDate` → `finishedAt`) where both dates exist.
 - Non-owned entries (drink/sample/virtual) never show fill-level or kill actions.
 
-**SP:** 5
+**SP:** 5 — **shipped** (R7, PR #98). `bottle-lifecycle` util + tests, kill/reopen service, detail lifecycle UI, swipe-to-kill with Undo.
 
 ---
 
-### BB-192 — Cellar Views: Shelf / Journal / Graveyard
+### BB-192 — Cellar Views: Shelf / Journal / Graveyard ✅
 **As a** user, **I want** to switch between what I physically own, my full tasting
 history, and my dead bottles, **so that** the Cellar answers "what do I have right
 now" vs "everything I've tried."
@@ -1364,11 +1364,11 @@ now" vs "everything I've tried."
   everything's in the Journal").
 - Segment choice is per-session UI state (signal), not persisted server-side.
 
-**SP:** 3
+**SP:** 3 — **shipped** (R7, PR #98). Segment control + `matchesCellarView`, segment-aware empty states, card fill-level/killed display.
 
 ---
 
-### BB-193 — Buy Again (Rebuy Clone)
+### BB-193 — Buy Again (Rebuy Clone) ✅
 **As a** user, **I want** to re-log a bottle I bought before, **so that** each
 purchase is its own instance with its own price, date, and pour log.
 
@@ -1385,11 +1385,11 @@ purchase is its own instance with its own price, date, and pour log.
   falsely merging two different tastings).
 - Saving creates a brand-new entry; the original is untouched.
 
-**SP:** 3
+**SP:** 3 — **shipped** (R8, PR #99). `?buyAgainFrom=` prefill, `repurchaseOfEntryId` lineage, suggested tags, single-barrel same/new prompt; tests.
 
 ---
 
-### BB-194 — Bottle History Roll-up
+### BB-194 — Bottle History Roll-up ✅
 **As a** user, **I want** to see all my logs of the same bottle in one place,
 **so that** I can track how my rating and the price changed over time.
 
@@ -1404,11 +1404,11 @@ purchase is its own instance with its own price, date, and pour log.
 - Stats tie-in: surface **bottles killed** and **currently open** counts to the
   Numbers tab (cheap derivations).
 
-**SP:** 5
+**SP:** 5 — **shipped** (R8, PR #99). `bottle-history` util + `app-bottle-history` on the detail page; Numbers "On the shelf"/"Bottles killed" cards; tests.
 
 ---
 
-### BB-195 — Single-Barrel Variance
+### BB-195 — Single-Barrel Variance ✅
 **As a** user, **I want** to compare the different barrels of a single-barrel
 bottle I've had, **so that** I remember which pick I loved.
 
@@ -1423,7 +1423,7 @@ bottle I've had, **so that** I remember which pick I loved.
 - Catalog stays at the **expression level** — a barrel is never its own
   `/bourbons` doc (protects search, dedupe, Similar Bottles).
 
-**SP:** 3
+**SP:** 3 — **shipped** (R8, PR #99). `barrelLabel` field + `barrelComparison` (favorite = top-rated) in the roll-up; tests.
 
 ---
 
