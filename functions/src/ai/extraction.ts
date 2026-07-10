@@ -55,9 +55,103 @@ export const EXTRACTION_SYSTEM_PROMPT =
   "words it uses per stage (e.g. vanilla, oak, cherry, smoke). MOST articles " +
   "are announcements with NO tasting notes — for those use empty arrays. Never " +
   "invent flavors. " +
-  "Include specific products only; exclude bare distillery/brand names, " +
-  "generic terms (bourbon, rye), people, places, and events. Do NOT include " +
-  "price or invent details. No duplicates. If none, use an empty array.";
+  "A product is something a shopper could ask for BY NAME at a store: a brand " +
+  "plus (usually) an expression. It must be named in the text as a product. " +
+  "NEVER turn a description of whiskey into a product name. From \"sources " +
+  "award-winning bourbon and rye barrels from multiple distilleries to create " +
+  "small-batch expressions\", the correct answer is an EMPTY array — " +
+  "\"award-winning bourbon\", \"award-winning rye\", and \"small-batch " +
+  "expressions\" are descriptions, not bottles. " +
+  "Also exclude: bare distillery, brand, and company names (\"Pursuit " +
+  "Spirits\", \"Buffalo Trace Distillery\"), podcasts, tours, trails, events, " +
+  "awards, people, and places. A brand named without a specific expression is " +
+  "NOT a product. " +
+  "Most articles announce news and name no bottle at all — returning an empty " +
+  "array is the common, correct answer. Prefer omitting a doubtful bottle over " +
+  "including it. Do NOT include price or invent details. No duplicates.";
+
+/**
+ * Whiskey vocabulary, qualifiers, and grammar words. A name built only from
+ * these is a description of whiskey, not a whiskey you can buy.
+ */
+const GENERIC_TOKENS = new Set([
+  // the spirit itself
+  "whiskey", "whisky", "whiskeys", "whiskies", "bourbon", "bourbons", "rye",
+  "ryes", "scotch", "malt", "corn", "wheat", "wheated", "american", "irish",
+  "japanese", "tennessee", "kentucky",
+  // style / process qualifiers
+  "single", "double", "barrel", "barrels", "small", "batch", "cask", "strength",
+  "straight", "blend", "blended", "blends", "bottled", "bond", "proof", "aged",
+  "age", "year", "years", "yr", "yrs", "old", "finished", "sourced", "craft",
+  "high", "low", "unfiltered", "uncut",
+  // product/marketing nouns
+  "expression", "expressions", "release", "releases", "edition", "editions",
+  "bottle", "bottles", "bottling", "bottlings", "collection", "series",
+  "label", "brand", "distillery", "distilleries", "spirits",
+  // marketing adjectives
+  "award", "awarded", "winning", "limited", "special", "new", "latest",
+  "premium", "rare", "exclusive", "annual",
+  // grammar
+  "and", "or", "the", "of", "a", "an", "with", "from", "by", "in", "its",
+]);
+
+/**
+ * Words that make a name a *company* rather than a product. Bare brand and
+ * distillery names are already excluded by the prompt; this catches the ones
+ * that slip through ("Pursuit Spirits" is the producer, not a bottle).
+ */
+const COMPANY_SUFFIXES = new Set([
+  "spirits", "distillery", "distilleries", "distilling", "distillers",
+  "company", "co", "brands", "group", "holdings", "llc", "inc", "podcast",
+]);
+
+/** Splits on whitespace and dashes, then strips surrounding punctuation. */
+function tokenize(name: string): string[] {
+  return name
+    .split(/[\s\-–—/]+/)
+    .map((t) => t.replace(/[^\p{L}\p{N}.']/gu, ""))
+    .filter((t) => t.length > 0);
+}
+
+/**
+ * A token that could plausibly be part of a brand: not whiskey vocabulary, and
+ * capitalized the way a proper noun is. Bare numbers only count at four digits
+ * ("1792", "1920" are brands; the "12" in "Weller 12 Year" is an age).
+ */
+function isDistinctive(token: string): boolean {
+  const bare = token.toLowerCase().replace(/[.']/g, "");
+  if (!bare || GENERIC_TOKENS.has(bare)) {
+    return false;
+  }
+  if (/^\d+$/.test(bare)) {
+    return bare.length === 4;
+  }
+  return /^[A-Z0-9]/.test(token);
+}
+
+/**
+ * Whether an extracted name is a real, buyable product (BB-201).
+ *
+ * The model reliably turns descriptive prose into "bottles": an article saying a
+ * brand "sources award-winning bourbon and rye barrels ... to create small-batch
+ * expressions" yielded `award-winning bourbon`, `award-winning rye`, and
+ * `small-batch expressions` — each of which then got a catalog entry and, from
+ * the enrichment sweep, an invented flavor profile. A prompt alone can't be
+ * trusted to hold this line, so the check is deterministic and testable: a
+ * product needs at least one proper-noun token that isn't whiskey vocabulary,
+ * and must not end in a company suffix.
+ */
+export function isProductName(name: string): boolean {
+  const tokens = tokenize(name);
+  if (tokens.length === 0) {
+    return false;
+  }
+  const last = tokens[tokens.length - 1].toLowerCase().replace(/\./g, "");
+  if (COMPANY_SUFFIXES.has(last)) {
+    return false;
+  }
+  return tokens.some(isDistinctive);
+}
 
 /**
  * Parses the model's JSON reply into whiskey-only `ExtractedBottle`s.
@@ -85,7 +179,8 @@ export function parseExtractionResponse(content: string): ExtractedBottle[] {
           : null,
       flavor: b["flavor"] ?? null,
     }))
-    .filter((b) => b.name.trim().length > 0);
+    .filter((b) => b.name.trim().length > 0)
+    .filter((b) => isProductName(b.name));
 }
 
 /**

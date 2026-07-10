@@ -27,10 +27,13 @@ export { nearbyRetailers } from "./places";
 
 // AI Find Bottles (BB-130): extract bottle mentions from new articles (cached),
 // a scheduled sweep for un-extracted/updated articles, plus a backfill callable.
+// refreshArticleBottleFlavor (BB-199) re-syncs chip flavor tags with the catalog.
 export {
   extractBottlesFromArticle,
   sweepArticleBottles,
   backfillArticleBottles,
+  refreshArticleBottleFlavor,
+  backfillArticleBottleFlavor,
 } from "./ai";
 
 // AI Flavor Enrichment (BB-185): on-demand callable + a proactive hourly sweep

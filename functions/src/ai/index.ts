@@ -8,7 +8,7 @@
  * it. The client reads the cached `mentionedBottles` field; no per-user AI cost.
  *
  * Provider: Groq (free tier, OpenAI-compatible). Chosen over Gemini free tier
- * for its far higher daily request cap (~14.4k RPD on llama-3.1-8b-instant vs
+ * for its far higher daily request cap (~1k RPD on llama-3.3-70b-versatile vs
  * ~200) and no region/billing-project free-tier traps. The key is a Secret
  * Manager secret (GROQ_API_KEY), never in code. All model-specific code lives in
  * `extractBottleNames`, so swapping providers again is a one-function change.
@@ -30,6 +30,7 @@ import {
 } from "./extraction";
 import {
   articleFlavorSeed,
+  FlavorTags,
   mergeFlavorTags,
   profileToTags,
   sameTags,
@@ -46,7 +47,12 @@ export {
 const GROQ_API_KEY = defineSecret("GROQ_API_KEY");
 
 // Free-tier: 30 RPM, 14.4k RPD, fast. Swap here if limits/models change.
-const GROQ_MODEL = "llama-3.1-8b-instant";
+// Extraction is a judgment call — deciding that "award-winning bourbon" is prose
+// and not a bottle (BB-201). The 8b model can't hold that line; 70b can. Its free
+// tier is 1k requests/day (vs 14.4k), which is far more than the ~50 articles/day
+// the feed produces. Flavor enrichment stays on 8b (see groq.ts) so the two
+// features don't share a rate-limit budget.
+const EXTRACTION_MODEL = "llama-3.3-70b-versatile";
 // Range-guide articles can list 10+ expressions, so keep this generous.
 const MAX_BOTTLES = 12;
 // Feed the model the real article body, not just the teaser (BB-130 fix). ~5k
@@ -64,6 +70,10 @@ const BACKFILL_MAX = 60;
 // path isn't paced — a lone 429 there is deferred to the sweep on purpose.)
 const BACKFILL_SPACING_MS = 18000;
 const SWEEP_LIMIT = 200; // recent articles scanned per scheduled sweep
+// Chip-flavor refresh: articles scanned per run, and Firestore's getAll batch cap.
+const FLAVOR_REFRESH_LIMIT = 150;
+const FLAVOR_REFRESH_MAX = 500;
+const GET_ALL_CHUNK = 100;
 const RATE_LIMITED = -2; // processArticle sentinel: hit the model rate limit
 
 interface MentionedBottle {
@@ -190,6 +200,124 @@ export const sweepArticleBottles = onSchedule(
 );
 
 /**
+ * Keeps chip flavor tags in step with the catalog (BB-199).
+ *
+ * `mentionedBottles[].flavor` is denormalized at extraction time so feed chips
+ * can show the Taste Match badge without a per-chip read. But most article
+ * bottles are *created* by that extraction and only get a profile later, when
+ * the enrichment sweep reaches them — so their cached flavor stays null and the
+ * badge never appears. This backfills it: recent articles only, catalog reads
+ * deduped by bourbonId, and a write only when a chip actually gained tags.
+ * No model calls, so it's free of the Groq pacing the extraction sweeps need.
+ */
+export const refreshArticleBottleFlavor = onSchedule(
+  {
+    schedule: "every 6 hours",
+    region: "us-central1",
+    timeoutSeconds: 300,
+  },
+  async () => {
+    const res = await refreshChipFlavor(getFirestore(), FLAVOR_REFRESH_LIMIT);
+    logger.info(
+      `Chip flavor refresh: scanned ${res.scanned}, updated ${res.updated} ` +
+        `article(s) from ${res.bottlesRead} catalog read(s).`
+    );
+  }
+);
+
+/**
+ * Admin-only one-shot of the same refresh, so a deploy doesn't have to wait up
+ * to 6 hours for chips to pick up flavor tags the catalog already has.
+ */
+export const backfillArticleBottleFlavor = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 540,
+    enforceAppCheck: ENFORCE_APP_CHECK,
+  },
+  async (request) => {
+    requireAdmin(request);
+    const requested = Number((request.data as { limit?: number })?.limit);
+    const limit = Math.min(
+      Math.max(Number.isFinite(requested) ? requested : FLAVOR_REFRESH_LIMIT, 1),
+      FLAVOR_REFRESH_MAX
+    );
+    const res = await refreshChipFlavor(getFirestore(), limit);
+    logger.info(
+      `Chip flavor backfill: scanned ${res.scanned}, updated ${res.updated} ` +
+        `article(s) from ${res.bottlesRead} catalog read(s).`
+    );
+    return res;
+  }
+);
+
+/** True when a profile carries at least one tag in any stage. */
+function hasTags(tags: FlavorTags | null | undefined): boolean {
+  return !!tags && tags.nose.length + tags.palate.length + tags.finish.length > 0;
+}
+
+/**
+ * Patches null `flavor` entries on recent articles' `mentionedBottles` from the
+ * catalog. Returns counters for the log line. Never throws per-article.
+ */
+async function refreshChipFlavor(
+  db: FirebaseFirestore.Firestore,
+  limit: number
+): Promise<{ scanned: number; updated: number; bottlesRead: number }> {
+  const snap = await db
+    .collection("newsArticles")
+    .orderBy("fetchedAt", "desc")
+    .limit(limit)
+    .get();
+
+  // One catalog read per distinct bottle across the whole scan, not per chip.
+  const missing = new Set<string>();
+  for (const doc of snap.docs) {
+    const bottles = (doc.get("mentionedBottles") as MentionedBottle[]) ?? [];
+    for (const b of bottles) {
+      if (b.bourbonId && !hasTags(b.flavor)) {
+        missing.add(b.bourbonId);
+      }
+    }
+  }
+  if (!missing.size) {
+    return { scanned: snap.size, updated: 0, bottlesRead: 0 };
+  }
+
+  const ids = [...missing];
+  const refs = ids.map((id) => db.collection("bourbons").doc(id));
+  const found = new Map<string, FlavorTags>();
+  for (let i = 0; i < refs.length; i += GET_ALL_CHUNK) {
+    const docs = await db.getAll(...refs.slice(i, i + GET_ALL_CHUNK));
+    for (const doc of docs) {
+      const tags = profileToTags(doc.get("flavorProfile"));
+      if (hasTags(tags)) {
+        found.set(doc.id, tags);
+      }
+    }
+  }
+
+  let updated = 0;
+  for (const doc of snap.docs) {
+    const bottles = (doc.get("mentionedBottles") as MentionedBottle[]) ?? [];
+    let changed = false;
+    const next = bottles.map((b) => {
+      const tags = b.bourbonId && !hasTags(b.flavor) ? found.get(b.bourbonId) : undefined;
+      if (!tags) {
+        return b;
+      }
+      changed = true;
+      return { ...b, flavor: tags };
+    });
+    if (changed) {
+      await doc.ref.update({ mentionedBottles: next });
+      updated++;
+    }
+  }
+  return { scanned: snap.size, updated, bottlesRead: ids.length };
+}
+
+/**
  * Scans the most-recently-fetched articles and extracts bottles for any that
  * lack `bottlesExtractedAt`, pacing calls and stopping early on a rate limit.
  */
@@ -300,20 +428,23 @@ async function processArticle(
     const category = raw.category;
     const distillery = raw.distillery?.trim() || null;
     const match = await matchOrCreateCatalog(db, key, name, distillery, category);
+    // Feed (a), BB-185: seed the bottle's catalog flavor profile from any
+    // tasting notes in the article. Best-effort — never fail extraction for it.
+    // Seeded before the chip is built so a bottle first created here still
+    // carries flavor tags for the Taste Match badge (BB-199).
+    let seeded: FlavorTags | null = null;
+    try {
+      seeded = await seedArticleFlavor(db, match.id, raw.flavor);
+    } catch (err) {
+      logger.warn(`Flavor seed failed for ${match.id}`, err);
+    }
     bottles.push({
       name,
       bourbonId: match.id,
       distillery,
       category,
-      flavor: match.flavorTags,
+      flavor: seeded ?? match.flavorTags,
     });
-    // Feed (a), BB-185: seed the bottle's catalog flavor profile from any
-    // tasting notes in the article. Best-effort — never fail extraction for it.
-    try {
-      await seedArticleFlavor(db, match.id, raw.flavor);
-    } catch (err) {
-      logger.warn(`Flavor seed failed for ${match.id}`, err);
-    }
     if (bottles.length >= MAX_BOTTLES) {
       break;
     }
@@ -408,17 +539,17 @@ async function seedArticleFlavor(
   db: FirebaseFirestore.Firestore,
   bourbonId: string,
   rawFlavor: unknown
-): Promise<void> {
+): Promise<FlavorTags | null> {
   const seed = articleFlavorSeed(rawFlavor);
   if (!seed) {
-    return;
+    return null;
   }
   const ref = db.collection("bourbons").doc(bourbonId);
   const snap = await ref.get();
   const existing = profileToTags(snap.get("flavorProfile"));
   const merged = mergeFlavorTags(existing, seed);
   if (sameTags(existing, merged)) {
-    return; // the article added nothing new — skip a redundant write
+    return hasTags(existing) ? existing : null; // nothing new — skip the write
   }
   // Carry the generation prompt version through (BB-196) — an article seed
   // augments a profile, it doesn't regenerate it, so the version must survive
@@ -430,12 +561,13 @@ async function seedArticleFlavor(
     flavorProfile: {
       ...merged,
       source: "ai",
-      model: GROQ_MODEL,
+      model: EXTRACTION_MODEL,
       ...(promptVersion !== undefined ? { promptVersion } : {}),
       generatedAt: Timestamp.now(),
     },
     flavorEnrichedAt: FieldValue.serverTimestamp(),
   });
+  return merged;
 }
 
 /**
@@ -457,7 +589,7 @@ async function extractBottleNames(
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: GROQ_MODEL,
+      model: EXTRACTION_MODEL,
       temperature: 0,
       max_tokens: 768,
       response_format: { type: "json_object" },

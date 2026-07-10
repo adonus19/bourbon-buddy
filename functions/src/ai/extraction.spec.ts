@@ -1,4 +1,4 @@
-import { parseExtractionResponse } from "./extraction";
+import { isProductName, parseExtractionResponse } from "./extraction";
 
 /** Wraps bottle objects in the JSON envelope the model returns. */
 const envelope = (bottles: unknown[]): string => JSON.stringify({ bottles });
@@ -81,8 +81,10 @@ describe("parseExtractionResponse (whiskey-only filter, BB-195)", () => {
     ];
     const out = parseExtractionResponse(
       envelope(
+        // Needs a proper-noun name — `isProductName` rejects "Bottle 0" as
+        // whiskey vocabulary, which is exactly its job.
         categories.map((category, i) => ({
-          name: `Bottle ${i}`,
+          name: `Larceny ${i}`,
           spirit: "whiskey",
           category,
         }))
@@ -121,5 +123,75 @@ describe("parseExtractionResponse (whiskey-only filter, BB-195)", () => {
 
   it("throws on malformed JSON so the article stays retryable", () => {
     expect(() => parseExtractionResponse("not json")).toThrow();
+  });
+});
+
+describe("isProductName (descriptive-phrase filter, BB-201)", () => {
+  const products = [
+    "Weller 12 Year",
+    "E.H. Taylor Small Batch",
+    "Pursuit United",
+    "Blanton's",
+    "1792 Small Batch",
+    "Old Fitzgerald Bottled-in-Bond",
+    "Mystery Single Barrel",
+    "Russell's Reserve 13",
+  ];
+  for (const name of products) {
+    it(`keeps the branded product "${name}"`, () => {
+      expect(isProductName(name)).toBe(true);
+    });
+  }
+
+  // The real regression: an article that merely *describes* whiskey generically
+  // ("sources award-winning bourbon and rye barrels ... to create small-batch
+  // expressions") had every one of these lifted out as a bottle.
+  const phrases = [
+    "award-winning bourbon",
+    "Award-Winning Bourbon",
+    "award-winning rye",
+    "small-batch expressions",
+    "bourbon and rye barrels",
+    "Bourbon And Rye Barrels",
+    "sourced barrels",
+    "straight bourbon whiskey",
+    "single barrel",
+    "limited edition release",
+  ];
+  for (const name of phrases) {
+    it(`drops the descriptive phrase "${name}"`, () => {
+      expect(isProductName(name)).toBe(false);
+    });
+  }
+
+  const companies = [
+    "Pursuit Spirits",
+    "Buffalo Trace Distillery",
+    "Heaven Hill Brands",
+    "Bardstown Bourbon Company",
+  ];
+  for (const name of companies) {
+    it(`drops the company/brand name "${name}"`, () => {
+      expect(isProductName(name)).toBe(false);
+    });
+  }
+
+  it("drops an empty or punctuation-only name", () => {
+    expect(isProductName("")).toBe(false);
+    expect(isProductName("  --  ")).toBe(false);
+  });
+});
+
+describe("parseExtractionResponse + product-name filter", () => {
+  it("drops descriptive phrases the model returned as bottles", () => {
+    const out = parseExtractionResponse(
+      envelope([
+        { name: "award-winning bourbon", spirit: "whiskey", category: "bourbon" },
+        { name: "award-winning rye", spirit: "whiskey", category: "rye" },
+        { name: "Pursuit Spirits", spirit: "whiskey", category: null },
+        { name: "Pursuit United", spirit: "whiskey", category: "bourbon" },
+      ])
+    );
+    expect(out.map((b) => b.name)).toEqual(["Pursuit United"]);
   });
 });

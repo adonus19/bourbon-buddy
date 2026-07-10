@@ -1,5 +1,12 @@
 :host {
   display: block;
+  height: 100%;
+}
+
+// The frosted surface lives on the modal's content part (see .glass-modal in
+// global.scss); ion-content must not paint over it.
+ion-content {
+  --background: transparent;
 }
 
 .sheet {
