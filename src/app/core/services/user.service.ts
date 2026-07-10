@@ -132,9 +132,12 @@ export class UserService {
       return; // no change
     }
 
+    const pubRef = this.publicDocRef(uid);
     await runTransaction(this.firestore, async (tx) => {
       const newRef = doc(this.firestore, `usernames/${lower}`);
+      // All reads must precede all writes in a Firestore transaction.
       const newSnap = await tx.get(newRef);
+      const pubSnap = await tx.get(pubRef);
       if (newSnap.exists() && newSnap.get('uid') !== uid) {
         throw new Error(USERNAME_TAKEN);
       }
@@ -146,11 +149,32 @@ export class UserService {
         username: handle,
         updatedAt: serverTimestamp(),
       });
-      tx.set(
-        this.publicDocRef(uid),
-        { username: handle, usernameLower: lower, updatedAt: serverTimestamp() },
-        { merge: true }
-      );
+      // Write the FULL public projection, not a partial merge. The hardened
+      // rules (BB-193) validate the whole resulting doc — an exact key set and
+      // per-field types — so a legacy/partial /publicProfiles doc (missing a
+      // now-required field, or carrying an old one) would make a merge write
+      // fail validation and break every claim. Re-emitting all allowed fields,
+      // preserving existing values, self-heals such a doc. friendCount is
+      // preserved (the friend callables maintain it), not reset.
+      const pub = pubSnap.data() ?? {};
+      const displayName =
+        typeof pub['displayName'] === 'string' && pub['displayName']
+          ? (pub['displayName'] as string)
+          : 'Bourbon Buddy';
+      tx.set(pubRef, {
+        displayName,
+        username: handle,
+        usernameLower: lower,
+        avatarUrl: pub['avatarUrl'] ?? null,
+        homeRegion: pub['homeRegion'] ?? null,
+        isDiscoverable:
+          typeof pub['isDiscoverable'] === 'boolean'
+            ? pub['isDiscoverable']
+            : false,
+        friendCount:
+          typeof pub['friendCount'] === 'number' ? pub['friendCount'] : 0,
+        updatedAt: serverTimestamp(),
+      });
     });
   }
 

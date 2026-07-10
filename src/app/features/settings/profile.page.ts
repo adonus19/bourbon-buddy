@@ -145,14 +145,36 @@ export class ProfilePage {
       this.usernameForm.markAsPristine();
       await this.presentToast(`Handle claimed: @${desired}`);
     } catch (err) {
-      const msg =
-        err instanceof Error && err.message === USERNAME_TAKEN
-          ? 'That handle is taken. Try another.'
-          : "Couldn't claim that handle. Try again.";
-      await this.presentToast(msg);
+      await this.presentToast(this.claimErrorMessage(err));
     } finally {
       this.claimingUsername = false;
     }
+  }
+
+  /**
+   * Turns a claim failure into a message that names the actual cause instead of
+   * a blanket "try again". The common real cause is a Firestore `permission-
+   * denied`: the claim writes the public-profile projection, which the hardened
+   * rules (BB-193) validate strictly, and an app that's been open (uncached) for
+   * a while can be running client code that predates the current shape — so the
+   * write is rejected for every handle, taken or not. Point that user at a
+   * refresh rather than letting them retry handles forever.
+   */
+  private claimErrorMessage(err: unknown): string {
+    if (err instanceof Error && err.message === USERNAME_TAKEN) {
+      return 'That handle is taken. Try another.';
+    }
+    const code =
+      typeof err === 'object' && err !== null && 'code' in err
+        ? String((err as { code: unknown }).code)
+        : '';
+    if (code === 'permission-denied') {
+      return "Couldn't claim that handle — your app may be out of date. Reload the app, then try again.";
+    }
+    if (code === 'unavailable') {
+      return "You appear to be offline. Check your connection and try again.";
+    }
+    return "Couldn't claim that handle. Try again.";
   }
 
   async setDefaultVisibility(value: SightingVisibility): Promise<void> {
