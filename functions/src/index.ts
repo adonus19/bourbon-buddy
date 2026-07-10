@@ -33,6 +33,7 @@ export {
   sweepArticleBottles,
   backfillArticleBottles,
   refreshArticleBottleFlavor,
+  backfillArticleBottleFlavor,
 } from "./ai";
 
 // AI Flavor Enrichment (BB-185): on-demand callable + a proactive hourly sweep

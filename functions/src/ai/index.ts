@@ -8,7 +8,7 @@
  * it. The client reads the cached `mentionedBottles` field; no per-user AI cost.
  *
  * Provider: Groq (free tier, OpenAI-compatible). Chosen over Gemini free tier
- * for its far higher daily request cap (~14.4k RPD on llama-3.1-8b-instant vs
+ * for its far higher daily request cap (~1k RPD on llama-3.3-70b-versatile vs
  * ~200) and no region/billing-project free-tier traps. The key is a Secret
  * Manager secret (GROQ_API_KEY), never in code. All model-specific code lives in
  * `extractBottleNames`, so swapping providers again is a one-function change.
@@ -47,7 +47,12 @@ export {
 const GROQ_API_KEY = defineSecret("GROQ_API_KEY");
 
 // Free-tier: 30 RPM, 14.4k RPD, fast. Swap here if limits/models change.
-const GROQ_MODEL = "llama-3.1-8b-instant";
+// Extraction is a judgment call — deciding that "award-winning bourbon" is prose
+// and not a bottle (BB-201). The 8b model can't hold that line; 70b can. Its free
+// tier is 1k requests/day (vs 14.4k), which is far more than the ~50 articles/day
+// the feed produces. Flavor enrichment stays on 8b (see groq.ts) so the two
+// features don't share a rate-limit budget.
+const EXTRACTION_MODEL = "llama-3.3-70b-versatile";
 // Range-guide articles can list 10+ expressions, so keep this generous.
 const MAX_BOTTLES = 12;
 // Feed the model the real article body, not just the teaser (BB-130 fix). ~5k
@@ -67,6 +72,7 @@ const BACKFILL_SPACING_MS = 18000;
 const SWEEP_LIMIT = 200; // recent articles scanned per scheduled sweep
 // Chip-flavor refresh: articles scanned per run, and Firestore's getAll batch cap.
 const FLAVOR_REFRESH_LIMIT = 150;
+const FLAVOR_REFRESH_MAX = 500;
 const GET_ALL_CHUNK = 100;
 const RATE_LIMITED = -2; // processArticle sentinel: hit the model rate limit
 
@@ -216,6 +222,32 @@ export const refreshArticleBottleFlavor = onSchedule(
       `Chip flavor refresh: scanned ${res.scanned}, updated ${res.updated} ` +
         `article(s) from ${res.bottlesRead} catalog read(s).`
     );
+  }
+);
+
+/**
+ * Admin-only one-shot of the same refresh, so a deploy doesn't have to wait up
+ * to 6 hours for chips to pick up flavor tags the catalog already has.
+ */
+export const backfillArticleBottleFlavor = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 540,
+    enforceAppCheck: ENFORCE_APP_CHECK,
+  },
+  async (request) => {
+    requireAdmin(request);
+    const requested = Number((request.data as { limit?: number })?.limit);
+    const limit = Math.min(
+      Math.max(Number.isFinite(requested) ? requested : FLAVOR_REFRESH_LIMIT, 1),
+      FLAVOR_REFRESH_MAX
+    );
+    const res = await refreshChipFlavor(getFirestore(), limit);
+    logger.info(
+      `Chip flavor backfill: scanned ${res.scanned}, updated ${res.updated} ` +
+        `article(s) from ${res.bottlesRead} catalog read(s).`
+    );
+    return res;
   }
 );
 
@@ -529,7 +561,7 @@ async function seedArticleFlavor(
     flavorProfile: {
       ...merged,
       source: "ai",
-      model: GROQ_MODEL,
+      model: EXTRACTION_MODEL,
       ...(promptVersion !== undefined ? { promptVersion } : {}),
       generatedAt: Timestamp.now(),
     },
@@ -557,7 +589,7 @@ async function extractBottleNames(
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: GROQ_MODEL,
+      model: EXTRACTION_MODEL,
       temperature: 0,
       max_tokens: 768,
       response_format: { type: "json_object" },
