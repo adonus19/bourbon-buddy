@@ -53,11 +53,21 @@ wishlisted, or sighted, and are **dry run by default**. On `--apply` they also
 scrub the deleted bottles out of cached `mentionedBottles` chips on news
 articles and `similarBottles` neighbor lists (shared rails in `lib-catalog.js`).
 
-Non-whiskey products (tequila, gin, beer …) — classified by Groq (BB-195):
+Non-whiskey products (tequila, gin, beer …) — classified by Groq (BB-195).
+**The classifier is a suggestion, not an authority** — it has flagged real
+whiskeys (Pursuit United, The Hearach), and deletion is irreversible. So there
+is no path from a classifier run straight to a delete: export the suggestions,
+review them by hand, and delete only from the reviewed list. Mode 3 makes no
+model call at all.
 
 ```
-GROQ_API_KEY=... node scripts/cleanup-non-whiskey.js            # preview
-GROQ_API_KEY=... node scripts/cleanup-non-whiskey.js --apply
+GROQ_API_KEY=... node scripts/cleanup-non-whiskey.js                       # report only
+GROQ_API_KEY=... node scripts/cleanup-non-whiskey.js --export=candidates.txt
+
+# ...open candidates.txt, DELETE THE LINES for bottles you want to KEEP...
+
+node scripts/cleanup-non-whiskey.js --from-list=candidates.txt             # preview
+node scripts/cleanup-non-whiskey.js --from-list=candidates.txt --apply
 ```
 
 Descriptive phrases and bare company names — "award-winning bourbon",
