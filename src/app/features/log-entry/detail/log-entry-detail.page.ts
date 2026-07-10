@@ -267,6 +267,13 @@ export class LogEntryDetailPage {
     }
   }
 
+  /** Clone this bottle into a fresh purchase instance (BB-193). */
+  buyAgain(): void {
+    void this.router.navigate(['/entry/new'], {
+      queryParams: { buyAgainFrom: this.entryId },
+    });
+  }
+
   async confirmDelete(): Promise<void> {
     const alert = await this.alertCtrl.create({
       header: 'Delete this entry?',
