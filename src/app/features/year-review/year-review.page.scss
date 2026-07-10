@@ -1,0 +1,108 @@
+.wrapped {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+
+  &__hero {
+    padding: 24px 16px;
+    text-align: center;
+  }
+
+  &__year {
+    font-family: var(--font-display);
+    font-size: 56px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    margin: 4px 0 0;
+    line-height: 1;
+  }
+
+  &__years {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  &__year-pick {
+    padding: 4px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 999px;
+
+    &--active {
+      color: var(--color-amber);
+      border-color: var(--color-amber);
+    }
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  &__stat {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-start;
+  }
+
+  &__num {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--color-amber);
+  }
+
+  &__label {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+  }
+
+  &__card {
+    padding: 16px;
+  }
+
+  &__big {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin: 8px 0 2px;
+  }
+
+  &__sub {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    margin: 0;
+  }
+
+  &__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  &__tag {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-amber);
+    border: 1px solid rgba(200, 135, 58, 0.35);
+    border-radius: 999px;
+    padding: 3px 10px;
+  }
+}
+
+.wrapped-empty {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--color-text-secondary);
+}

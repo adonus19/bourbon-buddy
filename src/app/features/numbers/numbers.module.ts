@@ -17,7 +17,16 @@ import { NumbersPage } from './numbers.page';
     IonicModule,
     SharedModule,
     BaseChartDirective,
-    RouterModule.forChild([{ path: '', component: NumbersPage }]),
+    RouterModule.forChild([
+      { path: '', component: NumbersPage },
+      {
+        path: 'year-review',
+        loadChildren: () =>
+          import('../year-review/year-review.module').then(
+            (m) => m.YearReviewPageModule
+          ),
+      },
+    ]),
   ],
   declarations: [NumbersPage],
   providers: [provideCharts(withDefaultRegisterables())],

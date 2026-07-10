@@ -1,0 +1,111 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/tabs/numbers"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Year in Review</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  @if (review(); as r) {
+    <div class="wrapped">
+      <header class="wrapped__hero glass-surface">
+        <span class="eyebrow">Whiskey Wrapped</span>
+        <h1 class="wrapped__year">{{ r.year }}</h1>
+        @if (years().length > 1) {
+          <div class="wrapped__years">
+            @for (y of years(); track y) {
+              <button
+                class="wrapped__year-pick"
+                [class.wrapped__year-pick--active]="y === r.year"
+                type="button"
+                (click)="pickYear(y)"
+              >
+                {{ y }}
+              </button>
+            }
+          </div>
+        }
+      </header>
+
+      <div class="wrapped__grid">
+        <div class="wrapped__stat glass-surface">
+          <span class="wrapped__num">{{ r.entryCount }}</span>
+          <span class="wrapped__label">entries logged</span>
+        </div>
+        <div class="wrapped__stat glass-surface">
+          <span class="wrapped__num">{{ r.uniqueBottles }}</span>
+          <span class="wrapped__label">unique bottles</span>
+        </div>
+        @if (r.totalSpent > 0) {
+          <div class="wrapped__stat glass-surface">
+            <span class="wrapped__num">${{ r.totalSpent | number: '1.0-0' }}</span>
+            <span class="wrapped__label">spent on bottles</span>
+          </div>
+        }
+        @if (r.avgRating !== null) {
+          <div class="wrapped__stat glass-surface">
+            <span class="wrapped__num">{{ r.avgRating | number: '1.1-1' }}★</span>
+            <span class="wrapped__label">average rating</span>
+          </div>
+        }
+      </div>
+
+      @if (r.topBottle; as top) {
+        <div class="wrapped__card glass-surface">
+          <span class="eyebrow">Bottle of the year</span>
+          <p class="wrapped__big">{{ top.name }}</p>
+          <p class="wrapped__sub">You rated it {{ top.rating | number: '1.1-1' }}★</p>
+        </div>
+      }
+
+      @if (topCategoryLabel(); as label) {
+        <div class="wrapped__card glass-surface">
+          <span class="eyebrow">Your category</span>
+          <p class="wrapped__big" [style.color]="topCategoryAccent()">
+            {{ label }}
+          </p>
+          <p class="wrapped__sub">
+            {{ r.topCategory?.count }} of {{ r.entryCount }} entries
+          </p>
+        </div>
+      }
+
+      @if (r.bestValue; as value) {
+        <div class="wrapped__card glass-surface">
+          <span class="eyebrow">Best value</span>
+          <p class="wrapped__big">{{ value.name }}</p>
+          <p class="wrapped__sub">
+            Value score {{ value.valueScore | number: '1.1-1' }}
+          </p>
+        </div>
+      }
+
+      @if (r.topTags.length) {
+        <div class="wrapped__card glass-surface">
+          <span class="eyebrow">Your palate this year</span>
+          <div class="wrapped__tags">
+            @for (t of r.topTags; track t.tag) {
+              <span class="wrapped__tag">{{ t.tag }} × {{ t.count }}</span>
+            }
+          </div>
+        </div>
+      }
+
+      @if (busiestMonthName(); as month) {
+        <div class="wrapped__card glass-surface">
+          <span class="eyebrow">Busiest month</span>
+          <p class="wrapped__big">{{ month }}</p>
+          <p class="wrapped__sub">
+            {{ r.busiestMonth?.count }} entries logged
+          </p>
+        </div>
+      }
+    </div>
+  } @else {
+    <div class="wrapped-empty">
+      <p>Nothing logged yet — your wrapped appears once you start logging.</p>
+    </div>
+  }
+</ion-content>
