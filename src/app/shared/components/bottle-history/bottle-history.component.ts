@@ -2,7 +2,7 @@ import { Component, computed, inject, input } from '@angular/core';
 
 import { LogEntry } from '../../../models';
 import { LogEntryService } from '../../../core/services/log-entry.service';
-import { bottleHistory } from '../../utils/bottle-history';
+import { barrelComparison, bottleHistory } from '../../utils/bottle-history';
 import { deriveBottleStatus } from '../../utils/bottle-lifecycle';
 
 /**
@@ -32,6 +32,12 @@ export class BottleHistoryComponent {
     this.history().instances.filter((e) => e.id !== this.currentEntryId())
   );
   readonly hasSiblings = computed(() => this.others().length > 0);
+
+  /** Barrel-by-barrel comparison for single barrels (BB-195); empty otherwise. */
+  readonly barrels = computed(() =>
+    barrelComparison(this.history().instances)
+  );
+  readonly showBarrels = computed(() => this.barrels().length > 0);
 
   /** Net price change from the first purchase to the latest, or null. */
   readonly priceDelta = computed(() => {

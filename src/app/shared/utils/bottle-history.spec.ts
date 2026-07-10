@@ -1,6 +1,6 @@
 import { Timestamp } from '@angular/fire/firestore';
 import { LogEntry } from '../../models';
-import { bottleHistory } from './bottle-history';
+import { barrelComparison, bottleHistory } from './bottle-history';
 
 const ts = (d: string) =>
   ({
@@ -110,5 +110,51 @@ describe('bottleHistory', () => {
     expect(h.count).toBe(0);
     expect(h.firstLoggedAt).toBeNull();
     expect(h.priceTrend).toEqual([]);
+  });
+});
+
+describe('barrelComparison', () => {
+  const sb = (over: Partial<LogEntry>) =>
+    entry({ subType: 'single_barrel', ...over });
+
+  it('is empty with fewer than two single-barrel instances', () => {
+    expect(barrelComparison([sb({ id: 'a', rating: 4 })])).toEqual([]);
+    expect(
+      barrelComparison([
+        sb({ id: 'a', rating: 4 }),
+        entry({ id: 'b', subType: 'small_batch', rating: 5 }),
+      ])
+    ).toEqual([]);
+  });
+
+  it('flags the highest-rated barrel as the favorite', () => {
+    const rows = barrelComparison([
+      sb({ id: 'a', barrelNumber: '42', rating: 3.5 }),
+      sb({ id: 'b', barrelLabel: 'K&L Pick', rating: 5 }),
+      sb({ id: 'c', barrelNumber: '255', rating: 4 }),
+    ]);
+    expect(rows.map((r) => r.label)).toEqual([
+      'Barrel 42',
+      'K&L Pick',
+      'Barrel 255',
+    ]);
+    expect(rows.find((r) => r.isFavorite)?.entryId).toBe('b');
+    expect(rows.filter((r) => r.isFavorite)).toHaveLength(1);
+  });
+
+  it('labels a barrel with no number/label as "Unlabeled barrel"', () => {
+    const rows = barrelComparison([
+      sb({ id: 'a', rating: 4 }),
+      sb({ id: 'b', rating: 3 }),
+    ]);
+    expect(rows[0].label).toBe('Unlabeled barrel');
+  });
+
+  it('flags no favorite when nothing is rated', () => {
+    const rows = barrelComparison([
+      sb({ id: 'a', barrelNumber: '1' }),
+      sb({ id: 'b', barrelNumber: '2' }),
+    ]);
+    expect(rows.some((r) => r.isFavorite)).toBe(false);
   });
 });

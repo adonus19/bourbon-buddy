@@ -27,6 +27,47 @@ export interface BottleHistory {
   priceTrend: PricePoint[];
 }
 
+/** One barrel in the single-barrel variance comparison (BB-195). */
+export interface BarrelRow {
+  entryId: string | undefined;
+  label: string;
+  rating: number | null;
+  isFavorite: boolean;
+}
+
+/**
+ * Barrel-by-barrel comparison for a single-barrel bottle (BB-195). Returns rows
+ * only when there are 2+ single-barrel instances (otherwise there's nothing to
+ * compare); the highest-rated barrel is flagged as the favorite.
+ */
+export function barrelComparison(instances: LogEntry[]): BarrelRow[] {
+  const singles = instances.filter((e) => e.subType === 'single_barrel');
+  if (singles.length < 2) {
+    return [];
+  }
+  const rows: BarrelRow[] = singles.map((e) => ({
+    entryId: e.id,
+    label:
+      e.barrelLabel ||
+      (e.barrelNumber ? `Barrel ${e.barrelNumber}` : 'Unlabeled barrel'),
+    rating: e.rating ?? null,
+    isFavorite: false,
+  }));
+
+  let bestIdx = -1;
+  let best = -Infinity;
+  rows.forEach((r, i) => {
+    if (r.rating != null && r.rating > best) {
+      best = r.rating;
+      bestIdx = i;
+    }
+  });
+  if (bestIdx >= 0) {
+    rows[bestIdx].isFavorite = true;
+  }
+  return rows;
+}
+
 export function bottleHistory(
   entries: LogEntry[],
   bourbonId: string

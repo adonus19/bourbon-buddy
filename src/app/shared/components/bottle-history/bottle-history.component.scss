@@ -92,6 +92,33 @@
     color: var(--color-text-secondary);
   }
 
+  &__subhead {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
+
+  &__barrel.fav {
+    border-color: var(--color-amber-light);
+  }
+
+  &__barrel-ribbon {
+    font-size: 16px;
+    color: var(--color-amber-light);
+  }
+
+  &__barrel-rating {
+    font-size: 13px;
+    color: var(--color-text-primary);
+  }
+
+  &__fav-tag {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-amber-light);
+  }
+
   &__single {
     margin: 4px 0 8px;
     font-size: 13px;

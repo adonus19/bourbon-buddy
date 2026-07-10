@@ -35,30 +35,55 @@
         </div>
       }
 
-      <div class="bh__list">
-        @for (e of others(); track e.id) {
-          <a class="bh__row" [routerLink]="['/entry', e.id]">
-            <span class="bh__row-date">
-              {{ e.entryDate.toDate() | date: 'MMM yyyy' }}
-            </span>
-            @if (barrelLabel(e); as bl) {
-              <span class="bh__row-barrel">{{ bl }}</span>
-            }
-            @if (e.rating != null) {
-              <app-rating-widget
-                [rating]="e.rating"
-                [size]="13"
-              ></app-rating-widget>
-            }
-            @if (statusLabel(e); as s) {
-              <span class="bh__row-status" [class.killed]="s === 'Killed'">
-                {{ s }}
+      @if (showBarrels()) {
+        <p class="bh__subhead">Barrels you've had</p>
+        <div class="bh__list">
+          @for (b of barrels(); track b.entryId) {
+            <a
+              class="bh__row bh__barrel"
+              [class.fav]="b.isFavorite"
+              [routerLink]="['/entry', b.entryId]"
+            >
+              @if (b.isFavorite) {
+                <ion-icon name="ribbon" class="bh__barrel-ribbon"></ion-icon>
+              }
+              <span class="bh__row-barrel">{{ b.label }}</span>
+              @if (b.rating !== null) {
+                <span class="bh__barrel-rating">{{ b.rating }}★</span>
+              }
+              @if (b.isFavorite) {
+                <span class="bh__fav-tag">Favorite</span>
+              }
+              <ion-icon name="chevron-forward" class="bh__row-chevron"></ion-icon>
+            </a>
+          }
+        </div>
+      } @else {
+        <div class="bh__list">
+          @for (e of others(); track e.id) {
+            <a class="bh__row" [routerLink]="['/entry', e.id]">
+              <span class="bh__row-date">
+                {{ e.entryDate.toDate() | date: 'MMM yyyy' }}
               </span>
-            }
-            <ion-icon name="chevron-forward" class="bh__row-chevron"></ion-icon>
-          </a>
-        }
-      </div>
+              @if (barrelLabel(e); as bl) {
+                <span class="bh__row-barrel">{{ bl }}</span>
+              }
+              @if (e.rating != null) {
+                <app-rating-widget
+                  [rating]="e.rating"
+                  [size]="13"
+                ></app-rating-widget>
+              }
+              @if (statusLabel(e); as s) {
+                <span class="bh__row-status" [class.killed]="s === 'Killed'">
+                  {{ s }}
+                </span>
+              }
+              <ion-icon name="chevron-forward" class="bh__row-chevron"></ion-icon>
+            </a>
+          }
+        </div>
+      }
     } @else {
       <p class="bh__single">Your first bottle. Buy it again when it's gone.</p>
     }
