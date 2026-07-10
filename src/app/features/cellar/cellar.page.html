@@ -137,10 +137,28 @@
 
     <div class="cellar-list">
       @for (e of visibleEntries(); track e.id) {
-        <app-log-entry-card
-          [entry]="e"
-          [routerLink]="['/entry', e.id]"
-        ></app-log-entry-card>
+        <ion-item-sliding>
+          <ion-item
+            class="cellar-item"
+            [routerLink]="['/entry', e.id]"
+            [detail]="false"
+            lines="none"
+            button
+          >
+            <app-log-entry-card [entry]="e"></app-log-entry-card>
+          </ion-item>
+          @if (view() === 'shelf') {
+            <ion-item-options side="end">
+              <ion-item-option
+                color="dark"
+                (click)="killFromList(e)"
+                aria-label="Kill bottle"
+              >
+                <ion-icon slot="icon-only" name="skull-outline"></ion-icon>
+              </ion-item-option>
+            </ion-item-options>
+          }
+        </ion-item-sliding>
       }
     </div>
   }

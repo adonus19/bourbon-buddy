@@ -8,6 +8,7 @@ import {
 import {
   ActionSheetController,
   ModalController,
+  ToastController,
   ViewWillEnter,
 } from '@ionic/angular';
 
@@ -48,6 +49,7 @@ export class CellarPage implements ViewWillEnter {
   private readonly logService = inject(LogEntryService);
   private readonly actionSheet = inject(ActionSheetController);
   private readonly modalCtrl = inject(ModalController);
+  private readonly toast = inject(ToastController);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly inbox = inject(InboxService);
 
@@ -130,6 +132,39 @@ export class CellarPage implements ViewWillEnter {
 
   setView(value: CellarView): void {
     this.view.set(value);
+  }
+
+  /** Swipe action: kill a bottle straight from the Shelf, with an Undo toast. */
+  async killFromList(e: LogEntry): Promise<void> {
+    if (!e.id) {
+      return;
+    }
+    const id = e.id;
+    const prevPct = e.bottleRemainingPct ?? null;
+    try {
+      await this.logService.killBottle(id);
+      const t = await this.toast.create({
+        message: `${e.bourbonName} killed. 🪦`,
+        duration: 3500,
+        position: 'bottom',
+        buttons: [
+          {
+            text: 'Undo',
+            handler: () => {
+              void this.logService.reopenBottle(id, prevPct);
+            },
+          },
+        ],
+      });
+      await t.present();
+    } catch {
+      const t = await this.toast.create({
+        message: "Couldn't update. Try again.",
+        duration: 2000,
+        position: 'bottom',
+      });
+      await t.present();
+    }
   }
 
   onSearchInput(value: string): void {
