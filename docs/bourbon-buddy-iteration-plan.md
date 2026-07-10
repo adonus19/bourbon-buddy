@@ -460,10 +460,32 @@ via an OpenStreetMap **Overpass** query run server-side (cached, fair-use). Firs
 pass = Retailers; Venues (bars/restaurants, BB-189) are backlog.
 **Independent** of R5 — can slot whenever.
 
-**After R6** we move to backlog — **Gamification (Phase 5)** is top of the list,
+### Iteration R7 — Bottle Lifecycle & the Graveyard (~8 SP)
+**Stories:** BB-191 (promoted from backlog), BB-192
+**Goal:** Answer "the bottle is empty." Fill-level becomes glanceable on the
+Cellar list, killing a bottle is a one-tap, kept-forever event (with a
+time-to-kill stat), and the Cellar splits into **Shelf / Journal / Graveyard**
+segments. Core model change: a `logEntry` is a **physical bottle instance**;
+`/bourbons` is the **product**. Adds one explicit lifecycle field
+(`bottleStatus`) + `finishedAt`; everything else derives from the existing
+`entries` signal via a unit-tested `deriveBottleView` pure function — **no
+migration, no new listeners/indexes** (legacy entries fall back to
+`bottleRemainingPct`).
+
+### Iteration R8 — Rebuys, Bottle History & Barrel Variance (~11 SP)
+**Stories:** BB-193, BB-194, BB-195
+**Goal:** Answer "I bought it again" and "this single barrel tastes different." A
+**Buy Again** action clones a bottle's identity/spec into a fresh instance (own
+price, date, pour log); a **Bottle History roll-up** on the bourbon detail page
+groups your logs by `bourbonId` (times logged, price trend, avg rating,
+open/killed counts) — all client-side; and **single-barrel variance** turns
+per-barrel differences into a comparison that highlights your favorite pick.
+Depends on R7's `bottleStatus`; all additive schema
+(`repurchaseOfEntryId`, `barrelLabel`).
+
+**After R8** we move to backlog — **Gamification (Phase 5)** is top of the list,
 then **Crowdsourced Flavor Aggregation (BB-188)**, **Nearby Venue Picker
-(BB-189)**, **Bottle Fill-Level & Pour Tracking (BB-191)**, and **News Full-Text
-Search (BB-190)**.
+(BB-189)**, and **News Full-Text Search (BB-190)**.
 
 ---
 

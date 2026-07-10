@@ -1296,6 +1296,137 @@ fair-use. First pass = Retailers only; Venues (bars/restaurants) are BB-189.
 
 ---
 
+## Epic 18: Bottle Lifecycle, Rebuys & Barrel Variance *(Post-Social)*
+
+> Answers three real cellar scenarios that the current model handles only
+> implicitly: a bottle is **finished** (empty), a bottle is **bought again**, and
+> a **single-barrel** rebuy is a genuinely different liquid. Core decision: a
+> `logEntry` is a **physical bottle instance / tasting event**; `/bourbons` is the
+> **product**. (Mostly already true — this makes it explicit.)
+>
+> **Cellar model:** one explicit lifecycle field + derived views. `entryType`
+> already encodes ownership, so we add only the genuinely-new state
+> (`bottleStatus: 'open' | 'finished'`, owned bottles only) and derive the rest
+> with a pure `deriveBottleView(entry)` function (unit-tested, mirrors
+> `ACTIVE_WISHLIST_STATUSES`):
+> - **Shelf** = owned && `bottleStatus === 'open'` — what you physically have open
+> - **Graveyard** = owned && `bottleStatus === 'finished'` — killed bottles (kept)
+> - **Journal** = every entry — full history incl. drinks/samples
+>
+> **Zero migration:** legacy entries with no `bottleStatus` fall back to
+> `bottleRemainingPct` (`0 → finished`, else `open`). New writes set it explicitly.
+> All roll-ups group the already-loaded `LogEntryService.entries` signal
+> **client-side** — no new listeners, reads, or composite indexes; owner-only
+> subcollection rules already cover it. Schema deltas are **additive**
+> (`bottleStatus`, `finishedAt`, `repurchaseOfEntryId`, `barrelLabel`).
+>
+> **Iterations:** R7 (BB-191, BB-192), R8 (BB-193, BB-194, BB-195). R8 depends on
+> R7's `bottleStatus`.
+
+### BB-191 — Bottle Fill-Level, Kill & Graveyard *(promoted from backlog)*
+**As a** user, **I want** to see how full my open bottles are and mark one dead when
+it's empty, **so that** I know what I'm running low on and keep a record of what
+I've killed.
+
+**Context:** promotes the former backlog item and its BB-020 pour-log overlap into
+a scoped story. Extends BB-020's `bottleRemainingPct`; **no schema fork.**
+
+**AC:**
+- Add `bottleStatus` (`open`/`finished`) + `finishedAt`; a `deriveBottleView(entry)`
+  pure function drives all views and falls back to `bottleRemainingPct` for legacy
+  entries (no migration/backfill).
+- Fill level is visible on the **Cellar list card** for owned bottles (not just
+  detail) — a compact meter/label from `bottleRemainingPct`.
+- A **"Kill it 🪦"** quick action (detail + list swipe) sets
+  `bottleStatus='finished'`, `bottleRemainingPct=0`, and stamps `finishedAt`;
+  setting Remaining to Empty in the form prompts the same.
+- Killed bottles are **never hidden from history** — they move to the Graveyard
+  view, out of the active Shelf.
+- A **Graveyard view** lists finished bottles with a **time-to-kill** stat
+  (`purchaseDate` → `finishedAt`) where both dates exist.
+- Non-owned entries (drink/sample/virtual) never show fill-level or kill actions.
+
+**SP:** 5
+
+---
+
+### BB-192 — Cellar Views: Shelf / Journal / Graveyard
+**As a** user, **I want** to switch between what I physically own, my full tasting
+history, and my dead bottles, **so that** the Cellar answers "what do I have right
+now" vs "everything I've tried."
+
+**AC:**
+- Ionic segment on the Cellar: **Shelf** (default), **Journal**, **Graveyard**,
+  derived from the `entries` signal via `deriveBottleView` — no new Firestore
+  reads/listeners.
+- Existing sort, filter chips, and search apply within the active segment.
+- Each segment has its own empty state (e.g. Shelf empty → "No open bottles —
+  everything's in the Journal").
+- Segment choice is per-session UI state (signal), not persisted server-side.
+
+**SP:** 3
+
+---
+
+### BB-193 — Buy Again (Rebuy Clone)
+**As a** user, **I want** to re-log a bottle I bought before, **so that** each
+purchase is its own instance with its own price, date, and pour log.
+
+**AC:**
+- **"Buy Again"** action on a log detail opens Add-Entry pre-filled with
+  **identity + bottle spec** (name, distillery, category, sub-type, proof, mash
+  bill, series), linked via `repurchaseOfEntryId` and the shared `bourbonId`.
+- **Experience fields reset:** new `purchaseDate` (today), `bottleStatus='open'`,
+  remaining 100%, empty pour log, blank price/rating.
+- Prior flavor tags carry as **suggested (dashed) chips** reusing the BB-186
+  suggested-tag pattern — a starting point you confirm, never the stored truth.
+- For `subType === 'single_barrel'`, the flow **prompts "Same barrel or new one?"**
+  and does **not** silently copy `barrelNumber`/`barrelLabel` (guards against
+  falsely merging two different tastings).
+- Saving creates a brand-new entry; the original is untouched.
+
+**SP:** 3
+
+---
+
+### BB-194 — Bottle History Roll-up
+**As a** user, **I want** to see all my logs of the same bottle in one place,
+**so that** I can track how my rating and the price changed over time.
+
+**AC:**
+- On the **bourbon detail page** (existing), a "Your history" section groups the
+  user's `logEntries` by `bourbonId` **client-side** (zero extra reads).
+- Shows: times logged, avg rating, **price trend** across purchases, first/last
+  logged, and current open/finished count.
+- Each instance row deep-links to its log entry; a **"Buy Again"** shortcut
+  (BB-193) sits here too.
+- Single-entry bottles render a graceful minimal state (no misleading "trend").
+- Stats tie-in: surface **bottles killed** and **currently open** counts to the
+  Numbers tab (cheap derivations).
+
+**SP:** 5
+
+---
+
+### BB-195 — Single-Barrel Variance
+**As a** user, **I want** to compare the different barrels of a single-barrel
+bottle I've had, **so that** I remember which pick I loved.
+
+**AC:**
+- Add `barrelLabel` free-text (e.g. "K&L Selection") alongside existing
+  `barrelNumber`, surfaced in the form and on detail when
+  `subType === 'single_barrel'`.
+- On the BB-194 roll-up, when a single-barrel product has >1 instance, render a
+  **barrel-comparison** list (barrel #/label + rating) with the **top-rated barrel
+  highlighted** ("Barrel #255 was your favorite").
+- Non-single-barrel products don't show barrel comparison.
+- Catalog stays at the **expression level** — a barrel is never its own
+  `/bourbons` doc (protects search, dedupe, Similar Bottles).
+
+**SP:** 3
+
+---
+
 # Backlog (Not Yet Iteration-Scoped)
 
 ### BB-188 — Crowdsourced Flavor Aggregation
@@ -1354,22 +1485,11 @@ Typesense is the cheaper-at-scale alternative if Algolia costs grow.
 
 ---
 
-### BB-191 — Bottle Fill-Level & Pour Tracking
-**As a** user, **I want to** track how much is left in an open bottle and log pours against it, **so that** I know what I'm running low on.
-
-**Context:** partly covered already by **BB-020 (Pour Session Log)**, whose AC
-includes an editable "bottle remaining percentage." This backlog item is the
-explicit extension — fill-level as a first-class, glanceable attribute on the
-Cellar list, "kill bottle" action, and low-stock surfacing — to be scoped as an
-extension of BB-020 rather than a parallel feature.
-
-**AC (draft):**
-- Fill level visible on the Cellar list, not just the detail screen
-- "Mark open" / "Kill bottle" quick actions
-- Optional low-stock indicator/sort
-- Reuses BB-020's pour subcollection; no schema fork
-
-**SP:** TBD *(backlog)*
+### BB-191 — Bottle Fill-Level & Pour Tracking → *promoted*
+**Promoted out of the backlog** into **Epic 18** (Iteration R7) as
+**BB-191 — Bottle Fill-Level, Kill & Graveyard**, alongside the Cellar views,
+rebuy, roll-up, and single-barrel variance stories (BB-192–195). See Epic 18
+above for the reframed story and acceptance criteria.
 
 ---
 

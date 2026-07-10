@@ -75,6 +75,7 @@ users/{userId}/logEntries/{entryId}
   mashBillMalt:       number | null    // 0-100
   batchNumber:        string | null
   barrelNumber:       string | null
+  barrelLabel:        string | null    // store-pick label, e.g. "Total Wine Pick" (BB-195)
   series:             string | null
 
   // Purchase / experience
@@ -85,6 +86,9 @@ users/{userId}/logEntries/{entryId}
   purchaseDate:       Timestamp | null
   bottleSizeMl:       number | null    // 50, 200, 375, 750, 1000, 1750
   bottleRemainingPct: number | null    // 100, 75, 50, 25, 0
+  bottleStatus:       string | null    // 'open' | 'finished'; owned bottles only, null otherwise (BB-191)
+  finishedAt:         Timestamp | null // "kill" date; enables time-to-kill (BB-191)
+  repurchaseOfEntryId: string | null   // lineage to the prior bottle instance on a rebuy (BB-193)
 
   // Ratings and notes
   rating:             number | null    // 0.5 – 5.0, half-step increments
@@ -120,6 +124,23 @@ users/{userId}/logEntries/{entryId}
 - Filter by rating range: `.where('rating', '>=', 4).where('rating', '<=', 5)`
 - Sort by value score: `.orderBy('valueScore', 'desc')`
 - Search by name: client-side filter on `bourbonName` after fetching (Firestore has no native full-text search; for MVP this is acceptable given small data set; Algolia or Typesense can be added later)
+
+**Bottle lifecycle & Cellar views (BB-191/192):** a log entry is a **physical
+bottle instance / tasting event** (the `/bourbons` catalog holds the *product*).
+`bottleStatus` (`open` | `finished`) is the only stored lifecycle state and applies
+only to **owned** bottles (`entryType ∈ {bottle_purchased, gift_received}`); it is
+`null` for drinks/samples/virtual tastings. The three Cellar views are **derived on
+read**, never stored, via a pure `deriveBottleView(entry)` function:
+- **Shelf** = owned && `bottleStatus === 'open'`
+- **Graveyard** = owned && `bottleStatus === 'finished'`
+- **Journal** = every entry (full history)
+
+Legacy entries with no `bottleStatus` fall back to `bottleRemainingPct`
+(`0 → finished`, else `open`), so **no migration/backfill is required**. Killing a
+bottle sets `bottleStatus='finished'`, `bottleRemainingPct=0`, and stamps
+`finishedAt`; time-to-kill = `purchaseDate → finishedAt`. Roll-ups (bottle history,
+single-barrel variance) group the already-loaded entries by `bourbonId`
+**client-side** — no extra reads, no new composite index.
 
 ---
 
@@ -691,6 +712,7 @@ export interface LogEntry {
   mashBillMalt?: number;
   batchNumber?: string;
   barrelNumber?: string;
+  barrelLabel?: string;
   series?: string;
   entryType: EntryType;
   didNotPurchase: boolean;
@@ -699,6 +721,9 @@ export interface LogEntry {
   purchaseDate?: Timestamp;
   bottleSizeMl?: number;
   bottleRemainingPct?: number;
+  bottleStatus?: BottleStatus | null;   // 'open' | 'finished'; owned bottles only
+  finishedAt?: Timestamp;               // kill date
+  repurchaseOfEntryId?: string;         // lineage on a rebuy
   rating?: number;
   wouldBuyAgain?: 'yes' | 'no' | 'maybe';
   noseNotes?: string;
@@ -726,6 +751,12 @@ export type BourbonSubType =
 
 export type EntryType =
   'drink' | 'bottle_purchased' | 'gift_received' | 'sample_split' | 'virtual_tasting';
+
+// Bottle lifecycle (BB-191) — owned bottles only; null for non-owned entries.
+export type BottleStatus = 'open' | 'finished';
+
+// Entry types that represent a bottle the user physically owns.
+export const OWNED_ENTRY_TYPES: EntryType[] = ['bottle_purchased', 'gift_received'];
 ```
 
 Define similar interfaces for `WishlistEntry`, `Bourbon`, `NewsArticle`, `PourSession`, `Sighting`, `UserProfile`, `UserNewsPreferences`.
