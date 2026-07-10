@@ -147,6 +147,7 @@ export class LogEntryDetailPage {
       this.mashBill(e).length > 0 ||
       !!e.batchNumber ||
       !!e.barrelNumber ||
+      !!e.barrelLabel ||
       !!e.series
     );
   });

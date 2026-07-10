@@ -135,6 +135,7 @@ export class AddEditEntryPage {
     mashBillMalt: [null as number | null],
     batchNumber: [''],
     barrelNumber: [''],
+    barrelLabel: [''],
     series: [''],
     // How you got it
     entryType: ['drink'],
@@ -166,6 +167,13 @@ export class AddEditEntryPage {
     () => this.entryTypeValue() === 'bottle_purchased'
   );
 
+  // Reactive view of subType so the template can reveal the barrel-label
+  // (store-pick) field only for single barrels (BB-195).
+  private readonly subTypeValue = signal(this.form.controls.subType.value);
+  readonly isSingleBarrel = computed(
+    () => this.subTypeValue() === 'single_barrel'
+  );
+
   // In edit mode, the entry comes from the cached entries signal; patch the
   // form once it's available (and only once, so we don't clobber edits).
   private readonly editEntry = this.editId
@@ -179,6 +187,9 @@ export class AddEditEntryPage {
   constructor() {
     this.form.controls.entryType.valueChanges.subscribe((v) =>
       this.entryTypeValue.set(v)
+    );
+    this.form.controls.subType.valueChanges.subscribe((v) =>
+      this.subTypeValue.set(v)
     );
 
     if (this.editEntry) {
@@ -278,6 +289,7 @@ export class AddEditEntryPage {
       mashBillMalt: e.mashBillMalt ?? null,
       batchNumber: e.batchNumber ?? '',
       barrelNumber: e.barrelNumber ?? '',
+      barrelLabel: e.barrelLabel ?? '',
       series: e.series ?? '',
       entryType: e.entryType,
       didNotPurchase: e.didNotPurchase,
@@ -471,6 +483,7 @@ export class AddEditEntryPage {
         mashBillMalt: this.numOrNull(v.mashBillMalt),
         batchNumber: this.strOrNull(v.batchNumber),
         barrelNumber: this.strOrNull(v.barrelNumber),
+        barrelLabel: this.strOrNull(v.barrelLabel),
         series: this.strOrNull(v.series),
         entryType,
         didNotPurchase: v.didNotPurchase ?? false,
