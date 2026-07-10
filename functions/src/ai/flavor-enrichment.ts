@@ -23,6 +23,10 @@ import {
 } from "../shared/guards";
 import { CANONICAL_FLAVOR_TAGS, matchCanonicalTags } from "./flavor-taxonomy";
 import { GROQ_API_KEY, GROQ_MODEL, RateLimitError, chatJson } from "./groq";
+// Deliberate require-cycle with ./similarity (it uses our pure tag helpers,
+// we call its recompute at request time) — safe because neither side touches
+// the other at module-init.
+import { recomputeNeighborsIfStale } from "./similarity";
 
 const MAX_TAGS_PER_STAGE = 6;
 
@@ -467,15 +471,15 @@ export const sweepFlavorEnrichment = onSchedule(
     timeoutSeconds: 540,
   },
   async () => {
-    const res = await sweepEnrichInadequate(
-      getFirestore(),
-      GROQ_API_KEY.value(),
-      SWEEP_LIMIT
-    );
+    const db = getFirestore();
+    const res = await sweepEnrichInadequate(db, GROQ_API_KEY.value(), SWEEP_LIMIT);
     logger.info(
       `Flavor sweep: scanned ${res.scanned}, enriched ${res.enriched}` +
         (res.rateLimited ? " (stopped: rate limited)." : ".")
     );
+    // Neighbor lists follow profile changes (BB-197). Staleness-gated: costs
+    // one read when no profile changed since the last recompute.
+    await recomputeNeighborsIfStale(db);
   }
 );
 
@@ -496,8 +500,9 @@ export const backfillFlavorEnrichment = onCall(
       SWEEP_LIMIT
     );
     // force (BB-196): also regenerate stale-prompt-version profiles.
+    const db = getFirestore();
     const res = await sweepEnrichInadequate(
-      getFirestore(),
+      db,
       GROQ_API_KEY.value(),
       limit,
       data?.force === true
@@ -506,6 +511,7 @@ export const backfillFlavorEnrichment = onCall(
       `Flavor backfill: scanned ${res.scanned}, enriched ${res.enriched}` +
         (res.rateLimited ? " (stopped: rate limited)." : ".")
     );
-    return res;
+    const similarity = await recomputeNeighborsIfStale(db);
+    return { ...res, similarity };
   }
 );

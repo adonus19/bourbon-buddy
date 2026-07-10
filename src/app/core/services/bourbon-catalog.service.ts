@@ -7,6 +7,7 @@ import {
   collection,
   doc,
   endAt,
+  getDoc,
   getDocs,
   limit,
   orderBy,
@@ -149,6 +150,20 @@ export class BourbonCatalogService {
       createdByUserId: this.requireUid(),
     });
     return ref.id;
+  }
+
+  /**
+   * One-shot read of a catalog bottle by id (BB-197: detail pages fetch it for
+   * the precomputed `similarBottles`). Not a listener on purpose — a detail
+   * view needs one snapshot, and the neighbor list only changes server-side
+   * on enrichment sweeps.
+   */
+  async getById(bourbonId: string): Promise<Bourbon | null> {
+    if (!bourbonId) {
+      return null;
+    }
+    const snap = await getDoc(doc(this.firestore, 'bourbons', bourbonId));
+    return snap.exists() ? ({ id: snap.id, ...snap.data() } as Bourbon) : null;
   }
 
   /**

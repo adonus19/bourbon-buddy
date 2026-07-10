@@ -184,6 +184,8 @@
           <p class="wdetail__text">{{ e.personalNotes }}</p>
         </div>
       }
+
+      <app-similar-bottles [bourbonId]="e.bourbonId" />
     </div>
   } @else {
     <div class="wdetail-missing">
