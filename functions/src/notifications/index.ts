@@ -18,6 +18,7 @@ import { ENFORCE_APP_CHECK } from "../shared/guards";
 export type NotificationType =
   | "sightingMatch"
   | "priceAlert"
+  | "tasteMatch"
   | "friendRequest"
   | "newsDigest";
 

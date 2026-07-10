@@ -33,6 +33,7 @@ import { ModalController, ToastController } from '@ionic/angular';
 
 import { MentionedBottle } from '../../../models';
 import { BourbonCatalogService } from '../../../core/services/bourbon-catalog.service';
+import { TasteMatchService } from '../../../core/services/taste-match.service';
 import { WishlistService } from '../../../core/services/wishlist.service';
 import { BottlePreviewSheetComponent } from './bottle-preview-sheet.component';
 
@@ -64,6 +65,10 @@ describe('BottlePreviewSheetComponent (BB-198)', () => {
       providers: [
         { provide: BourbonCatalogService, useValue: catalog },
         { provide: WishlistService, useValue: wishlist },
+        {
+          provide: TasteMatchService,
+          useValue: { matches: () => ({ matched: false, tags: [] }) },
+        },
         { provide: ModalController, useValue: modal },
         {
           provide: ToastController,

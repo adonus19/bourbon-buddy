@@ -19,6 +19,7 @@ import {
 } from '../../models';
 import { SightingService } from '../../core/services/sighting.service';
 import { FriendService } from '../../core/services/friend.service';
+import { TasteMatchService } from '../../core/services/taste-match.service';
 import { WishlistService } from '../../core/services/wishlist.service';
 import {
   SightingFreshness,
@@ -45,6 +46,7 @@ export class FriendsFeedPage {
   private readonly sightings = inject(SightingService);
   private readonly friends = inject(FriendService);
   private readonly wishlist = inject(WishlistService);
+  private readonly taste = inject(TasteMatchService);
   private readonly router = inject(Router);
   private readonly nav = inject(NavController);
   private readonly toast = inject(ToastController);
@@ -168,6 +170,19 @@ export class FriendsFeedPage {
 
   matchEntryId(s: Sighting): string | null {
     return this.huntIndex().get(s.bourbonId) ?? null;
+  }
+
+  /**
+   * Taste Match badge (BB-199) from tags denormalized at logSighting. The
+   * hunt-list match is the stronger, more specific signal — when it shows,
+   * this badge stays quiet (same one-signal precedence the alerts use).
+   */
+  tasteTags(s: Sighting): string[] {
+    if (this.matchEntryId(s)) {
+      return [];
+    }
+    const res = this.taste.matches(s.flavorTags);
+    return res.matched ? res.tags : [];
   }
 
   when(s: Sighting): string {

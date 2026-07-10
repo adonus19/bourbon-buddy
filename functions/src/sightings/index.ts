@@ -50,6 +50,21 @@ export const logSighting = onCall(
     if (existing?.exists) {
       return true; // idempotent replay: don't re-write or re-count the limit
     }
+    // Denormalize the bottle's flavor tags onto the sighting (BB-199) so feed
+    // badges and taste-match alerts never need a per-sighting catalog read.
+    const bottleSnap = await tx.get(db.doc(`bourbons/${v.bourbonId}`));
+    const profile = bottleSnap.get("flavorProfile") as
+      | { nose?: unknown; palate?: unknown; finish?: unknown }
+      | undefined;
+    const stage = (x: unknown): string[] =>
+      Array.isArray(x) ? x.filter((t): t is string => typeof t === "string") : [];
+    const flavorTags = profile
+      ? {
+          nose: stage(profile.nose),
+          palate: stage(profile.palate),
+          finish: stage(profile.finish),
+        }
+      : null;
     const snap = await tx.get(limitRef);
     const data = snap.data();
     const count = data && data.day === today ? (data.count as number) : 0;
@@ -92,6 +107,7 @@ export const logSighting = onCall(
       geohash,
       storePlaceId: v.store?.id ?? null,
       presenceVerified,
+      flavorTags,
       clientId: v.clientId,
       markedStaleManually: false,
       visibility: v.visibility,

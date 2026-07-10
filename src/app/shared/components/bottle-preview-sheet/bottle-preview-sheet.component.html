@@ -18,6 +18,13 @@
     </button>
   </header>
 
+  @if (taste().matched) {
+    <div class="sheet__taste">
+      <ion-icon name="sparkles" aria-hidden="true"></ion-icon>
+      Matches your taste · {{ taste().tags.slice(0, 3).join(' · ') }}
+    </div>
+  }
+
   @if (profile(); as p) {
     <section class="sheet__flavor">
       <span class="eyebrow">Flavor profile</span>

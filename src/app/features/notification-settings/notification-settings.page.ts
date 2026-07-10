@@ -36,6 +36,11 @@ export class NotificationSettingsPage implements OnInit {
       desc: 'A bottle you want drops to your target price',
     },
     {
+      key: 'tasteMatch',
+      label: 'Taste match alerts',
+      desc: 'A friend spots a bottle that matches your taste',
+    },
+    {
       key: 'friendRequest',
       label: 'Friend requests',
       desc: 'Someone wants to connect',

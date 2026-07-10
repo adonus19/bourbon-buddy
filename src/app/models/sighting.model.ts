@@ -38,6 +38,10 @@ export interface Sighting {
   confirmCount?: number;
   disputeCount?: number;
   lastConfirmedAt?: Timestamp | null;
+  // Bottle flavor tags denormalized by logSighting (BB-199): power the feed's
+  // Taste Match badge and server alert matching without per-sighting reads.
+  // Absent on pre-BB-199 sightings.
+  flavorTags?: { nose: string[]; palate: string[]; finish: string[] } | null;
   markedStaleManually: boolean;
   visibility: SightingVisibility;
   createdAt: Timestamp;

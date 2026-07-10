@@ -86,6 +86,26 @@
     }
   }
 
+  // Taste Match (BB-199): quieter than the hunt-list match (it's a hint, not
+  // a saved intention), same one-badge precedence as the alerts.
+  &__taste {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    padding: 4px 10px;
+    background: transparent;
+    color: var(--color-amber);
+    border: 1px solid rgba(200, 135, 58, 0.35);
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+
+    ion-icon {
+      font-size: 14px;
+    }
+  }
+
   &__store {
     margin: 10px 0 0;
     color: var(--color-text-primary);
