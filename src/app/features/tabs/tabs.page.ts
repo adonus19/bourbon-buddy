@@ -1,6 +1,7 @@
 import { Component, OnInit, inject } from '@angular/core';
 
 import { NewsService } from '../../core/services/news.service';
+import { OnboardingService } from '../../core/onboarding/onboarding.service';
 
 @Component({
   selector: 'app-tabs',
@@ -10,6 +11,7 @@ import { NewsService } from '../../core/services/news.service';
 })
 export class TabsPage implements OnInit {
   private readonly news = inject(NewsService);
+  private readonly onboarding = inject(OnboardingService);
 
   /** Approximate unread-news count for the Dispatch tab badge. */
   readonly unreadCount = this.news.unreadCount;
@@ -17,5 +19,9 @@ export class TabsPage implements OnInit {
   ngOnInit(): void {
     // Load once so the badge reflects unread news without visiting the tab.
     void this.news.ensureLoaded();
+    // First time the user reaches the shell, offer the guided walkthrough.
+    // No-ops once it's been completed or skipped. Deferred a beat so the tab
+    // bar (the tour's first anchors) is mounted before we measure.
+    setTimeout(() => this.onboarding.maybeStartFirstRun(), 400);
   }
 }

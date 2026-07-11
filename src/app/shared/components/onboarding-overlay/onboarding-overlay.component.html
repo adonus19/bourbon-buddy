@@ -1,0 +1,59 @@
+@if (active(); as p) {
+  <div
+    class="ob"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="ob-title"
+  >
+    @if (spotlight(); as s) {
+      <!-- Cut-out spotlight: transparent box, scrim is its box-shadow. -->
+      <div
+        class="ob__spot"
+        [style.top.px]="s.top"
+        [style.left.px]="s.left"
+        [style.width.px]="s.width"
+        [style.height.px]="s.height"
+      ></div>
+    } @else {
+      <div class="ob__scrim"></div>
+    }
+
+    <div
+      class="ob__bubble glass-modal"
+      [class.ob__bubble--center]="!spotlight()"
+      [ngStyle]="bubbleStyle()"
+    >
+      <p class="ob__eyebrow eyebrow">
+        {{ p.kind === 'tip' ? 'Tip' : 'The tour' }}
+      </p>
+      <h2 id="ob-title" class="ob__title">{{ p.step.title }}</h2>
+      <p class="ob__body">{{ p.step.body }}</p>
+
+      @if (p.kind === 'tour') {
+        @if (dots().length > 1) {
+          <div class="ob__dots" aria-hidden="true">
+            @for (d of dots(); track d) {
+              <span class="ob__dot" [class.ob__dot--on]="d === p.index"></span>
+            }
+          </div>
+        }
+        <div class="ob__actions">
+          <button type="button" class="ob__skip" (click)="skip()">Skip</button>
+          <span class="ob__spacer"></span>
+          @if (p.index > 0) {
+            <button type="button" class="ob__back" (click)="back()">Back</button>
+          }
+          <button type="button" class="ob__next" (click)="next()">
+            {{ p.index === p.total - 1 ? 'Done' : 'Next' }}
+          </button>
+        </div>
+      } @else {
+        <div class="ob__actions ob__actions--tip">
+          <button type="button" class="ob__next" (click)="dismissTip()">
+            Got it
+          </button>
+        </div>
+      }
+    </div>
+  </div>
+}

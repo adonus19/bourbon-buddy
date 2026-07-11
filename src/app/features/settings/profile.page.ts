@@ -15,6 +15,7 @@ import { ExportKind, ExportService } from '../../core/services/export.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { InboxService } from '../../core/services/inbox.service';
 import { GeolocationService } from '../../core/services/geolocation.service';
+import { OnboardingService } from '../../core/onboarding/onboarding.service';
 import {
   USERNAME_MAX,
   USERNAME_MIN,
@@ -40,6 +41,7 @@ export class ProfilePage {
   private readonly notifications = inject(NotificationService);
   private readonly inbox = inject(InboxService);
   private readonly geo = inject(GeolocationService);
+  private readonly onboarding = inject(OnboardingService);
 
   /** Unread inbox count for the badge; refreshed on entering the page. */
   readonly inboxUnread = signal(0);
@@ -339,6 +341,12 @@ export class ProfilePage {
     } catch {
       await this.presentToast("Couldn't export. Try again.");
     }
+  }
+
+  /** Replay the guided walkthrough from the Cellar. */
+  async takeTour(): Promise<void> {
+    await this.router.navigateByUrl('/tabs/cellar');
+    this.onboarding.startTour();
   }
 
   async confirmSignOut(): Promise<void> {
