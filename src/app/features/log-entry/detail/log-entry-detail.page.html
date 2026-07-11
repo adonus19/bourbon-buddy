@@ -171,7 +171,7 @@
         }
       </div>
 
-      <div class="section">
+      <div class="section" bbTourAnchor="detail-history">
         <app-bottle-history
           [bourbonId]="e.bourbonId"
           [currentEntryId]="entryId"
@@ -210,6 +210,7 @@
               class="detail__log-dram"
               fill="clear"
               size="small"
+              bbTourAnchor="detail-pours"
               (click)="openPourForm()"
             >
               <ion-icon name="add" slot="start"></ion-icon>

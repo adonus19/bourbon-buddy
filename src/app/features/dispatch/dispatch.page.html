@@ -125,6 +125,7 @@
                 @if (a.mentionedBottles?.length) {
                   <div
                     class="article__bottles"
+                    [bbTourAnchor]="a.id === firstAiArticleId() ? 'dispatch-ai' : ''"
                     (click)="$event.stopPropagation()"
                   >
                     <span class="article__bottles-label">Bottles mentioned</span>

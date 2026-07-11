@@ -10,6 +10,8 @@ import { ViewDidEnter } from '@ionic/angular';
 import { ChartConfiguration } from 'chart.js';
 
 import { StatsService } from '../../core/services/stats.service';
+import { OnboardingService } from '../../core/onboarding/onboarding.service';
+import { TIPS } from '../../core/onboarding/tips.config';
 import { cssVarValue } from '../../shared/utils/css-var';
 import {
   ActivityRange,
@@ -29,6 +31,7 @@ export class NumbersPage implements ViewDidEnter {
   private readonly stats = inject(StatsService);
   private readonly router = inject(Router);
   private readonly cdr = inject(ChangeDetectorRef);
+  private readonly onboarding = inject(OnboardingService);
 
   readonly hasData = this.stats.hasData;
   readonly summary = this.stats.summary;
@@ -241,6 +244,11 @@ export class NumbersPage implements ViewDidEnter {
       this.chartsReady.set(true);
       this.cdr.detectChanges();
     });
+    // Point out the Year in Review, but only once there's data to celebrate;
+    // on an empty account it stays unflagged and fires on a later visit.
+    if (this.hasData()) {
+      setTimeout(() => void this.onboarding.showTipOnce(TIPS.yearReview), 500);
+    }
   }
 
   spent(): string {

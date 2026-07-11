@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, effect, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
@@ -28,6 +28,8 @@ import {
   timeToKillDays,
 } from '../../../shared/utils/bottle-lifecycle';
 import { PourFormComponent } from '../../../shared/components/pour-form/pour-form.component';
+import { OnboardingService } from '../../../core/onboarding/onboarding.service';
+import { TIPS } from '../../../core/onboarding/tips.config';
 
 @Component({
   selector: 'app-log-entry-detail',
@@ -46,6 +48,23 @@ export class LogEntryDetailPage {
   private readonly actionSheet = inject(ActionSheetController);
   private readonly modalCtrl = inject(ModalController);
   private readonly toast = inject(ToastController);
+  private readonly onboarding = inject(OnboardingService);
+
+  /** Guards the one-shot tip fire against the effect re-running. */
+  private firedTipsFor: string | undefined = undefined;
+
+  // Surface the relevant just-in-time tips once the entry loads. showTipOnce
+  // is idempotent and one-per-visit, so a single-barrel purchased bottle shows
+  // its tips across visits rather than stacking them on one screen.
+  private readonly tipsEffect = effect(() => {
+    const e = this.entry();
+    if (!e || !e.id || this.firedTipsFor === e.id) {
+      return;
+    }
+    this.firedTipsFor = e.id;
+    // Defer so the anchored sections have rendered before we measure them.
+    setTimeout(() => void this.fireDetailTips(), 500);
+  });
 
   readonly remainingOptions = [
     { value: 100, label: 'Full' },
@@ -170,6 +189,27 @@ export class LogEntryDetailPage {
       return 'NAS';
     }
     return e.ageStatement != null ? `${e.ageStatement} yr` : '';
+  }
+
+  /**
+   * Fire the bottle-detail tips in priority order. Awaiting serializes them so
+   * the overlay's "one active at a time" guard shows the most specific tip this
+   * visit; the rest surface on later visits.
+   */
+  private async fireDetailTips(): Promise<void> {
+    const e = this.entry();
+    if (!e) {
+      return;
+    }
+    const isSingleBarrel =
+      e.subType === 'single_barrel' || !!e.barrelLabel || !!e.barrelNumber;
+    if (isSingleBarrel) {
+      await this.onboarding.showTipOnce(TIPS.barrelVariance);
+    }
+    await this.onboarding.showTipOnce(TIPS.bottleHistory);
+    if (this.isPurchasedBottle()) {
+      await this.onboarding.showTipOnce(TIPS.pours);
+    }
   }
 
   async openPourForm(): Promise<void> {
