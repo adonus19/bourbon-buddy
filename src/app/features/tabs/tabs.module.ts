@@ -4,9 +4,10 @@ import { IonicModule } from '@ionic/angular';
 
 import { TabsPageRoutingModule } from './tabs-routing.module';
 import { TabsPage } from './tabs.page';
+import { OnboardingModule } from '../../shared/onboarding.module';
 
 @NgModule({
-  imports: [CommonModule, IonicModule, TabsPageRoutingModule],
+  imports: [CommonModule, IonicModule, TabsPageRoutingModule, OnboardingModule],
   declarations: [TabsPage],
 })
 export class TabsPageModule {}

@@ -42,6 +42,7 @@ import { ServiceWorkerModule } from '@angular/service-worker';
 import { environment } from '../environments/environment';
 import { AppComponent } from './app.component';
 import { AppRoutingModule } from './app-routing.module';
+import { OnboardingModule } from './shared/onboarding.module';
 
 @NgModule({
   declarations: [AppComponent],
@@ -49,6 +50,9 @@ import { AppRoutingModule } from './app-routing.module';
     BrowserModule,
     IonicModule.forRoot(),
     AppRoutingModule,
+    // Guided walkthrough overlay lives at the app root so it can spotlight
+    // elements on any route (tabs and top-level detail pages alike).
+    OnboardingModule,
     // App-shell caching (ngsw): instant repeat-visit paint + offline startup.
     // Registered at scope '/', coexisting with firebase-messaging-sw.js which
     // FCM registers at its own push scope. 'registerWhenStable' keeps SW setup

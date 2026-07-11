@@ -2,7 +2,11 @@
   <ion-toolbar>
     <ion-title>Friends</ion-title>
     <ion-buttons slot="end">
-      <ion-button routerLink="/sightings/map" aria-label="Sightings map">
+      <ion-button
+        routerLink="/sightings/map"
+        aria-label="Sightings map"
+        bbTourAnchor="social-map"
+      >
         <ion-icon slot="icon-only" name="map-outline"></ion-icon>
       </ion-button>
       <ion-button (click)="toggleStale()" aria-label="Toggle stale sightings">

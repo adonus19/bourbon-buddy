@@ -1,0 +1,180 @@
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: 30000;
+  pointer-events: none; // inert until a step is active
+}
+
+.ob {
+  position: fixed;
+  inset: 0;
+  pointer-events: auto; // capture taps so the app underneath is inert
+}
+
+$scrim: rgba(18, 16, 14, 0.86);
+
+.ob__scrim {
+  position: absolute;
+  inset: 0;
+  background: $scrim;
+  animation: ob-fade 200ms ease-out;
+}
+
+// Transparent window; the scrim is the shadow spilling out around it.
+.ob__spot {
+  position: fixed;
+  border-radius: 14px;
+  box-shadow: 0 0 0 9999px $scrim;
+  outline: 2px solid var(--color-amber-light);
+  outline-offset: 0;
+  pointer-events: none;
+  transition: top 200ms ease, left 200ms ease, width 200ms ease,
+    height 200ms ease;
+}
+
+.ob__bubble {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  max-width: 420px;
+  margin-inline: auto;
+  padding: 20px 22px 18px;
+  border: 1px solid rgba(200, 135, 58, 0.18);
+  border-radius: var(--radius-sheet);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  animation: ob-rise 240ms ease-out;
+
+  &--center {
+    top: 50%;
+    transform: translateY(-50%);
+    text-align: center;
+  }
+}
+
+.ob__eyebrow {
+  margin: 0 0 8px;
+  color: var(--color-amber);
+}
+
+.ob__title {
+  margin: 0 0 8px;
+  font-family: var(--font-display, 'Playfair Display', Georgia, serif);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--color-text-primary);
+}
+
+.ob__body {
+  margin: 0;
+  font-family: var(--font-body, 'DM Sans', sans-serif);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+
+.ob__dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin: 18px 0 4px;
+}
+
+.ob__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-border-bright);
+  transition: background 150ms ease, transform 150ms ease;
+
+  &--on {
+    background: var(--color-amber);
+    transform: scale(1.25);
+  }
+}
+
+.ob__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+
+  &--tip {
+    justify-content: flex-end;
+  }
+}
+
+.ob__spacer {
+  flex: 1;
+}
+
+.ob__skip,
+.ob__back {
+  background: transparent;
+  border: none;
+  padding: 8px 4px;
+  font-family: var(--font-body, 'DM Sans', sans-serif);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.ob__skip {
+  color: var(--color-text-disabled);
+}
+
+.ob__back {
+  color: var(--color-text-secondary);
+}
+
+.ob__next {
+  background: var(--color-amber);
+  color: var(--color-bg-primary);
+  border: none;
+  padding: 9px 20px;
+  border-radius: var(--radius-button);
+  font-family: var(--font-body, 'DM Sans', sans-serif);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:active {
+    background: var(--color-amber-light);
+  }
+}
+
+@keyframes ob-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ob-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// Centered card rises without the vertical offset fighting the transform.
+.ob__bubble--center {
+  animation: ob-fade 240ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ob__scrim,
+  .ob__spot,
+  .ob__bubble,
+  .ob__bubble--center,
+  .ob__dot {
+    animation: none !important;
+    transition: none !important;
+  }
+}

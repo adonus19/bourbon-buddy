@@ -27,6 +27,8 @@ import {
   sightingFreshness,
 } from '../../shared/utils/sighting';
 import { relativeTime } from '../../shared/utils/relative-time';
+import { OnboardingService } from '../../core/onboarding/onboarding.service';
+import { TIPS } from '../../core/onboarding/tips.config';
 
 /**
  * Friends' Sightings Feed (BB-111): friends' shared sightings, newest-first,
@@ -50,6 +52,7 @@ export class FriendsFeedPage {
   private readonly router = inject(Router);
   private readonly nav = inject(NavController);
   private readonly toast = inject(ToastController);
+  private readonly onboarding = inject(OnboardingService);
 
   private readonly PAGE = 20;
 
@@ -90,6 +93,9 @@ export class FriendsFeedPage {
     if (this.loading()) {
       void this.load();
     }
+    // Introduce the map + taste matches once. The map button is always in the
+    // toolbar, so this fires on the first Friends visit regardless of feed data.
+    setTimeout(() => void this.onboarding.showTipOnce(TIPS.social), 500);
   }
 
   /** Segment: switch to the Friends view within the Social tab. */

@@ -20,6 +20,8 @@ import {
 } from '../../models';
 import { NewsService } from '../../core/services/news.service';
 import { TasteMatchService } from '../../core/services/taste-match.service';
+import { OnboardingService } from '../../core/onboarding/onboarding.service';
+import { TIPS } from '../../core/onboarding/tips.config';
 import { BottlePreviewSheetComponent } from '../../shared/components/bottle-preview-sheet/bottle-preview-sheet.component';
 import { relativeTime } from '../../shared/utils/relative-time';
 import { isWatched, passesPrefs } from '../../shared/utils/news-filter';
@@ -43,6 +45,7 @@ export class DispatchPage implements ViewWillEnter {
   private readonly modalCtrl = inject(ModalController);
   private readonly toast = inject(ToastController);
   private readonly cdr = inject(ChangeDetectorRef);
+  private readonly onboarding = inject(OnboardingService);
 
   readonly loading = this.news.loading;
   readonly loadingMore = this.news.loadingMore;
@@ -84,6 +87,11 @@ export class DispatchPage implements ViewWillEnter {
     });
   });
 
+  /** First visible article with AI-extracted bottles — the tip's spotlight. */
+  readonly firstAiArticleId = computed<string | null>(
+    () => this.visible().find((a) => a.mentionedBottles?.length)?.id ?? null
+  );
+
   watched(a: NewsArticle): boolean {
     return isWatched(a, this.news.effectivePrefs());
   }
@@ -91,6 +99,9 @@ export class DispatchPage implements ViewWillEnter {
   ionViewWillEnter(): void {
     void this.news.ensureLoaded();
     this.cdr.detectChanges();
+    // Point out AI-extracted bottles once, after the feed has had a moment to
+    // render an article that actually has some. No-ops (unflagged) otherwise.
+    setTimeout(() => void this.onboarding.showTipOnce(TIPS.aiFinds), 800);
   }
 
   setSegment(value: Segment): void {

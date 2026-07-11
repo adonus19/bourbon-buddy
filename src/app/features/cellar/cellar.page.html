@@ -61,6 +61,7 @@
     <ion-toolbar>
       <ion-segment
         class="cellar-segment"
+        bbTourAnchor="cellar-segment"
         [value]="view()"
         (ionChange)="setView($any($event.detail.value))"
       >
@@ -164,7 +165,7 @@
   }
 
   <ion-fab slot="fixed" vertical="bottom" horizontal="end">
-    <ion-fab-button aria-label="Quick actions">
+    <ion-fab-button aria-label="Quick actions" bbTourAnchor="cellar-fab">
       <ion-icon name="add"></ion-icon>
     </ion-fab-button>
     <ion-fab-list side="top">

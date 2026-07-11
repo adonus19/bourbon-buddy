@@ -22,6 +22,7 @@ import { SimilarBottlesComponent } from './components/similar-bottles/similar-bo
 import { BottleHistoryComponent } from './components/bottle-history/bottle-history.component';
 import { BottlePreviewSheetComponent } from './components/bottle-preview-sheet/bottle-preview-sheet.component';
 import { InputHelpersDirective } from './directives/input-helpers.directive';
+import { OnboardingModule } from './onboarding.module';
 
 /**
  * Shared declarations reused across feature modules (presentational
@@ -51,7 +52,15 @@ const COMPONENTS = [
 
 @NgModule({
   declarations: COMPONENTS,
-  imports: [CommonModule, ReactiveFormsModule, RouterModule, IonicModule],
-  exports: COMPONENTS,
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    RouterModule,
+    IonicModule,
+    OnboardingModule,
+  ],
+  // Re-export OnboardingModule so `bbTourAnchor` is available in every feature
+  // template that already imports SharedModule.
+  exports: [...COMPONENTS, OnboardingModule],
 })
 export class SharedModule {}
