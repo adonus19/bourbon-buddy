@@ -25,13 +25,14 @@ import { TIPS } from '../../core/onboarding/tips.config';
 import { BottlePreviewSheetComponent } from '../../shared/components/bottle-preview-sheet/bottle-preview-sheet.component';
 import { relativeTime } from '../../shared/utils/relative-time';
 import { isWatched, passesPrefs } from '../../shared/utils/news-filter';
+import { RadarBottle, releaseRadar } from '../../shared/utils/release-radar';
 import {
   NEWS_SOURCE_NAMES,
   NEWS_WINDOWS,
   NewsWindow,
 } from '../../shared/constants/news-sources';
 
-type Segment = 'feed' | 'read' | 'saved';
+type Segment = 'feed' | 'read' | 'saved' | 'radar';
 
 @Component({
   selector: 'app-dispatch',
@@ -91,6 +92,29 @@ export class DispatchPage implements ViewWillEnter {
   readonly firstAiArticleId = computed<string | null>(
     () => this.visible().find((a) => a.mentionedBottles?.length)?.id ?? null
   );
+
+  /**
+   * Release Radar (BB-207): bottles recently surfaced in the news, derived
+   * client-side from the already-loaded articles' cached `mentionedBottles` —
+   * no extra Firestore reads, no listener. Honest framing: "spotted in the
+   * news," never "released."
+   */
+  readonly radarBottles = computed<RadarBottle[]>(() =>
+    releaseRadar(this.news.articles())
+  );
+
+  /** The newest source that mentioned a radar bottle, for its card. */
+  radarSource(r: RadarBottle): string {
+    return r.articles[0]?.sourceName ?? '';
+  }
+
+  /** Relative time of the most recent mention of a radar bottle. */
+  radarWhen(r: RadarBottle): string {
+    const newest = r.articles[0];
+    return relativeTime(
+      newest?.publishedAt?.toDate() ?? newest?.fetchedAt?.toDate() ?? null
+    );
+  }
 
   watched(a: NewsArticle): boolean {
     return isWatched(a, this.news.effectivePrefs());

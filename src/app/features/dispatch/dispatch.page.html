@@ -13,6 +13,7 @@
       (ionChange)="setSegment($any($event.detail.value))"
     >
       <ion-segment-button value="feed"><ion-label>Feed</ion-label></ion-segment-button>
+      <ion-segment-button value="radar"><ion-label>Radar</ion-label></ion-segment-button>
       <ion-segment-button value="saved"><ion-label>Saved</ion-label></ion-segment-button>
       <ion-segment-button value="read"><ion-label>Read</ion-label></ion-segment-button>
     </ion-segment>
@@ -61,7 +62,37 @@
     </div>
   }
 
-  @if (loading() && articles().length === 0) {
+  @if (segment() === 'radar') {
+    @if (loading() && articles().length === 0) {
+      <app-list-skeleton [count]="6"></app-list-skeleton>
+    } @else if (radarBottles().length === 0) {
+      <div class="dispatch-empty">
+        <ion-icon name="sparkles-outline" aria-hidden="true"></ion-icon>
+        <h2 class="dispatch-empty__title">No new bottles in the news lately.</h2>
+        <p class="dispatch-empty__sub">Check back after the next feed refresh.</p>
+      </div>
+    } @else {
+      <p class="radar__note">Spotted in the news — not confirmed releases.</p>
+      <ion-list class="dispatch-list" lines="none">
+        @for (r of radarBottles(); track r.key) {
+          <ion-item class="radar-item" lines="none" detail="false">
+            <div class="radar-item__body">
+              <h3 class="radar-item__name">{{ r.bottle.name }}</h3>
+              <p class="radar-item__meta">
+                @if (r.bottle.distillery) { {{ r.bottle.distillery }} · }
+                in {{ r.articleCount }}
+                {{ r.articleCount === 1 ? 'article' : 'articles' }}
+              </p>
+              <p class="radar-item__src">
+                {{ radarSource(r) }}@if (radarWhen(r)) { · {{ radarWhen(r) }} }
+              </p>
+            </div>
+          </ion-item>
+        }
+      </ion-list>
+    }
+  } @else {
+    @if (loading() && articles().length === 0) {
     <app-list-skeleton [count]="6"></app-list-skeleton>
   } @else if (error() && articles().length === 0) {
     <div class="dispatch-empty">
@@ -193,6 +224,7 @@
         </ion-item-sliding>
       }
     </ion-list>
+  }
   }
 
   <ion-infinite-scroll
