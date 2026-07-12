@@ -483,7 +483,32 @@ per-barrel differences into a comparison that highlights your favorite pick.
 Depends on R7's `bottleStatus`; all additive schema
 (`repurchaseOfEntryId`, `barrelLabel`).
 
-**After R8** we move to backlog — **Gamification (Phase 5)** is top of the list,
+### Iteration R9 — Price History & Release Radar (~29 SP)
+**Stories:** Epic 19 — BB-202, BB-203, BB-204, BB-205, BB-206 (17 SP);
+Epic 20 — BB-207, BB-208, BB-209 (12 SP).
+**Goal:** The two features that let Bourbon Buddy compete with OnlyDrams on
+**pricing history** and **new-release discovery** — built on data the app already
+collects, no scraping.
+- **Price History (Epic 19):** a per-bottle price timeline that *accumulates over
+  time*. Crowd sightings are purged at 30 days, so each spot mints a **durable,
+  immutable price point** in a new top-level `/priceHistory` collection (written in
+  the `logSighting` callable, own/friends visibility). The `app-price-history`
+  detail-page component plots durable crowd points **+** your own permanent purchase
+  prices (`bottleHistory().priceTrend`) with honest per-point provenance, an MSRP
+  delta, and an "on shelves now" callout from live sightings. Reads are two bounded
+  one-shots (no listeners); +1 tiny write per sighting (bounded by the BB-163 rate
+  limit). Chain: BB-202 → BB-203 → BB-204 → (BB-205, BB-206).
+- **Release Radar (Epic 20):** a "New & Noteworthy" segment on the Dispatch tab,
+  derived **client-side** from already-extracted `mentionedBottles` (BB-130) — zero
+  new backend, zero extra reads. Taste-match badges, Hunt-List/Cellar annotations,
+  add-to-Hunt-List, and the existing preview sheet. Honestly framed as "spotted in
+  the news." Chain: BB-207 → BB-208 → BB-209. Independent of Epic 19 (parallelizable).
+
+**Deferred (documented, not scoped):** Radar confidence states
+(`firstSeenInNewsAt` / `isNewToCatalog`) and the **TTB COLA** authoritative
+upgrade (needs Cloud Run + an admin review queue) — revisit at scale.
+
+**After R9** the backlog remains — **Gamification (Phase 5)** is top of the list,
 then **Crowdsourced Flavor Aggregation (BB-188)**, **Nearby Venue Picker
 (BB-189)**, and **News Full-Text Search (BB-190)**.
 

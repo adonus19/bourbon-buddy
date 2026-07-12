@@ -490,6 +490,55 @@ rolling daily count) gate creation; a scheduled job purges sightings well past t
 staleness window so the collection stays bounded. Exact shapes decided at
 implementation (Iteration 8 creation-side, Iteration 10 fan-out-side).
 
+### Collection: `/priceHistory/{pointId}` *(Epic 19 — BB-202)*
+
+The **durable, immutable** price timeline that backs Price History. Live
+`/sightings` are hard-deleted at 30 days (`cleanupStaleSightings`), so crowd
+prices never accumulate — this collection preserves each observed price as
+permanent history. It **mirrors `/sightings`** (catalog-keyed by `bourbonId`,
+own/friends visibility) but has a different lifecycle: write-once, never purged.
+
+```
+priceHistory/{pointId}
+  bourbonId:         string        // catalog match key (same as the sighting)
+  price:             number
+  sightingDate:      Timestamp     // when it was observed
+  storeName:         string | null
+  city:              string | null
+  state:             string | null
+  spotterUid:        string        // for visibility filtering
+  visibility:        string        // "private" | "friends" — copied from the sighting
+  sourceSightingId:  string | null // provenance link (the sighting may be deleted later)
+  createdAt:         Timestamp
+```
+
+**Write path:** minted **server-side inside the `logSighting` callable**, right
+after the live sighting is created — one extra write, bounded by the BB-163
+per-user rate limit. The offline-outbox replay path keys off the same `clientId`
+so a replayed sighting can't double-write its point. **Each sighting mints exactly
+one point (1:1)** — the Price History timeline plots `/priceHistory` alone and uses
+live `/sightings` only for the "on shelves now" freshness annotation, so there is
+no double-counting.
+
+**Immutability:** marking a sighting stale, confirming/disputing it (BB-194), or
+deleting it **never** touches the point — *"this price was observed on this date"*
+stays true regardless of whether the bottle is still on the shelf. An abuse-driven
+prune of points from removed/flagged sightings is an at-scale concern (deferred).
+
+**Queries (BB-203):** two bounded one-shot reads merged & deduped, mirroring
+`nearbySightings`:
+- own: `.where('bourbonId','==',x).where('spotterUid','==',uid)`
+- friends: `.where('bourbonId','==',x).where('visibility','==','friends').where('spotterUid','in', friendUids[≤30])`
+
+**Security:** readable by `spotterUid` always, and by the spotter's accepted,
+non-blocked friends when `visibility == 'friends'` (copy of the `/sightings` read
+rule); **create/update/delete denied to clients** (`if false`) — admin-SDK only,
+so points are immutable.
+
+**Indexes** (add to `firestore.indexes.json`): `priceHistory`
+(bourbonId ASC, spotterUid ASC, sightingDate ASC),
+`priceHistory` (bourbonId ASC, visibility ASC, spotterUid ASC, sightingDate ASC).
+
 ### Subcollection: `/users/{userId}/notifications/{notificationId}` *(Phase 4 — BB-113)*
 
 In-app inbox; one doc written alongside each push so missed notifications are
@@ -509,6 +558,8 @@ notifications/{notificationId}
 `friendRequests` (toUid ASC, status ASC), `friendRequests` (fromUid ASC,
 status ASC), `sightings` (bourbonId ASC, price ASC),
 `sightings` (spotterUid ASC, createdAt DESC),
+`priceHistory` (bourbonId ASC, spotterUid ASC, sightingDate ASC),
+`priceHistory` (bourbonId ASC, visibility ASC, spotterUid ASC, sightingDate ASC),
 `notifications` collection-group (read ASC, createdAt DESC).
 
 ---
