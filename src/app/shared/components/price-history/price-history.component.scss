@@ -149,6 +149,59 @@
     border: 1px solid var(--color-success, #46a758);
   }
 
+  // "Your purchases" — the viewer's own permanent price stream (BB-205), kept
+  // visually distinct from the crowd data above so they never read as one number.
+  &__mine {
+    &--divided {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--color-border);
+    }
+  }
+
+  &__subhead {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
+
+  &__trend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+  }
+
+  &__trend-price {
+    color: var(--color-text-primary);
+  }
+
+  &__trend-arrow {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+  }
+
+  &__trend-delta {
+    margin-left: 4px;
+    font-size: 12px;
+    font-weight: 600;
+
+    &.up {
+      color: var(--color-danger, #e5484d);
+    }
+    &.down {
+      color: var(--color-success, #46a758);
+    }
+  }
+
+  &__mine-single {
+    margin: 0;
+    font-size: 14px;
+    color: var(--color-text-primary);
+  }
+
   &__empty {
     margin: 4px 0 0;
     font-size: 13px;

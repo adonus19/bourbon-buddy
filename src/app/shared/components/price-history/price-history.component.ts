@@ -3,7 +3,9 @@ import { Component, OnInit, computed, inject, input, signal } from '@angular/cor
 import { PriceHistoryPoint } from '../../../models';
 import { AuthService } from '../../../core/auth/auth.service';
 import { FriendService } from '../../../core/services/friend.service';
+import { LogEntryService } from '../../../core/services/log-entry.service';
 import { PriceHistoryService } from '../../../core/services/price-history.service';
+import { PricePoint, bottleHistory } from '../../utils/bottle-history';
 import { pointsWithinDays, priceStats } from '../../utils/price-history';
 
 /** A provenance row for the timeline (newest-first). */
@@ -40,6 +42,7 @@ export class PriceHistoryComponent implements OnInit {
   private readonly priceHistory = inject(PriceHistoryService);
   private readonly friends = inject(FriendService);
   private readonly auth = inject(AuthService);
+  private readonly log = inject(LogEntryService);
 
   readonly bourbonId = input.required<string>();
   readonly msrp = input<number | null>(null);
@@ -69,7 +72,28 @@ export class PriceHistoryComponent implements OnInit {
     }
   }
 
-  readonly hasData = computed(() => this.points().length > 0);
+  /** Crowd/market prices (durable sightings) exist for this bottle. */
+  readonly hasCrowd = computed(() => this.points().length > 0);
+
+  /**
+   * The viewer's own purchase-price trend (BB-205) for this bottle, oldest →
+   * newest, derived from the already-loaded `LogEntryService.entries` signal —
+   * zero extra reads. A separate, permanent stream from crowd sightings; the two
+   * never blend into one averaged number.
+   */
+  readonly purchaseTrend = computed<PricePoint[]>(
+    () => bottleHistory(this.log.entries(), this.bourbonId()).priceTrend
+  );
+  readonly hasPurchases = computed(() => this.purchaseTrend().length > 0);
+
+  /** Net change from first to latest purchase, or null with < 2 purchases. */
+  readonly purchaseDelta = computed<number | null>(() => {
+    const t = this.purchaseTrend();
+    return t.length >= 2 ? t[t.length - 1].price - t[0].price : null;
+  });
+
+  /** Anything to show — crowd prices or the viewer's own purchases. */
+  readonly hasData = computed(() => this.hasCrowd() || this.hasPurchases());
 
   readonly stats = computed(() => priceStats(this.points()));
 

@@ -3,64 +3,91 @@
     <div class="ph">
       <p class="eyebrow">Price history</p>
 
-      @if (stats(); as s) {
-        <div class="ph__summary">
-          <span class="ph__median">${{ s.median }}</span>
-          <span class="ph__median-label">typical</span>
-          @if (msrpDelta(); as d) {
-            @if (d !== 0) {
-              <span class="ph__msrp" [class.over]="d > 0" [class.under]="d < 0">
-                {{ d > 0 ? '+' : '' }}{{ d }}% vs MSRP
-              </span>
-            } @else {
-              <span class="ph__msrp">at MSRP</span>
+      @if (hasCrowd()) {
+        @if (stats(); as s) {
+          <div class="ph__summary">
+            <span class="ph__median">${{ s.median }}</span>
+            <span class="ph__median-label">typical</span>
+            @if (msrpDelta(); as d) {
+              @if (d !== 0) {
+                <span class="ph__msrp" [class.over]="d > 0" [class.under]="d < 0">
+                  {{ d > 0 ? '+' : '' }}{{ d }}% vs MSRP
+                </span>
+              } @else {
+                <span class="ph__msrp">at MSRP</span>
+              }
             }
-          }
-        </div>
+          </div>
 
-        <p class="ph__meta">
-          {{ s.count }} {{ s.count === 1 ? 'price' : 'prices' }}
-          @if (s.min !== s.max) {
-            <span class="ph__dot">·</span> ${{ s.min }}–${{ s.max }}
-          }
-          @if (spanSince(); as sp) {
-            <span class="ph__dot">·</span> since {{ sp | date: 'MMM y' }}
-          }
-        </p>
-      }
-
-      @if (recentBest(); as rb) {
-        <p class="ph__recent">
-          <ion-icon name="pricetag-outline" class="ph__recent-icon"></ion-icon>
-          Spotted recently from <strong>${{ rb }}</strong>
-        </p>
-      }
-
-      @if (bars().length) {
-        <div class="ph__spark" aria-hidden="true">
-          @for (h of bars(); track $index) {
-            <span class="ph__spark-bar" [style.height.%]="h"></span>
-          }
-        </div>
-      }
-
-      <div class="ph__list">
-        @for (r of rows(); track r.id) {
-          <div class="ph__row">
-            <span class="ph__row-price">${{ r.price }}</span>
-            <span class="ph__row-src" [class.mine]="r.mine">
-              {{ r.mine ? 'You' : 'Friend' }}
-            </span>
-            @if (r.place) {
-              <span class="ph__row-place">{{ r.place }}</span>
+          <p class="ph__meta">
+            {{ s.count }} {{ s.count === 1 ? 'price' : 'prices' }}
+            @if (s.min !== s.max) {
+              <span class="ph__dot">·</span> ${{ s.min }}–${{ s.max }}
             }
-            <span class="ph__row-date">{{ r.date | date: 'MMM d, y' }}</span>
-            @if (r.fresh) {
-              <span class="ph__row-fresh">Fresh</span>
+            @if (spanSince(); as sp) {
+              <span class="ph__dot">·</span> since {{ sp | date: 'MMM y' }}
+            }
+          </p>
+        }
+
+        @if (recentBest(); as rb) {
+          <p class="ph__recent">
+            <ion-icon name="pricetag-outline" class="ph__recent-icon"></ion-icon>
+            Spotted recently from <strong>${{ rb }}</strong>
+          </p>
+        }
+
+        @if (bars().length) {
+          <div class="ph__spark" aria-hidden="true">
+            @for (h of bars(); track $index) {
+              <span class="ph__spark-bar" [style.height.%]="h"></span>
             }
           </div>
         }
-      </div>
+
+        <div class="ph__list">
+          @for (r of rows(); track r.id) {
+            <div class="ph__row">
+              <span class="ph__row-price">${{ r.price }}</span>
+              <span class="ph__row-src" [class.mine]="r.mine">
+                {{ r.mine ? 'You' : 'Friend' }}
+              </span>
+              @if (r.place) {
+                <span class="ph__row-place">{{ r.place }}</span>
+              }
+              <span class="ph__row-date">{{ r.date | date: 'MMM d, y' }}</span>
+              @if (r.fresh) {
+                <span class="ph__row-fresh">Fresh</span>
+              }
+            </div>
+          }
+        </div>
+      }
+
+      @if (hasPurchases()) {
+        <div class="ph__mine" [class.ph__mine--divided]="hasCrowd()">
+          <p class="ph__subhead">Your purchases</p>
+          @if (purchaseTrend().length >= 2) {
+            <div class="ph__trend">
+              @for (p of purchaseTrend(); track $index) {
+                <span class="ph__trend-price">${{ p.price }}</span>
+                @if (!$last) {
+                  <ion-icon name="arrow-forward" class="ph__trend-arrow"></ion-icon>
+                }
+              }
+              @if (purchaseDelta(); as d) {
+                @if (d !== 0) {
+                  <span class="ph__trend-delta" [class.up]="d > 0" [class.down]="d < 0">
+                    {{ d > 0 ? '+' : '−' }}${{ d > 0 ? d : -d }}
+                  </span>
+                }
+              }
+            </div>
+          } @else {
+            <p class="ph__mine-single">You paid ${{ purchaseTrend()[0].price }}</p>
+          }
+        </div>
+      }
     </div>
   } @else {
     <div class="ph">

@@ -1,4 +1,4 @@
-import { NO_ERRORS_SCHEMA } from '@angular/core';
+import { NO_ERRORS_SCHEMA, WritableSignal, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 jest.mock('@angular/fire/firestore', () => ({
@@ -22,13 +22,32 @@ jest.mock('@angular/fire/auth', () => ({ Auth: class {} }));
 
 import { Timestamp } from '@angular/fire/firestore';
 
-import { PriceHistoryPoint } from '../../../models';
+import { LogEntry, PriceHistoryPoint } from '../../../models';
 import { AuthService } from '../../../core/auth/auth.service';
 import { FriendService } from '../../../core/services/friend.service';
+import { LogEntryService } from '../../../core/services/log-entry.service';
 import { PriceHistoryService } from '../../../core/services/price-history.service';
 import { PriceHistoryComponent } from './price-history.component';
 
 const DAY = 24 * 60 * 60 * 1000;
+
+/** A minimal owned, priced log entry for the "Your purchases" trend. */
+function purchase(price: number, daysAgo: number): LogEntry {
+  const ms = Date.now() - daysAgo * DAY;
+  const ts = { toMillis: () => ms } as unknown as Timestamp;
+  return {
+    id: `e${price}`,
+    bourbonId: 'b1',
+    entryType: 'bottle_purchased',
+    didNotPurchase: false,
+    purchasePrice: price,
+    purchaseDate: ts,
+    entryDate: ts,
+    bottleStatus: 'open',
+    bottleRemainingPct: 100,
+    rating: null,
+  } as unknown as LogEntry;
+}
 
 function pt(
   id: string,
@@ -54,6 +73,7 @@ describe('PriceHistoryComponent (BB-204)', () => {
   let component: PriceHistoryComponent;
   let priceHistory: { priceHistoryForBottle: jest.Mock };
   let friends: { friendsOnce: jest.Mock };
+  let log: { entries: WritableSignal<LogEntry[]> };
 
   /**
    * Creates the component and deterministically awaits its async load by
@@ -79,6 +99,7 @@ describe('PriceHistoryComponent (BB-204)', () => {
   beforeEach(() => {
     priceHistory = { priceHistoryForBottle: jest.fn().mockResolvedValue([]) };
     friends = { friendsOnce: jest.fn().mockResolvedValue([]) };
+    log = { entries: signal<LogEntry[]>([]) };
 
     TestBed.configureTestingModule({
       declarations: [PriceHistoryComponent],
@@ -86,6 +107,7 @@ describe('PriceHistoryComponent (BB-204)', () => {
         { provide: PriceHistoryService, useValue: priceHistory },
         { provide: FriendService, useValue: friends },
         { provide: AuthService, useValue: { snapshotUser: { uid: 'me' } } },
+        { provide: LogEntryService, useValue: log },
       ],
       schemas: [NO_ERRORS_SCHEMA],
     });
@@ -160,5 +182,36 @@ describe('PriceHistoryComponent (BB-204)', () => {
     ]);
     expect(dense.bars()).toHaveLength(4);
     expect(dense.bars().every((h) => h >= 8 && h <= 100)).toBe(true);
+  });
+
+  // BB-205 — personal purchase-price series
+  it('derives the "Your purchases" trend from log entries without blending into the crowd median', async () => {
+    log.entries.set([purchase(40, 10), purchase(60, 2)]); // oldest→newest: 40, 60
+    const c = await load([pt('a', 50, 2), pt('b', 30, 5), pt('c', 70, 9)]);
+    // Crowd median is unchanged by the viewer's purchases.
+    expect(c.stats()).toMatchObject({ median: 50 });
+    expect(c.hasPurchases()).toBe(true);
+    expect(c.purchaseTrend().map((p) => p.price)).toEqual([40, 60]);
+    expect(c.purchaseDelta()).toBe(20);
+  });
+
+  it('shows a single purchase gracefully (no misleading trend)', async () => {
+    log.entries.set([purchase(45, 3)]);
+    const c = await load([]); // no crowd data at all
+    expect(c.hasData()).toBe(true); // purchases alone are enough to render
+    expect(c.hasCrowd()).toBe(false);
+    expect(c.hasPurchases()).toBe(true);
+    expect(c.purchaseTrend()).toHaveLength(1);
+    expect(c.purchaseDelta()).toBeNull();
+  });
+
+  it('ignores non-purchase entries and other bottles in the trend', async () => {
+    log.entries.set([
+      purchase(40, 5),
+      { ...purchase(999, 4), didNotPurchase: true } as LogEntry, // not a purchase
+      { ...purchase(50, 3), bourbonId: 'other' } as LogEntry, // different bottle
+    ]);
+    const c = await load([]);
+    expect(c.purchaseTrend().map((p) => p.price)).toEqual([40]);
   });
 });
