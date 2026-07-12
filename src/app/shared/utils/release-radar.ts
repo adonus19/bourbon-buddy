@@ -94,6 +94,20 @@ export function releaseRadar(articles: NewsArticle[]): RadarBottle[] {
 }
 
 /**
+ * Drops radar bottles the user already tracks (BB-209): anything whose catalog
+ * id is in `trackedIds` (their Cellar + active Hunt List). Bottles not yet in the
+ * catalog (no bourbonId) are always kept — they can't be "already tracked".
+ */
+export function withoutTracked(
+  radar: RadarBottle[],
+  trackedIds: Set<string>
+): RadarBottle[] {
+  return radar.filter(
+    (r) => !r.bottle.bourbonId || !trackedIds.has(r.bottle.bourbonId)
+  );
+}
+
+/**
  * The representative mention: the newest article's name (freshest as-written),
  * with id / distillery / category / flavor backfilled from any mention that has
  * them — so a later bare mention never drops details an earlier one carried.

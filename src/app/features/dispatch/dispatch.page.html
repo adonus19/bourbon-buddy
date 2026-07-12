@@ -72,12 +72,26 @@
         <p class="dispatch-empty__sub">Check back after the next feed refresh.</p>
       </div>
     } @else {
-      <p class="radar__note">Spotted in the news — not confirmed releases.</p>
-      <div class="radar-cards">
-        @for (r of radarBottles(); track r.key) {
-          <app-radar-card [radar]="r"></app-radar-card>
-        }
+      <div class="radar-head" bbTourAnchor="dispatch-radar">
+        <p class="radar__note">Spotted in the news — not confirmed releases.</p>
+        <ion-toggle
+          class="radar-filter"
+          labelPlacement="start"
+          [checked]="hideTracked()"
+          (ionChange)="hideTracked.set($any($event.detail.checked))"
+        >
+          Hide ones I track
+        </ion-toggle>
       </div>
+      @if (visibleRadar().length === 0) {
+        <p class="radar__all">You're already tracking every new bottle here.</p>
+      } @else {
+        <div class="radar-cards">
+          @for (r of visibleRadar(); track r.key) {
+            <app-radar-card [radar]="r"></app-radar-card>
+          }
+        </div>
+      }
     }
   } @else {
     @if (loading() && articles().length === 0) {

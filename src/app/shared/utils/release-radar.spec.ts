@@ -1,7 +1,7 @@
 import { Timestamp } from '@angular/fire/firestore';
 
 import { MentionedBottle, NewsArticle } from '../../models';
-import { releaseRadar } from './release-radar';
+import { RadarBottle, releaseRadar, withoutTracked } from './release-radar';
 
 const DAY = 24 * 60 * 60 * 1000;
 const BASE = 1_700_000_000_000;
@@ -112,5 +112,26 @@ describe('releaseRadar', () => {
       fetchedAt: ts(ms),
     };
     expect(releaseRadar([a])[0].firstSeen).toBe(ms);
+  });
+});
+
+describe('withoutTracked', () => {
+  const radar = (key: string, bourbonId: string | null): RadarBottle =>
+    ({ key, bottle: { name: key, bourbonId } } as RadarBottle);
+
+  it('drops bottles whose bourbonId is tracked, keeps the rest', () => {
+    const list = [radar('a', 'a1'), radar('b', 'b1'), radar('c', 'c1')];
+    const out = withoutTracked(list, new Set(['a1', 'c1']));
+    expect(out.map((r) => r.key)).toEqual(['b']);
+  });
+
+  it('always keeps bottles not yet in the catalog (no bourbonId)', () => {
+    const list = [radar('new', null), radar('tracked', 't1')];
+    expect(withoutTracked(list, new Set(['t1'])).map((r) => r.key)).toEqual(['new']);
+  });
+
+  it('is a no-op when nothing is tracked', () => {
+    const list = [radar('a', 'a1'), radar('b', 'b1')];
+    expect(withoutTracked(list, new Set())).toHaveLength(2);
   });
 });
