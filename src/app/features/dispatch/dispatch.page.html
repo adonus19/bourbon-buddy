@@ -73,23 +73,11 @@
       </div>
     } @else {
       <p class="radar__note">Spotted in the news — not confirmed releases.</p>
-      <ion-list class="dispatch-list" lines="none">
+      <div class="radar-cards">
         @for (r of radarBottles(); track r.key) {
-          <ion-item class="radar-item" lines="none" detail="false">
-            <div class="radar-item__body">
-              <h3 class="radar-item__name">{{ r.bottle.name }}</h3>
-              <p class="radar-item__meta">
-                @if (r.bottle.distillery) { {{ r.bottle.distillery }} · }
-                in {{ r.articleCount }}
-                {{ r.articleCount === 1 ? 'article' : 'articles' }}
-              </p>
-              <p class="radar-item__src">
-                {{ radarSource(r) }}@if (radarWhen(r)) { · {{ radarWhen(r) }} }
-              </p>
-            </div>
-          </ion-item>
+          <app-radar-card [radar]="r"></app-radar-card>
         }
-      </ion-list>
+      </div>
     }
   } @else {
     @if (loading() && articles().length === 0) {

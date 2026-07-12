@@ -103,19 +103,6 @@ export class DispatchPage implements ViewWillEnter {
     releaseRadar(this.news.articles())
   );
 
-  /** The newest source that mentioned a radar bottle, for its card. */
-  radarSource(r: RadarBottle): string {
-    return r.articles[0]?.sourceName ?? '';
-  }
-
-  /** Relative time of the most recent mention of a radar bottle. */
-  radarWhen(r: RadarBottle): string {
-    const newest = r.articles[0];
-    return relativeTime(
-      newest?.publishedAt?.toDate() ?? newest?.fetchedAt?.toDate() ?? null
-    );
-  }
-
   watched(a: NewsArticle): boolean {
     return isWatched(a, this.news.effectivePrefs());
   }

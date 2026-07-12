@@ -1,0 +1,60 @@
+<div class="radar-card">
+  <div class="radar-card__text">
+    <h3 class="radar-card__name">{{ bottle().name }}</h3>
+
+    <div class="radar-card__meta">
+      @if (categoryLabel(); as label) {
+        <span class="radar-card__category" [style.--cat-accent]="categoryAccent()">
+          {{ label }}
+        </span>
+      }
+      @if (bottle().distillery) {
+        <span class="radar-card__distillery">{{ bottle().distillery }}</span>
+      }
+    </div>
+
+    @if (isTasteMatch()) {
+      <p class="radar-card__taste">
+        <ion-icon name="sparkles" aria-hidden="true"></ion-icon>
+        Matches your taste
+      </p>
+    }
+
+    <p class="radar-card__src">
+      in {{ radar().articleCount }}
+      {{ radar().articleCount === 1 ? 'article' : 'articles' }}
+      @if (source()) { · {{ source() }} }
+      @if (when()) { · {{ when() }} }
+    </p>
+
+    @if (onHuntList()) {
+      <p class="radar-card__note">
+        <ion-icon name="bookmark" aria-hidden="true"></ion-icon>
+        On your Hunt List
+      </p>
+    } @else if (inCellar()) {
+      <p class="radar-card__note">
+        <ion-icon name="checkmark-circle" aria-hidden="true"></ion-icon>
+        In your Cellar
+      </p>
+    }
+  </div>
+
+  <div class="radar-card__actions">
+    <ion-button fill="clear" size="small" (click)="view()">
+      <ion-icon slot="start" name="eye-outline" aria-hidden="true"></ion-icon>
+      View
+    </ion-button>
+    @if (!onHuntList()) {
+      <ion-button
+        fill="clear"
+        size="small"
+        [disabled]="adding()"
+        (click)="addToHuntList()"
+      >
+        <ion-icon slot="start" name="add" aria-hidden="true"></ion-icon>
+        Hunt
+      </ion-button>
+    }
+  </div>
+</div>

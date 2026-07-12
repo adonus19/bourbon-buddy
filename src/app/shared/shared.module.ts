@@ -22,6 +22,7 @@ import { SimilarBottlesComponent } from './components/similar-bottles/similar-bo
 import { BottleHistoryComponent } from './components/bottle-history/bottle-history.component';
 import { PriceHistoryComponent } from './components/price-history/price-history.component';
 import { BottlePreviewSheetComponent } from './components/bottle-preview-sheet/bottle-preview-sheet.component';
+import { RadarCardComponent } from './components/radar-card/radar-card.component';
 import { InputHelpersDirective } from './directives/input-helpers.directive';
 import { OnboardingModule } from './onboarding.module';
 
@@ -50,6 +51,7 @@ const COMPONENTS = [
   BottleHistoryComponent,
   PriceHistoryComponent,
   BottlePreviewSheetComponent,
+  RadarCardComponent,
 ];
 
 @NgModule({

@@ -1,0 +1,82 @@
+:host {
+  display: block;
+}
+
+.radar-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border);
+
+  &__text {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  &__name {
+    margin: 0 0 4px;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
+
+  &__meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  &__category {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--cat-accent, var(--color-cat-other));
+    border: 1px solid var(--cat-accent, var(--color-cat-other));
+    border-radius: 999px;
+    padding: 1px 8px;
+    flex-shrink: 0;
+  }
+
+  &__distillery {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__taste {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 6px 0 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-amber-light);
+  }
+
+  &__src {
+    margin: 6px 0 0;
+    font-size: 12px;
+    color: var(--color-text-secondary);
+  }
+
+  &__note {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 6px 0 0;
+    font-size: 12px;
+    color: var(--color-text-secondary);
+  }
+
+  &__actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    flex-shrink: 0;
+  }
+}
