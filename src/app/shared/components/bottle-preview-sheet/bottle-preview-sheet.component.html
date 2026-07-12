@@ -44,6 +44,7 @@
   }
 
   @if (bottle.bourbonId) {
+    <app-price-history [bourbonId]="bottle.bourbonId" [compact]="true" />
     <app-similar-bottles [bourbonId]="bottle.bourbonId" />
   }
 

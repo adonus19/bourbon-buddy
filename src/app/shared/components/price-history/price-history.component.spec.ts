@@ -96,6 +96,26 @@ describe('PriceHistoryComponent (BB-204)', () => {
     return component;
   }
 
+  /**
+   * Like `load`, but also renders to the DOM (deterministically: ngOnInit is
+   * awaited first, then detectChanges paints with the already-loaded points).
+   */
+  async function renderDom(
+    points: PriceHistoryPoint[],
+    opts: { compact?: boolean } = {}
+  ): Promise<HTMLElement> {
+    priceHistory.priceHistoryForBottle.mockResolvedValue(points);
+    fixture = TestBed.createComponent(PriceHistoryComponent);
+    component = fixture.componentInstance;
+    fixture.componentRef.setInput('bourbonId', 'b1');
+    if (opts.compact) {
+      fixture.componentRef.setInput('compact', true);
+    }
+    await component.ngOnInit();
+    fixture.detectChanges();
+    return fixture.nativeElement as HTMLElement;
+  }
+
   beforeEach(() => {
     priceHistory = { priceHistoryForBottle: jest.fn().mockResolvedValue([]) };
     friends = { friendsOnce: jest.fn().mockResolvedValue([]) };
@@ -213,5 +233,37 @@ describe('PriceHistoryComponent (BB-204)', () => {
     ]);
     const c = await load([]);
     expect(c.purchaseTrend().map((p) => p.price)).toEqual([40]);
+  });
+
+  // BB-206 — compact preview-sheet variant
+  it('compact: renders a mini crowd-price readout, without the full provenance list', async () => {
+    const el = await renderDom([pt('a', 50, 2), pt('b', 30, 5), pt('c', 70, 9)], {
+      compact: true,
+    });
+    expect(el.querySelector('.ph--compact')).toBeTruthy();
+    expect(el.textContent).toContain('$50'); // median
+    expect(el.textContent).toContain('typical');
+    expect(el.querySelector('.ph__list')).toBeNull(); // no provenance rows
+    expect(el.querySelector('.eyebrow')).toBeNull(); // no "Price history" heading
+    expect(el.textContent).not.toContain('No price data yet');
+  });
+
+  it('compact: renders nothing (no empty state) when there are no crowd prices', async () => {
+    const el = await renderDom([], { compact: true });
+    expect(el.querySelector('.ph')).toBeNull();
+    expect(el.textContent?.trim()).toBe('');
+  });
+
+  it('compact: shows the mini sparkline once there are enough points', async () => {
+    const el = await renderDom(
+      [pt('a', 40, 4), pt('b', 60, 3), pt('c', 50, 2), pt('d', 70, 1)],
+      { compact: true }
+    );
+    expect(el.querySelectorAll('.ph__spark-bar')).toHaveLength(4);
+  });
+
+  it('full mode still shows the empty state (restructure regression guard)', async () => {
+    const el = await renderDom([]);
+    expect(el.textContent).toContain('No price data yet');
   });
 });

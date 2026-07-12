@@ -1,5 +1,25 @@
 @if (!loading()) {
-  @if (hasData()) {
+  @if (compact()) {
+    <!-- BB-206: crowd-price-only mini for the preview sheet; nothing when empty. -->
+    @if (stats(); as s) {
+      <div class="ph ph--compact">
+        <ion-icon name="pricetag-outline" class="ph__c-icon" aria-hidden="true"></ion-icon>
+        <span class="ph__c-median">${{ s.median }}</span>
+        <span class="ph__c-label">typical</span>
+        @if (s.count > 1) {
+          <span class="ph__dot">·</span>
+          <span class="ph__c-count">{{ s.count }} prices</span>
+        }
+        @if (bars().length) {
+          <span class="ph__c-spark" aria-hidden="true">
+            @for (h of bars(); track $index) {
+              <span class="ph__spark-bar" [style.height.%]="h"></span>
+            }
+          </span>
+        }
+      </div>
+    }
+  } @else if (hasData()) {
     <div class="ph">
       <p class="eyebrow">Price history</p>
 
