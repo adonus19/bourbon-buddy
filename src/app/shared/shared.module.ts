@@ -20,6 +20,7 @@ import { ListSkeletonComponent } from './components/list-skeleton/list-skeleton.
 import { OfflineSyncBadgeComponent } from './components/offline-sync-badge/offline-sync-badge.component';
 import { SimilarBottlesComponent } from './components/similar-bottles/similar-bottles.component';
 import { BottleHistoryComponent } from './components/bottle-history/bottle-history.component';
+import { PriceHistoryComponent } from './components/price-history/price-history.component';
 import { BottlePreviewSheetComponent } from './components/bottle-preview-sheet/bottle-preview-sheet.component';
 import { InputHelpersDirective } from './directives/input-helpers.directive';
 import { OnboardingModule } from './onboarding.module';
@@ -47,6 +48,7 @@ const COMPONENTS = [
   OfflineSyncBadgeComponent,
   SimilarBottlesComponent,
   BottleHistoryComponent,
+  PriceHistoryComponent,
   BottlePreviewSheetComponent,
 ];
 
