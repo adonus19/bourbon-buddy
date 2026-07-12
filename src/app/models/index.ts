@@ -7,6 +7,7 @@ export * from './log-entry.model';
 export * from './pour-session.model';
 export * from './wishlist-entry.model';
 export * from './sighting.model';
+export * from './price-history.model';
 export * from './bourbon.model';
 export * from './news-article.model';
 export * from './user-news-preferences.model';
