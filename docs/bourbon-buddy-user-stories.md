@@ -1427,6 +1427,222 @@ bottle I've had, **so that** I remember which pick I loved.
 
 ---
 
+## Epic 19: Price History *(Post-Social)*
+
+> A per-bottle **price timeline that genuinely accumulates over time** — the
+> OnlyDrams-style "pricing history" reframed to fit Bourbon Buddy's crowd-sourced
+> sightings and personal purchase log, with honest per-point provenance (never one
+> "magic value").
+>
+> **Core problem:** live `/sightings` are **hard-deleted at 30 days**
+> (`cleanupStaleSightings`), so crowd prices never accumulate into a history. Fix:
+> mint a **durable, immutable price point** in a new top-level **`/priceHistory`**
+> collection at sighting-creation time, mirroring `/sightings`' catalog-keyed shape
+> and friends/own visibility. Live `/sightings` continue to drive current-market /
+> best-price / freshness / map **unchanged**; `/priceHistory` is the growing
+> timeline. Each sighting mints exactly one point (1:1), so the timeline plots
+> `/priceHistory` alone and uses live sightings only for the "on shelves now"
+> annotation — no double-counting.
+>
+> **Two streams, always labeled separately:** durable crowd points (own +
+> friends-shared) **and** your own permanent purchase prices (`bottleHistory().priceTrend`,
+> derived from the already-loaded `LogEntryService.entries` signal — zero extra
+> reads). They share a time axis but never blend into an averaged number.
+>
+> **Cost discipline:** +1 tiny server write per sighting (bounded by the existing
+> BB-163 rate limit); detail-page reads are **two bounded one-shot `getDocs`** (own +
+> friends), merged and deduped like `nearbySightings()` — no listeners, no Firestore
+> in `computed`/`effect`. Pro-gating is deferred (10-user cohort); the component
+> reserves a gate hook for the monetization backlog (BB-141).
+>
+> **Dependency chain:** BB-202 → BB-203 → BB-204 → (BB-205, BB-206).
+
+### BB-202 — Durable Price-Point Store
+**As a** user, **I want** every price someone spots to be preserved as history,
+**so that** a bottle's price trend survives even after the live sighting expires at
+30 days.
+
+**AC:**
+- New top-level collection **`/priceHistory/{pointId}`** mirroring `/sightings`'
+  catalog-keyed shape: `bourbonId`, `price`, `sightingDate`, `storeName`, `city`,
+  `state`, `spotterUid`, `visibility` (`'private'|'friends'`, copied from the
+  sighting), `sourceSightingId`, `createdAt`.
+- Written **server-side inside the existing `logSighting` callable**, immediately
+  after the live sighting is created — one extra write, bounded by the BB-163
+  per-user rate limit. On the offline-outbox replay path it keys off the same
+  `clientId` so a replayed sighting can't double-write its point.
+- **Immutable:** `setStale`, confirm/dispute (BB-194), and sighting deletion
+  **never** touch the point; `cleanupStaleSightings` deletes only `/sightings`.
+- **Rules:** read = own always, friends' only when `visibility=='friends'` and the
+  requester is an accepted, non-blocked friend (copy of the `/sightings` read rule);
+  **create/update/delete = `if false`** (admin-SDK only).
+- **Indexes** added to `firestore.indexes.json`: `(bourbonId, spotterUid, sightingDate)`
+  and `(bourbonId, visibility, spotterUid, sightingDate)`.
+- **One-time backfill:** a bounded admin callable seeds `/priceHistory` from
+  currently-live `/sightings` so history doesn't start empty on launch.
+- Tests: callable writes the point with correct visibility/link; cleanup leaves
+  points intact; rules dry-run (own read / friend read / stranger denied /
+  client-write denied).
+
+**SP:** 5
+
+---
+
+### BB-203 — Price-History Read Service & Model
+**As a** developer, **I want** one service method that returns the visible price
+history for a bottle, **so that** the UI stays on the app's one-listener /
+bounded-read discipline.
+
+**AC:**
+- `PriceHistoryPoint` model added to the `models` barrel.
+- `priceHistoryForBottle(bourbonId, friendUids)` → **two bounded one-shot `getDocs`**
+  merged & deduped, mirroring `nearbySightings()`:
+  - own: `where('bourbonId','==',x).where('spotterUid','==',me)`
+  - friends: `where('bourbonId','==',x).where('visibility','==','friends').where('spotterUid','in',friendUids.slice(0,30))`
+- Returns points sorted oldest→newest; **pure** summary helpers (`median`, `min`,
+  `max`, `count`, windowed subset) live in `shared/utils/` (no Firestore).
+- No listener (detail pages are pull surfaces); no Firestore in `computed`/`effect`.
+- Tests: pure summary/dedupe helpers and the merge logic.
+
+**SP:** 3
+
+---
+
+### BB-204 — Price History Component (Timeline + Provenance)
+**As a** user, **I want** to see a bottle's price over time with where each price
+came from, **so that** I can judge whether a price is good without trusting one
+number.
+
+**AC:**
+- Shared `app-price-history` component (input `bourbonId`, optional `msrp`),
+  rendered **below `app-bottle-history`** on `log-entry/detail` and
+  `wishlist-entry/detail`.
+- **Sparkline/timeline** of points (reuse the Numbers-tab charting approach; no new
+  chart lib for sparse data).
+- **Summary row:** median · range · sample size · window ("6 prices · past 90 days ·
+  $54–$110").
+- **MSRP marker + delta** when catalog `msrp` exists (reuse the wishlist
+  "% above/below MSRP" logic).
+- **Provenance list:** each point tagged **You / Friend** · store-or-city · date;
+  live points (≤30 d) also show a freshness chip via `sightingFreshness()`.
+- **"On shelves now"** callout from live `/sightings` best-non-stale price (distinct
+  from the historical timeline).
+- **Empty state:** "No price data yet — log a purchase or spot it to start the
+  history."
+- Theme-aware, mobile-first, design tokens.
+- Component tests: timeline / summary / MSRP delta / empty state from mock data.
+
+**SP:** 5
+
+---
+
+### BB-205 — Personal Purchase-Price Series
+**As a** user, **I want** my own purchase prices shown alongside crowd sightings,
+**so that** I see what *I* actually paid across my rebuys.
+
+**AC:**
+- Fold the existing `bottleHistory().priceTrend` (permanent, from the already-loaded
+  `LogEntryService.entries` signal — **zero extra reads**) into `app-price-history`
+  as a **distinct, visually separated** series labeled "Your purchases."
+- Combined honestly on the same time axis; the two series never blend into one
+  averaged number.
+- Single-purchase bottles render a graceful point (no misleading "trend"),
+  consistent with BB-194.
+- Tests: series separation and the single-point graceful state.
+
+**SP:** 2
+
+---
+
+### BB-206 — Mini Price Sparkline in Preview Sheet
+**As a** user, **I want** a glance-able price sparkline when I peek a bottle,
+**so that** I get price context without opening the full detail page.
+
+**AC:**
+- Compact read-only sparkline variant of `app-price-history` embedded in
+  `bottle-preview-sheet` (thus surfaced from Release Radar **and** Similar Bottles).
+- Reuses the BB-203 service; degrades to nothing when there are no points (no
+  empty-state clutter in a sheet).
+- Tests: renders with points, renders nothing without.
+
+**SP:** 2
+
+---
+
+## Epic 20: Release Radar *(Post-Social)*
+
+> A browsable **"New & Noteworthy"** surface of bottles recently surfacing in the
+> news feed — a lightweight release radar built **entirely on already-extracted
+> `mentionedBottles`** (BB-130): **zero new backend, zero extra Firestore reads.**
+> Honestly framed as "spotted in the news," never "released."
+>
+> **Data:** a pure, tested `releaseRadar(articles)` derivation flattens each
+> article's cached `mentionedBottles`, **dedupes by `bourbonId`**, keeps the earliest
+> mention as `firstSeen` plus the source articles, and sorts newest-first — exposed
+> as a `computed()` over the already-loaded `NewsService` articles. Annotations
+> (taste-match, on-Hunt-List, in-Cellar) come from already-loaded signals.
+>
+> **Evolution (documented, not in this epic):** a `firstSeenInNewsAt` /
+> `isNewToCatalog` denormalization → real confidence states (possible → likely →
+> confirmed → available); then **TTB COLA** as the authoritative early-discovery +
+> label-facts upgrade (needs Cloud Run + an admin review queue; revisit at scale).
+>
+> **Dependency chain:** BB-207 → BB-208 → BB-209. Independent of Epic 19 — can run
+> in parallel (no backend).
+
+### BB-207 — Radar Derivation & Dispatch Segment
+**As a** user, **I want** a "New Bottles" view in my news tab, **so that** I can
+discover releases without reading every article.
+
+**AC:**
+- Dispatch tab gains a **`radar`** segment (`feed | read | saved | radar`).
+- Pure, tested util `releaseRadar(articles)` → flattens `mentionedBottles`,
+  **dedupes by `bourbonId`**, keeps earliest mention date as `firstSeen` + source
+  articles, sorts by `firstSeen` desc.
+- Exposed as a `computed()` over the already-loaded `NewsService` articles — **no
+  new Firestore reads, no listener.**
+- Honest framing: labeled "Spotted in the news," never "Released."
+- Tests for the derivation (dedupe, firstSeen, ordering, empty).
+
+**SP:** 5
+
+---
+
+### BB-208 — Radar Cards, Annotations & Actions
+**As a** user, **I want** each radar bottle to show whether it fits my taste and let
+me act on it, **so that** I can add promising bottles to my Hunt List fast.
+
+**AC:**
+- Card: bottle name · distillery · **category accent color** (honoring the Rye-green
+  / Irish-burgundy overrides) · **taste-match badge** (`TasteMatchService`, using the
+  flavor tags already denormalized on the mention) · "in N articles" · newest source
+  name + relative time.
+- **Annotations** from already-loaded signals: "On your Hunt List" / "In your Cellar."
+- **Actions:** **Add to Hunt List** (pre-fills from the mention, reusing hunt-list
+  add) and **View** → existing `BottlePreviewSheetComponent`.
+- Component tests: badge, annotations, and both actions.
+
+**SP:** 5
+
+---
+
+### BB-209 — Radar Filters, Empty State & First-Run Tip
+**As a** user, **I want** to hide bottles I already track and understand what Radar
+is, **so that** the list stays useful.
+
+**AC:**
+- "Hide bottles I've already logged/hunted" toggle (client-side over the loaded
+  signals).
+- Empty state when no new bottles in the window ("No new bottles in the news lately —
+  check back after the next feed refresh").
+- A just-in-time onboarding tip on first Radar visit, added to
+  `core/onboarding/tips.config.ts` (consistent with the Pass-2 contextual tips).
+- Tests: filter behavior and empty state.
+
+**SP:** 2
+
+---
+
 # Backlog (Not Yet Iteration-Scoped)
 
 ### BB-188 — Crowdsourced Flavor Aggregation
