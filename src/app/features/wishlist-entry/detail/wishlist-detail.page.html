@@ -185,6 +185,13 @@
         </div>
       }
 
+      <div class="section">
+        <app-price-history
+          [bourbonId]="e.bourbonId"
+          [msrp]="e.msrp ?? null"
+        ></app-price-history>
+      </div>
+
       <app-similar-bottles [bourbonId]="e.bourbonId" />
     </div>
   } @else {
