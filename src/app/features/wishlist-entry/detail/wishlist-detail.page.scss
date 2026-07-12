@@ -104,6 +104,18 @@
   border-top: 1px solid var(--color-border);
 }
 
+// Similar Bottles is a shared component whose root is a rounded `glass-surface`
+// card, so it isn't a `.section`. Separate it from the preceding section (e.g.
+// Price History) with a divider that floats in whitespace — margin above AND
+// padding below — so the full-width line reads as a section separator instead of
+// running across the card's rounded top corners. Mirrors the Cellar detail page.
+app-similar-bottles {
+  display: block;
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--color-border);
+}
+
 .wdetail__section-head {
   display: flex;
   align-items: center;
