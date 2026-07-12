@@ -207,4 +207,38 @@
     font-size: 13px;
     color: var(--color-text-secondary);
   }
+
+  // Compact mode (BB-206): a single glanceable row for the preview sheet.
+  &--compact {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+  }
+
+  &__c-icon {
+    font-size: 15px;
+    color: var(--color-amber-light);
+  }
+
+  &__c-median {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+  }
+
+  &__c-label,
+  &__c-count {
+    color: var(--color-text-secondary);
+  }
+
+  &__c-spark {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 20px;
+    width: 48px;
+    margin-left: auto;
+  }
 }

@@ -46,6 +46,13 @@ export class PriceHistoryComponent implements OnInit {
 
   readonly bourbonId = input.required<string>();
   readonly msrp = input<number | null>(null);
+  /**
+   * Compact mode (BB-206): a one-line crowd-price readout + mini sparkline for
+   * embedding in the bottle preview sheet. Read-only, no provenance list, no
+   * "Your purchases", and — crucially — no empty state: with no crowd prices it
+   * renders nothing rather than cluttering the sheet.
+   */
+  readonly compact = input(false);
 
   /** Points within this many days count as "fresh" (still likely on the shelf). */
   private static readonly FRESH_DAYS = 15;
