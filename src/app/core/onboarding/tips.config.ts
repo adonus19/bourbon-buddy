@@ -43,6 +43,14 @@ export const TIPS = {
     title: 'Let the robot read for you',
     body: 'We pull the bottles worth chasing out of each story so you can drop them straight onto your Hunt List. No skimming required.',
   },
+  /** Dispatch — the Release Radar of bottles surfacing in the news. */
+  releaseRadar: {
+    key: 'release-radar',
+    anchor: 'dispatch-radar',
+    placement: 'auto',
+    title: 'New bottles, on the radar',
+    body: 'Every bottle the news is talking about, gathered in one place — newest first. Add the ones worth chasing to your Hunt List, and hide what you already track.',
+  },
   /** Friends — the sightings map + taste matches. */
   social: {
     key: 'social',

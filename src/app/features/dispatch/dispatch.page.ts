@@ -14,18 +14,25 @@ import {
 } from '@ionic/angular';
 
 import {
+  ACTIVE_WISHLIST_STATUSES,
   ArticleState,
   MentionedBottle,
   NewsArticle,
 } from '../../models';
 import { NewsService } from '../../core/services/news.service';
+import { LogEntryService } from '../../core/services/log-entry.service';
+import { WishlistService } from '../../core/services/wishlist.service';
 import { TasteMatchService } from '../../core/services/taste-match.service';
 import { OnboardingService } from '../../core/onboarding/onboarding.service';
 import { TIPS } from '../../core/onboarding/tips.config';
 import { BottlePreviewSheetComponent } from '../../shared/components/bottle-preview-sheet/bottle-preview-sheet.component';
 import { relativeTime } from '../../shared/utils/relative-time';
 import { isWatched, passesPrefs } from '../../shared/utils/news-filter';
-import { RadarBottle, releaseRadar } from '../../shared/utils/release-radar';
+import {
+  RadarBottle,
+  releaseRadar,
+  withoutTracked,
+} from '../../shared/utils/release-radar';
 import {
   NEWS_SOURCE_NAMES,
   NEWS_WINDOWS,
@@ -42,6 +49,8 @@ type Segment = 'feed' | 'read' | 'saved' | 'radar';
 })
 export class DispatchPage implements ViewWillEnter {
   private readonly news = inject(NewsService);
+  private readonly log = inject(LogEntryService);
+  private readonly wishlist = inject(WishlistService);
   private readonly tasteMatch = inject(TasteMatchService);
   private readonly modalCtrl = inject(ModalController);
   private readonly toast = inject(ToastController);
@@ -103,6 +112,27 @@ export class DispatchPage implements ViewWillEnter {
     releaseRadar(this.news.articles())
   );
 
+  /** "Hide ones I track" toggle (BB-209). */
+  readonly hideTracked = signal(false);
+
+  /** Catalog ids the user already tracks — their Cellar + active Hunt List. */
+  private readonly trackedIds = computed<Set<string>>(() => {
+    const ids = new Set(this.log.entries().map((e) => e.bourbonId));
+    for (const e of this.wishlist.entries()) {
+      if (ACTIVE_WISHLIST_STATUSES.includes(e.status)) {
+        ids.add(e.bourbonId);
+      }
+    }
+    return ids;
+  });
+
+  /** Radar after the optional "hide tracked" filter. */
+  readonly visibleRadar = computed<RadarBottle[]>(() =>
+    this.hideTracked()
+      ? withoutTracked(this.radarBottles(), this.trackedIds())
+      : this.radarBottles()
+  );
+
   watched(a: NewsArticle): boolean {
     return isWatched(a, this.news.effectivePrefs());
   }
@@ -119,6 +149,10 @@ export class DispatchPage implements ViewWillEnter {
     this.segment.set(value);
     if (value === 'saved') {
       void this.news.loadSaved();
+    } else if (value === 'radar') {
+      // Fire the first-run tip once the radar list has had a moment to render an
+      // anchor; skipped (unmarked) when the radar is empty, so it retries later.
+      setTimeout(() => void this.onboarding.showTipOnce(TIPS.releaseRadar), 800);
     }
   }
 
