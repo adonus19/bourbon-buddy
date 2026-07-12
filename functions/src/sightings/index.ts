@@ -15,9 +15,13 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 
 import { isPresenceVerified } from "./presence";
+import {
+  priceHistoryPoint,
+  priceHistoryPointFromSighting,
+} from "./price-history";
 import { DAY_MS, LogSightingData, validate } from "./validate";
 import { encodeGeohash } from "../shared/geohash";
-import { ENFORCE_APP_CHECK } from "../shared/guards";
+import { ENFORCE_APP_CHECK, requireAdmin } from "../shared/guards";
 
 const DAILY_SIGHTING_LIMIT = 40;
 // BB-171: sightings go stale at 30 days, so drop them at 30 rather than 90.
@@ -113,6 +117,16 @@ export const logSighting = onCall(
       visibility: v.visibility,
       createdAt: FieldValue.serverTimestamp(),
     });
+
+    // Durable price history (BB-202): mint one immutable point per sighting so
+    // crowd prices survive the 30-day sighting purge. The point id IS the
+    // sighting id (1:1), which keeps the backfill idempotent. Same transaction,
+    // so it only writes on a genuine create — the idempotent replay above
+    // returned before reaching here.
+    tx.set(
+      db.collection("priceHistory").doc(sightingRef.id),
+      priceHistoryPoint(v, d, uid, sightingRef.id, FieldValue.serverTimestamp())
+    );
     return false;
   });
 
@@ -149,5 +163,49 @@ export const cleanupStaleSightings = onSchedule(
       }
     }
     logger.info(`cleanupStaleSightings removed ${deleted} sightings.`);
+  }
+);
+
+/**
+ * One-time seed (BB-202): backfill /priceHistory from currently-live /sightings
+ * so the timeline doesn't start empty at launch. Admin-only (it writes across
+ * users). Idempotent — points are keyed by sighting id and carry the sighting's
+ * own createdAt, so re-running overwrites identical data rather than duplicating.
+ */
+const BACKFILL_DEFAULT = 200;
+const BACKFILL_MAX = 1000;
+const BACKFILL_WRITE_CHUNK = 400; // Firestore batched-write cap is 500
+
+export const backfillPriceHistory = onCall(
+  { region: "us-central1", timeoutSeconds: 540, enforceAppCheck: ENFORCE_APP_CHECK },
+  async (request) => {
+    requireAdmin(request);
+    const requested = Number((request.data as { limit?: number })?.limit);
+    const limit = Math.min(
+      Math.max(Number.isFinite(requested) ? requested : BACKFILL_DEFAULT, 1),
+      BACKFILL_MAX
+    );
+
+    const db = getFirestore();
+    const snap = await db
+      .collection("sightings")
+      .orderBy("createdAt", "desc")
+      .limit(limit)
+      .get();
+
+    let written = 0;
+    for (let i = 0; i < snap.docs.length; i += BACKFILL_WRITE_CHUNK) {
+      const batch = db.batch();
+      for (const doc of snap.docs.slice(i, i + BACKFILL_WRITE_CHUNK)) {
+        batch.set(
+          db.collection("priceHistory").doc(doc.id),
+          priceHistoryPointFromSighting(doc.id, doc.data())
+        );
+        written++;
+      }
+      await batch.commit();
+    }
+    logger.info(`backfillPriceHistory wrote ${written} of ${snap.size} scanned.`);
+    return { scanned: snap.size, written };
   }
 );

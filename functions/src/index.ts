@@ -18,7 +18,12 @@ export { sendTestNotification, cleanupOldNotifications } from "./notifications";
 export { onSightingCreated } from "./alerts";
 
 // Sighting guards (BB-163): rate-limited create callable + stale cleanup.
-export { logSighting, cleanupStaleSightings } from "./sightings";
+// backfillPriceHistory (BB-202): one-time seed of /priceHistory from live sightings.
+export {
+  logSighting,
+  cleanupStaleSightings,
+  backfillPriceHistory,
+} from "./sightings";
 // Community confirmation (BB-194): presence-gated confirm/dispute votes.
 export { confirmSighting } from "./sightings/confirm";
 

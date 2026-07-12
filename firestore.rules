@@ -188,6 +188,21 @@ service cloud.firestore {
                     && resource.data.spotterUid == request.auth.uid;
     }
 
+    // Durable price history (BB-202). One immutable point per sighting, minted by
+    // the logSighting callable (Admin SDK) so crowd prices survive the 30-day
+    // sighting purge. Same read model as /sightings — the spotter always, and the
+    // spotter's friends when shared. ALL client writes are denied: points are
+    // write-once and never edited or deleted (re-dating/re-pricing would forge the
+    // history); the callable and the backfill use the Admin SDK, which bypasses
+    // these rules.
+    match /priceHistory/{pointId} {
+      allow read: if isSignedIn()
+                  && (resource.data.spotterUid == request.auth.uid
+                      || (resource.data.visibility == 'friends'
+                          && exists(/databases/$(database)/documents/users/$(resource.data.spotterUid)/friends/$(request.auth.uid))));
+      allow write: if false;
+    }
+
     // Friend requests (BB-101/102). Visible to the two parties only. CREATE is
     // denied: all creation goes through the `sendFriendRequest` callable, which
     // enforces the self/block/duplicate checks and a per-user daily rate limit.
