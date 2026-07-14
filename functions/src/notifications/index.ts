@@ -1,19 +1,16 @@
 /**
  * Notification delivery (BB-090 backend).
  *
- * `sendNotificationToUser` is the reusable send-helper every future alert
- * (sighting match, price alert, friend request, news digest) calls. It honors
- * the user's preferences, fans out to all their devices, and prunes dead tokens.
- *
- * `sendTestNotification` is a callable the app uses to verify the whole loop.
+ * `sendNotificationToUser` is the reusable send-helper every alert (sighting
+ * match, price alert, friend request, news digest, access request) calls. It
+ * honors the user's preferences, fans out to all their devices, and prunes
+ * dead tokens. (The BB-090-era `sendTestNotification` callable was removed in
+ * BB-213 — it was dev scaffolding visible to every user.)
  */
 import { FieldValue, getFirestore, Timestamp } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
 import { logger } from "firebase-functions/v2";
-import { onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-
-import { ENFORCE_APP_CHECK, requireApproved } from "../shared/guards";
 
 export type NotificationType =
   | "sightingMatch"
@@ -164,19 +161,3 @@ export const cleanupOldNotifications = onSchedule(
   }
 );
 
-export const sendTestNotification = onCall(
-  { region: "us-central1", enforceAppCheck: ENFORCE_APP_CHECK },
-  async (request) => {
-    const uid = requireApproved(request);
-    const sent = await sendNotificationToUser(uid, {
-      title: "Bourbon Buddy",
-      body: "🥃 Test notification — your push is working.",
-      link: "/tabs/dispatch",
-      // Carry a badge so the test also exercises the app-icon badge (BB-093).
-      // (The untyped test writes no inbox record, so the count is a stand-in;
-      // opening the app resyncs the badge to the real unread total.)
-      data: { badge: "1" },
-    });
-    return { sent };
-  }
-);
