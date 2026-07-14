@@ -1,0 +1,23 @@
+@use '../auth-styles' as *;
+
+.pending-state {
+  text-align: center;
+  margin: 24px 0 32px;
+
+  &__icon {
+    font-size: 44px;
+    color: var(--ion-color-primary);
+    margin-bottom: 12px;
+  }
+
+  &__spinner {
+    width: 40px;
+    height: 40px;
+    color: var(--ion-color-primary);
+    margin-bottom: 12px;
+  }
+}
+
+.pending-signout {
+  margin-top: 8px;
+}

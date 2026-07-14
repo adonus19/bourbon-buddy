@@ -1,8 +1,9 @@
-import { Injectable, Signal, computed, inject } from '@angular/core';
+import { Injectable, Signal, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import {
   Auth,
   GoogleAuthProvider,
+  ParsedToken,
   User,
   authState,
   createUserWithEmailAndPassword,
@@ -17,6 +18,15 @@ import { shareReplay, switchMap } from 'rxjs/operators';
 
 import { UserProfile } from '../../models';
 import { UserService } from '../services/user.service';
+
+/**
+ * Gated access (BB-210/211): does this ID token grant entry? Mirrors the
+ * `isApproved()` rules helper — the `approved` claim, or `admin` (so the owner
+ * can never lock themself out).
+ */
+export function hasAccessClaims(claims: ParsedToken): boolean {
+  return claims['approved'] === true || claims['admin'] === true;
+}
 
 /**
  * Session state holder. Owns the auth state and the current user's profile,
@@ -56,6 +66,49 @@ export class AuthService {
   );
 
   readonly isAuthenticated = computed(() => !!this.currentUser());
+
+  /**
+   * Whether the current ID token carries an access-granting claim (BB-211).
+   * `undefined` = not resolved yet for the current user; `false` = signed out
+   * or unapproved. Fed from the CACHED token (no network) on every auth-state
+   * change; `refreshClaims()` is the explicit network path used when the
+   * pending screen sees the profile flip to approved.
+   */
+  private readonly approvedClaimState = signal<boolean | undefined>(undefined);
+  readonly approvedClaim = this.approvedClaimState.asReadonly();
+
+  constructor() {
+    // Piggybacks on the single shared auth stream — no extra Firebase
+    // listener. getIdTokenResult() here reads the locally cached token.
+    this.currentUser$.subscribe((user) => void this.resolveClaims(user));
+  }
+
+  private async resolveClaims(user: User | null): Promise<void> {
+    if (!user) {
+      this.approvedClaimState.set(false);
+      return;
+    }
+    const { claims } = await user.getIdTokenResult();
+    this.approvedClaimState.set(hasAccessClaims(claims));
+  }
+
+  /**
+   * Force-refreshes the ID token so newly minted custom claims (approval just
+   * granted) take effect without a re-login, and returns whether access is now
+   * granted. Auth-only network call — nothing here touches Firestore.
+   */
+  async refreshClaims(): Promise<boolean> {
+    const user = this.auth.currentUser;
+    if (!user) {
+      this.approvedClaimState.set(false);
+      return false;
+    }
+    await user.getIdToken(true);
+    const { claims } = await user.getIdTokenResult();
+    const granted = hasAccessClaims(claims);
+    this.approvedClaimState.set(granted);
+    return granted;
+  }
 
   /**
    * The signed-in user's profile document, fed by the single shared auth

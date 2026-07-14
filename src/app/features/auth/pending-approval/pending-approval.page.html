@@ -1,0 +1,54 @@
+<ion-content class="auth-content" [fullscreen]="true">
+  <div class="auth-shell">
+    <div class="auth-header">
+      <img
+        class="auth-header__badge"
+        src="assets/icon/bb-badge.png"
+        alt="Bourbon Buddy"
+      />
+      <app-wordmark [size]="34"></app-wordmark>
+      <p class="auth-header__tagline">Every dram, remembered.</p>
+    </div>
+
+    @switch (state()) {
+      @case ('checking') {
+        <div class="pending-state">
+          <ion-spinner name="crescent" class="pending-state__spinner"></ion-spinner>
+          <h1 class="auth-title">Setting up your account&hellip;</h1>
+          <p class="auth-subtitle">This only takes a moment.</p>
+        </div>
+      }
+      @case ('pending') {
+        <div class="pending-state">
+          <ion-icon name="hourglass-outline" class="pending-state__icon"></ion-icon>
+          <h1 class="auth-title">Almost there.</h1>
+          <p class="auth-subtitle">
+            Bourbon Buddy is invite-only. The owner's been notified about your
+            signup &mdash; as soon as you're approved, this page will let you
+            straight in. No need to sign up again.
+          </p>
+        </div>
+      }
+      @case ('denied') {
+        <div class="pending-state">
+          <ion-icon name="lock-closed-outline" class="pending-state__icon"></ion-icon>
+          <h1 class="auth-title">Access not granted.</h1>
+          <p class="auth-subtitle">
+            Your request wasn't approved. If you think that's a mistake, reach
+            out to the person who shared Bourbon Buddy with you.
+          </p>
+        </div>
+      }
+    }
+
+    <ion-button
+      class="auth-social-btn pending-signout"
+      expand="block"
+      fill="outline"
+      (click)="signOut()"
+    >
+      <ion-icon name="log-out-outline" slot="start"></ion-icon>
+      Sign out
+    </ion-button>
+  </div>
+</ion-content>
