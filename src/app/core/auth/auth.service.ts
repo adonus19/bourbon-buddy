@@ -77,6 +77,14 @@ export class AuthService {
   private readonly approvedClaimState = signal<boolean | undefined>(undefined);
   readonly approvedClaim = this.approvedClaimState.asReadonly();
 
+  /**
+   * Whether the current token carries `admin: true` (BB-212) — gates the
+   * owner-tools Settings entry and the /admin route. Same cached-token
+   * plumbing as approvedClaim.
+   */
+  private readonly adminClaimState = signal<boolean | undefined>(undefined);
+  readonly adminClaim = this.adminClaimState.asReadonly();
+
   constructor() {
     // Piggybacks on the single shared auth stream — no extra Firebase
     // listener. getIdTokenResult() here reads the locally cached token.
@@ -86,10 +94,12 @@ export class AuthService {
   private async resolveClaims(user: User | null): Promise<void> {
     if (!user) {
       this.approvedClaimState.set(false);
+      this.adminClaimState.set(false);
       return;
     }
     const { claims } = await user.getIdTokenResult();
     this.approvedClaimState.set(hasAccessClaims(claims));
+    this.adminClaimState.set(claims['admin'] === true);
   }
 
   /**
@@ -107,6 +117,7 @@ export class AuthService {
     const { claims } = await user.getIdTokenResult();
     const granted = hasAccessClaims(claims);
     this.approvedClaimState.set(granted);
+    this.adminClaimState.set(claims['admin'] === true);
     return granted;
   }
 

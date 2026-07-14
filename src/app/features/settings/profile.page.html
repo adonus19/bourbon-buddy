@@ -242,6 +242,20 @@
       Notification settings
     </ion-button>
 
+    @if (isAdmin()) {
+      <p class="eyebrow profile__section">Owner tools</p>
+
+      <ion-button
+        class="profile__account-btn"
+        expand="block"
+        fill="outline"
+        routerLink="/admin"
+      >
+        <ion-icon name="key-outline" slot="start"></ion-icon>
+        Access requests &amp; allowlist
+      </ion-button>
+    }
+
     <p class="eyebrow profile__section">Help</p>
 
     <ion-button

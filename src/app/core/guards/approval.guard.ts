@@ -39,3 +39,20 @@ export const pendingOnlyGuard: CanActivateFn = async () => {
   const { claims } = await user.getIdTokenResult();
   return hasAccessClaims(claims) ? router.createUrlTree(['/tabs']) : true;
 };
+
+/**
+ * Owner tools (BB-212): the /admin route needs the `admin: true` claim.
+ * Non-admins are quietly sent to the app rather than shown an error — the
+ * entry point is hidden from them anyway, and rules deny the data regardless.
+ */
+export const adminGuard: CanActivateFn = async () => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+
+  const user = await firstValueFrom(auth.currentUser$);
+  if (!user) {
+    return router.createUrlTree(['/login']);
+  }
+  const { claims } = await user.getIdTokenResult();
+  return claims['admin'] === true ? true : router.createUrlTree(['/tabs']);
+};

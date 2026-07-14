@@ -49,6 +49,8 @@ export class ProfilePage {
   // Already-loaded signals from the session state holder — no new Firebase reads.
   readonly user = this.auth.currentUser;
   readonly profile = this.auth.profile;
+  /** Shows the owner-tools entry (BB-212); false for everyone but the admin. */
+  readonly isAdmin = this.auth.adminClaim;
 
   /** Only email/password users can change a password. */
   readonly hasPasswordProvider = computed(
