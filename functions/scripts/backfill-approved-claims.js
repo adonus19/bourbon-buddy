@@ -20,7 +20,10 @@ const { getFirestore } = require("firebase-admin/firestore");
 
 async function main() {
   const dryRun = process.argv.includes("--dry-run");
-  initializeApp();
+  // Explicit projectId: with bare user ADC the Identity Toolkit API rejects
+  // unattributed requests (403 "requires a quota project"); pinning the
+  // project here routes/attributes them correctly.
+  initializeApp({ projectId: process.env.GCLOUD_PROJECT ?? "bourbonbuddy-dev" });
   const auth = getAuth();
   const db = getFirestore();
 

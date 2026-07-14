@@ -5,11 +5,36 @@
     </ion-buttons>
     <ion-title>Inbox</ion-title>
     <ion-buttons slot="end">
-      @if (hasUnread()) {
-        <ion-button (click)="markAllRead()">Mark all read</ion-button>
+      @if (editMode()) {
+        <ion-button (click)="exitEdit()"><strong>Done</strong></ion-button>
+      } @else if (items().length) {
+        @if (hasUnread()) {
+          <ion-button (click)="markAllRead()">Mark all read</ion-button>
+        }
+        <ion-button (click)="enterEdit()">Edit</ion-button>
       }
     </ion-buttons>
   </ion-toolbar>
+
+  @if (editMode()) {
+    <ion-toolbar class="inbox-edit-bar">
+      <ion-buttons slot="start">
+        @if (items().length > 1) {
+          <ion-button (click)="toggleSelectAll()">
+            {{ allSelected() ? 'Clear all' : 'Select all' }}
+          </ion-button>
+        }
+      </ion-buttons>
+      <ion-buttons slot="end">
+        @if (selected().size) {
+          <ion-button color="danger" (click)="deleteSelected()">
+            <ion-icon name="trash-outline" slot="start"></ion-icon>
+            Delete ({{ selected().size }})
+          </ion-button>
+        }
+      </ion-buttons>
+    </ion-toolbar>
+  }
 </ion-header>
 
 <ion-content [fullscreen]="true" class="inbox-content">
@@ -24,24 +49,46 @@
   } @else {
     <div class="inbox">
       @for (n of items(); track n.id) {
-        <button
-          class="inbox__item"
-          [class.inbox__item--unread]="!n.read"
-          type="button"
-          (click)="open(n)"
-        >
-          <div class="inbox__icon">
-            <ion-icon [name]="icon(n.type)"></ion-icon>
-          </div>
-          <div class="inbox__body">
-            <p class="inbox__title">{{ n.title }}</p>
-            <p class="inbox__text">{{ n.body }}</p>
-            <p class="inbox__time">{{ when(n) }}</p>
-          </div>
-          @if (!n.read) {
-            <span class="inbox__dot" aria-label="Unread"></span>
-          }
-        </button>
+        <ion-item-sliding [disabled]="editMode()">
+          <ion-item
+            button
+            lines="full"
+            class="inbox__row"
+            [class.inbox__row--unread]="!n.read"
+            (click)="open(n)"
+          >
+            @if (editMode()) {
+              <ion-checkbox
+                slot="start"
+                class="inbox__check"
+                [checked]="n.id ? selected().has(n.id) : false"
+                aria-label="Select notification"
+              ></ion-checkbox>
+            }
+            <div class="inbox__item">
+              <div class="inbox__icon">
+                <ion-icon [name]="icon(n.type)"></ion-icon>
+              </div>
+              <div class="inbox__body">
+                <p class="inbox__title">{{ n.title }}</p>
+                <p class="inbox__text">{{ n.body }}</p>
+                <p class="inbox__time">{{ when(n) }}</p>
+              </div>
+              @if (!n.read) {
+                <span class="inbox__dot" aria-label="Unread"></span>
+              }
+            </div>
+          </ion-item>
+          <ion-item-options side="end">
+            <ion-item-option
+              color="danger"
+              aria-label="Delete notification"
+              (click)="deleteOne(n)"
+            >
+              <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+            </ion-item-option>
+          </ion-item-options>
+        </ion-item-sliding>
       }
     </div>
   }

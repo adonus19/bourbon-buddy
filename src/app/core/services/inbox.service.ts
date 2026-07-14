@@ -96,6 +96,24 @@ export class InboxService {
     this.applyAppBadge(0);
   }
 
+  /**
+   * Deletes notifications outright (BB-214: user-pruned inbox — edit mode and
+   * swipe-to-delete). One batched write (list is capped at 50, well under the
+   * 500-op batch limit), then a badge resync since unread items may have gone.
+   */
+  async remove(ids: string[]): Promise<void> {
+    const uid = this.auth.snapshotUser?.uid;
+    if (!uid || !ids.length) {
+      return;
+    }
+    const batch = writeBatch(this.firestore);
+    for (const id of ids) {
+      batch.delete(doc(this.firestore, `users/${uid}/notifications/${id}`));
+    }
+    await batch.commit();
+    void this.unreadCount();
+  }
+
   /** Clear the OS app-icon badge, e.g. on sign-out (BB-093). */
   clearAppBadge(): void {
     this.applyAppBadge(0);
