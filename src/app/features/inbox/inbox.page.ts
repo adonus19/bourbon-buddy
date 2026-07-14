@@ -11,6 +11,7 @@ const TYPE_ICON: Record<NotificationType, string> = {
   priceAlert: 'trending-down',
   friendRequest: 'person-add',
   newsDigest: 'newspaper',
+  accessRequest: 'key',
 };
 
 /**

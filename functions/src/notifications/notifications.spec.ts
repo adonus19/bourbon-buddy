@@ -47,6 +47,18 @@ describe("sendNotificationToUser", () => {
     expect(sendEachForMulticast).not.toHaveBeenCalled();
   });
 
+  it("delivers accessRequest without consulting prefs (BB-210)", async () => {
+    tokensGet.mockResolvedValue(tokensSnap(["t1"]));
+    sendEachForMulticast.mockResolvedValue({
+      successCount: 1,
+      responses: [{ success: true }],
+    });
+    const sent = await sendNotificationToUser("u1", payload, "accessRequest");
+    expect(sent).toBe(1);
+    expect(prefsGet).not.toHaveBeenCalled(); // per-type prefs & pausedAll bypassed
+    expect(addFn).toHaveBeenCalledTimes(1); // inbox record still written
+  });
+
   it("writes an inbox record even when there are no devices", async () => {
     prefsGet.mockResolvedValue(prefsSnap({ friendRequest: true }));
     tokensGet.mockResolvedValue(tokensSnap([]));

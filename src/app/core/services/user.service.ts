@@ -52,11 +52,18 @@ export class UserService {
   async ensureProfile(user: User): Promise<void> {
     const ref = this.userDocRef(user.uid);
     const snapshot = await getDoc(ref);
+    const existing = snapshot.exists()
+      ? (snapshot.data() as UserProfile)
+      : undefined;
 
     let profile: UserProfile;
-    if (snapshot.exists()) {
-      profile = snapshot.data() as UserProfile;
+    if (existing?.createdAt) {
+      profile = existing;
     } else {
+      // Missing doc — or a doc without createdAt, which means the BB-210
+      // access trigger won the signup race and wrote accessStatus first.
+      // merge:true fills in the profile fields WITHOUT clobbering that status
+      // (which rules forbid the owner from touching anyway).
       const created = {
         displayName:
           user.displayName ?? user.email?.split('@')[0] ?? 'Bourbon Buddy',
@@ -70,8 +77,8 @@ export class UserService {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
-      await setDoc(ref, created);
-      profile = created as unknown as UserProfile;
+      await setDoc(ref, created, { merge: true });
+      profile = { ...existing, ...created } as unknown as UserProfile;
     }
 
     const pubRef = this.publicDocRef(user.uid);

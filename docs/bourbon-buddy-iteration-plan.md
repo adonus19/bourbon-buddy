@@ -508,7 +508,27 @@ collects, no scraping.
 (`firstSeenInNewsAt` / `isNewToCatalog`) and the **TTB COLA** authoritative
 upgrade (needs Cloud Run + an admin review queue) — revisit at scale.
 
-**After R9** the backlog remains — **Gamification (Phase 5)** is top of the list,
+### Iteration R10 — Gated Access & Notification Housekeeping (~22 SP)
+**Stories:** Epic 21 — BB-210, BB-211, BB-212 (18 SP);
+Epic 22 — BB-213, BB-214 (4 SP).
+**Goal:** The app is now shared with friends — close the door to strangers and
+clean up notification loose ends.
+- **Gated Access (Epic 21):** anyone can sign up, but a new account has no access
+  until approved. Enforcement is an `approved: true` **custom claim** checked by
+  Security Rules and callables (zero extra reads). Allowlisted + verified emails
+  auto-approve in seconds; everyone else lands in a pending queue, the owner gets
+  a push, and an admin screen (approve/deny + allowlist manager) waves friends
+  in. Deny is soft. Chain: BB-210 (backend + rules) → BB-211 (pending flow) →
+  BB-212 (admin screen).
+  **⚠ Rollout order (lockout hazard):** deploy functions → run
+  `backfill-approved-claims.js` (must merge claims, preserving `admin`) → deploy
+  app → **deploy rules LAST**.
+- **Notification Housekeeping (Epic 22):** remove the dev-era test-notification
+  button/callable (visible to every user today — BB-213), and let users prune
+  their inbox with an edit mode (multi-select + select-all, no confirm) plus
+  swipe-to-delete (BB-214).
+
+**After R10** the backlog remains — **Gamification (Phase 5)** is top of the list,
 then **Crowdsourced Flavor Aggregation (BB-188)**, **Nearby Venue Picker
 (BB-189)**, and **News Full-Text Search (BB-190)**.
 

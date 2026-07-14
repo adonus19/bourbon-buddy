@@ -4,7 +4,12 @@ jest.mock("firebase-admin/firestore", () => ({
   FieldValue: { serverTimestamp: () => "SERVER_TS" },
 }));
 
-import { consumeDailyLimit, requireAdmin, todayKey } from "./guards";
+import {
+  consumeDailyLimit,
+  requireAdmin,
+  requireApproved,
+  todayKey,
+} from "./guards";
 
 type TxData = Record<string, unknown> | undefined;
 
@@ -87,5 +92,45 @@ describe("requireAdmin", () => {
 
   it("returns the uid for a real admin", () => {
     expect(requireAdmin(req({ uid: "u1", token: { admin: true } }))).toBe("u1");
+  });
+});
+
+describe("requireApproved", () => {
+  const req = (auth: unknown) => ({ auth }) as never;
+
+  it("rejects signed-out callers as unauthenticated", () => {
+    try {
+      requireApproved(req(undefined));
+      fail("should have thrown");
+    } catch (e) {
+      expect((e as HttpsError).code).toBe("unauthenticated");
+    }
+  });
+
+  it("rejects signed-in-but-unapproved callers with permission-denied", () => {
+    try {
+      requireApproved(req({ uid: "u1", token: {} }));
+      fail("should have thrown");
+    } catch (e) {
+      expect((e as HttpsError).code).toBe("permission-denied");
+    }
+  });
+
+  it("rejects a truthy-but-not-true approved claim", () => {
+    expect(() =>
+      requireApproved(req({ uid: "u1", token: { approved: "yes" } }))
+    ).toThrow(HttpsError);
+  });
+
+  it("returns the uid for an approved user", () => {
+    expect(
+      requireApproved(req({ uid: "u1", token: { approved: true } }))
+    ).toBe("u1");
+  });
+
+  it("lets an admin through even without the approved claim", () => {
+    expect(requireApproved(req({ uid: "u1", token: { admin: true } }))).toBe(
+      "u1"
+    );
   });
 });

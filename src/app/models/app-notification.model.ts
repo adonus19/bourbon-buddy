@@ -5,7 +5,10 @@ export type NotificationType =
   | 'sightingMatch'
   | 'priceAlert'
   | 'friendRequest'
-  | 'newsDigest';
+  | 'newsDigest'
+  // Gated access (BB-210): admin's new-signup alert AND the "you're in"
+  // welcome. Operational — the server delivers it regardless of prefs.
+  | 'accessRequest';
 
 /**
  * In-app inbox record (BB-113). Written at /users/{uid}/notifications/{id} by

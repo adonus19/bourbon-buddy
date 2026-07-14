@@ -1,11 +1,19 @@
 import { Timestamp } from '@angular/fire/firestore';
 import { SightingVisibility } from './sighting.model';
 
+/**
+ * Gated access (BB-210). UI mirror of the `approved` custom claim — written
+ * ONLY by the Admin SDK (access trigger/callables/backfill); Security Rules
+ * reject any owner write touching it. Absent on legacy docs until backfilled.
+ */
+export type AccessStatus = 'pending' | 'approved' | 'denied';
+
 // Collection: /users/{userId}  (document ID = Firebase Auth UID)
 export interface UserProfile {
   id?: string;
   displayName: string;
   email: string;
+  accessStatus?: AccessStatus;
   avatarUrl?: string | null;
   bio?: string | null;
   homeRegion?: string | null;

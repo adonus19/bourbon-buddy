@@ -1643,6 +1643,185 @@ is, **so that** the list stays useful.
 
 ---
 
+## Epic 21: Gated Access *(Post-Social — app is now shared with friends)*
+
+> The app is invite-gated: **anyone can create an account, but a new account has
+> no access until approved.** Enforcement is an `approved: true` **custom claim**
+> checked by Security Rules and callables — server-side, zero extra reads (the
+> claim rides in the auth token). Two paths in: the signup email is on the
+> owner-managed **allowlist** (auto-approved in seconds, if the email is
+> verified), or the owner **manually approves** from an admin screen after a push
+> notification. Deny is soft (status only, account not disabled, reversible).
+> A stranger's blast radius: one Auth record + one profile doc they alone can see.
+>
+> **Dependency chain:** BB-210 → BB-211 → BB-212.
+>
+> **⚠ Rollout order (lockout hazard):** deploy functions → run
+> `backfill-approved-claims.js` (stamps every existing user; MUST merge claims —
+> `setCustomUserClaims` replaces, and would otherwise strip the owner's `admin`
+> claim) → deploy app → **deploy rules LAST**. The door only closes at the rules
+> deploy; existing sessions pick the claim up at their hourly token refresh.
+
+### BB-210 — Access Backend: Allowlist, Claims & Rules
+**As the** app owner, **I want** new accounts gated behind my allowlist or my
+explicit approval, **so that** only people I've allowed can use the app.
+
+**AC:**
+- New collection **`/accessAllowlist/{emailLower}`** — doc ID is the lowercased
+  email (dedupe for free); fields `note: string | null`, `addedAt: Timestamp`.
+  Rules: read/write only with the `admin` claim.
+- New profile field **`users/{uid}.accessStatus`**: `'pending' | 'approved' |
+  'denied'` — written **only** by the Admin SDK; rules reject any owner write
+  that creates or changes it. Added to the `UserProfile` model + data-model doc.
+- **`onAuthUserCreated`** (v1 Auth trigger `auth.user().onCreate` — fires for
+  every provider, no Identity Platform upgrade) in `functions/src/access/`:
+  - Email on allowlist **and** `emailVerified` (Google sign-ins always are) →
+    set `approved: true` custom claim (merged with existing claims, never
+    replacing) + merge `accessStatus: 'approved'` into the profile doc.
+  - Otherwise → merge `accessStatus: 'pending'` + notify the admin: push + inbox
+    record via `sendNotificationToUser`, new **`accessRequest`** notification
+    type **delivered regardless of per-type prefs** (operational, must never be
+    lost), deep link `/admin`. An allowlisted-but-unverified email is called out
+    in the notification body so the owner can one-tap approve.
+  - Admin UID supplied via a `defineString` functions param.
+- **`approveUser` / `denyUser` callables**, gated by the existing `requireAdmin`:
+  - Approve: merge `approved` claim + `accessStatus: 'approved'` + upsert the
+    email into `/accessAllowlist` (a deleted-and-recreated account self-heals) +
+    push "You're in 🥃" to the new user.
+  - Deny: `accessStatus: 'denied'` only — claim never set, account not disabled.
+- New shared **`requireApproved(request)`** guard in `functions/src/shared/guards.ts`,
+  applied to every existing user-facing callable alongside its current checks.
+- **firestore.rules:** new `isApproved()` (`request.auth.token.approved == true`)
+  and `isAdmin()` helpers. The `/users/{userId}/{document=**}` rule splits:
+  - Profile doc: owner read/write **while pending** (the pending screen needs it)
+    but owner may never touch `accessStatus` (create must not include the key;
+    update diff must not affect it); `admin` claim gets read (approval-queue query).
+  - All subcollections: owner **and** approved.
+  - Every other `isSignedIn()` gate becomes `isApproved()`: `bourbons`,
+    `publicProfiles`, `usernames`, `sightings`, `priceHistory`, `friendRequests`,
+    `newsArticles`, `userNewsPreferences`.
+- **storage.rules:** avatar/label **writes** additionally require the approved claim.
+- **`functions/scripts/backfill-approved-claims.js`**: stamps claim +
+  `accessStatus: 'approved'` on all existing users, merging existing claims
+  (must preserve `admin`). Idempotent.
+- **Emulator rules tests** (pending / approved / admin matrix): pending user
+  denied on catalog, publicProfiles, newsArticles, and own subcollections;
+  allowed to read own profile doc; blocked from writing `accessStatus`; approved
+  user behavior unchanged; admin can read pending profiles + allowlist.
+- **Functions tests:** trigger branches (allowlisted-verified auto-approve,
+  allowlisted-unverified → pending + hint, unknown → pending + notify), both
+  callables (admin gating, claim merge, allowlist upsert, soft deny).
+
+**SP:** 8
+
+---
+
+### BB-211 — Pending-Approval Flow (Client)
+**As a** new user, **I want** a clear waiting screen after signup, **so that** I
+know access is coming without re-registering or guessing what's wrong.
+
+**AC:**
+- `AuthService` gains an **`approvedClaim` signal** (from cached
+  `getIdTokenResult()` — no network) and **`refreshClaims()`**
+  (`getIdToken(true)`, then re-reads the claim).
+- New functional **`approvedGuard`** chained after `authGuard` on every protected
+  route; no `approved` claim → redirect `/pending-approval`. Approved users pass
+  with zero network overhead.
+- New lazy page **`features/auth/pending-approval`** (requires auth; approved →
+  bounce to `/tabs`). States driven by the existing live `profile()` signal:
+  - `accessStatus` not yet written → "Setting up your account…" (covers the
+    ~2 s auto-approve trigger window after registration).
+  - `'pending'` → friendly waiting copy ("You'll get access once approved").
+  - `'denied'` → access-not-granted copy.
+  - Sign-out button always available.
+- When `accessStatus` flips to `'approved'` while the page is open (owner
+  approves): call `refreshClaims()`, then navigate to `/tabs` — **no re-login**.
+- Register/login flows land unapproved users on `/pending-approval` (via the guard).
+- Tests: guard (approved passes, unapproved redirects), page state machine
+  (all four states + token refresh on approval).
+
+**SP:** 5
+
+---
+
+### BB-212 — Admin Approvals & Allowlist Screen
+**As the** app owner, **I want** to approve/deny requests and manage the
+allowlist from my phone, **so that** I can wave friends in from anywhere.
+
+**AC:**
+- New lazy module **`features/admin`** at route `/admin`, protected by a new
+  **`adminGuard`** (admin claim from the cached token). Entry point in Settings,
+  visible only when the admin claim is present.
+- **Pending requests** section: one-shot `getDocs` of
+  `users where accessStatus == 'pending'` on view-enter + manual refresh (no
+  standing listener — cost discipline). Each row: displayName, email, signup
+  time; **Approve** / **Deny** buttons call the BB-210 callables; row removed on
+  success; toast feedback; empty state ("No pending requests").
+- **Allowlist** section: lists `/accessAllowlist` docs; add via Reactive Form
+  (required, email-format validator, trimmed + lowercased before write, doc ID =
+  lowercased email); remove per row. Direct Firestore ops under the admin rules.
+- The `accessRequest` push deep-links to `/admin`; the inbox `TYPE_ICON` map
+  gets an `accessRequest` icon.
+- Tests: `adminGuard`, pending list render + approve/deny actions, allowlist
+  add validation (trim/lowercase/dedupe) + remove.
+
+**SP:** 5
+
+---
+
+## Epic 22: Notification Housekeeping
+
+> Two cleanups that fell out of sharing the app: dev-era test-notification
+> tooling every user can see, and an inbox users can read but never prune
+> (the server purges only items older than 30 days).
+
+### BB-213 — Remove Test-Notification Tooling
+**As the** app owner, **I want** the dev-only "send test notification" path
+removed, **so that** shared users don't see leftover scaffolding.
+
+**Context:** the button on the notification-settings page is visible to every
+signed-in user, and the `sendTestNotification` callable only checks auth — any
+user can trigger a self-push. Harmless (sends only to the caller's own devices)
+but it was BB-090 development scaffolding.
+
+**AC:**
+- Remove the test button + `sendTest()` handler from the notification-settings
+  page and `NotificationService.sendTest()`.
+- Remove the `sendTestNotification` callable, its export, and its tests. The
+  `sendNotificationToUser` helper and `cleanupOldNotifications` are untouched.
+- `ng build` and functions build/tests green; the deployed function is deleted
+  on the next `deploy:functions` (confirm the deletion prompt).
+
+**SP:** 1
+
+---
+
+### BB-214 — Inbox Management: Edit Mode & Swipe-to-Delete
+**As a** user, **I want** to delete notifications I've dealt with, **so that**
+my inbox only shows what's still useful.
+
+**Context:** inbox items (bell icon → `/inbox`) can be marked read but never
+removed by the user; the server purges only items older than 30 days.
+
+**AC:**
+- **Edit** button in the inbox header, shown only when the list is non-empty.
+  In edit mode: a select control next to each item; a **Select all** master
+  control when the list has more than one item; a **Delete** button appears once
+  ≥ 1 item is selected; **no confirmation dialog** (they're just notifications);
+  Done/Cancel exits edit mode and clears selection.
+- In edit mode, tapping a row toggles selection (never navigates/marks read).
+- **Swipe-to-delete** (`ion-item-sliding`) on each row outside edit mode, as the
+  quick single-item path.
+- Deletion removes the docs from `users/{uid}/notifications` (batched) and
+  resyncs the unread count + OS app-icon badge via `unreadCount()`.
+- Empty state unchanged; deleting the last item exits edit mode and shows it.
+- Tests: selection logic (select all / partial / clear on exit), batched delete +
+  badge resync, swipe delete, edit affordance hidden when empty.
+
+**SP:** 3
+
+---
+
 # Backlog (Not Yet Iteration-Scoped)
 
 ### BB-188 — Crowdsourced Flavor Aggregation

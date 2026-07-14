@@ -13,7 +13,7 @@ import { logger } from "firebase-functions/v2";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 
-import { ENFORCE_APP_CHECK } from "../shared/guards";
+import { ENFORCE_APP_CHECK, requireApproved } from "../shared/guards";
 import { sendNotificationToUser } from "../notifications";
 
 const DAILY_REQUEST_LIMIT = 20;
@@ -25,10 +25,7 @@ interface SendFriendRequestData {
 export const sendFriendRequest = onCall(
   { region: "us-central1", enforceAppCheck: ENFORCE_APP_CHECK },
   async (request) => {
-    const fromUid = request.auth?.uid;
-    if (!fromUid) {
-      throw new HttpsError("unauthenticated", "Sign in to add friends.");
-    }
+    const fromUid = requireApproved(request);
     const toUid = (request.data as SendFriendRequestData)?.toUid;
     if (!toUid || typeof toUid !== "string") {
       throw new HttpsError("invalid-argument", "Who do you want to add?");
@@ -161,10 +158,7 @@ function decrementFriendCount(
 export const respondToFriendRequest = onCall(
   { region: "us-central1", enforceAppCheck: ENFORCE_APP_CHECK },
   async (request) => {
-    const uid = request.auth?.uid;
-    if (!uid) {
-      throw new HttpsError("unauthenticated", "Sign in to respond.");
-    }
+    const uid = requireApproved(request);
     const { requestId, action } = (request.data as RespondData) ?? {};
     if (!requestId || (action !== "accept" && action !== "decline")) {
       throw new HttpsError("invalid-argument", "Missing request or action.");
@@ -240,10 +234,7 @@ interface RemoveFriendData {
 export const removeFriend = onCall(
   { region: "us-central1", enforceAppCheck: ENFORCE_APP_CHECK },
   async (request) => {
-    const uid = request.auth?.uid;
-    if (!uid) {
-      throw new HttpsError("unauthenticated", "Sign in to manage friends.");
-    }
+    const uid = requireApproved(request);
     const friendUid = (request.data as RemoveFriendData)?.friendUid;
     if (!friendUid || typeof friendUid !== "string" || friendUid === uid) {
       throw new HttpsError("invalid-argument", "Who do you want to remove?");
@@ -281,10 +272,7 @@ interface BlockUserData {
 export const blockUser = onCall(
   { region: "us-central1", enforceAppCheck: ENFORCE_APP_CHECK },
   async (request) => {
-  const uid = request.auth?.uid;
-  if (!uid) {
-    throw new HttpsError("unauthenticated", "Sign in to manage friends.");
-  }
+  const uid = requireApproved(request);
   const blockedUid = (request.data as BlockUserData)?.blockedUid;
   if (!blockedUid || typeof blockedUid !== "string" || blockedUid === uid) {
     throw new HttpsError("invalid-argument", "Who do you want to block?");
