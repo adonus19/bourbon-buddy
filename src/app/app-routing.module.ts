@@ -2,7 +2,11 @@ import { NgModule } from '@angular/core';
 import { PreloadAllModules, RouterModule, Routes } from '@angular/router';
 
 import { authGuard, publicOnlyGuard } from './core/guards/auth.guard';
-import { approvedGuard, pendingOnlyGuard } from './core/guards/approval.guard';
+import {
+  adminGuard,
+  approvedGuard,
+  pendingOnlyGuard,
+} from './core/guards/approval.guard';
 
 const routes: Routes = [
   {
@@ -41,6 +45,13 @@ const routes: Routes = [
       import('./features/auth/pending-approval/pending-approval.module').then(
         (m) => m.PendingApprovalPageModule
       ),
+  },
+  // Owner tools (BB-212): approvals queue + signup allowlist. Admin claim only.
+  {
+    path: 'admin',
+    canActivate: [authGuard, adminGuard],
+    loadChildren: () =>
+      import('./features/admin/admin.module').then((m) => m.AdminPageModule),
   },
   {
     path: 'settings',

@@ -6,7 +6,11 @@ jest.mock('@angular/fire/auth', () => ({ Auth: class {} }));
 jest.mock('@angular/fire/firestore', () => ({ Firestore: class {} }));
 
 import { AuthService } from '../auth/auth.service';
-import { approvedGuard, pendingOnlyGuard } from './approval.guard';
+import {
+  adminGuard,
+  approvedGuard,
+  pendingOnlyGuard,
+} from './approval.guard';
 
 type Claims = Record<string, unknown>;
 
@@ -76,6 +80,24 @@ describe('pendingOnlyGuard (BB-211)', () => {
 
   it('sends signed-out visitors to /login', async () => {
     const result = await run(pendingOnlyGuard, null);
+    expect(redirectOf(result)).toBe('/login');
+  });
+});
+
+describe('adminGuard (BB-212)', () => {
+  afterEach(() => TestBed.resetTestingModule());
+
+  it('lets the admin in', async () => {
+    expect(await run(adminGuard, { claims: { admin: true } })).toBe(true);
+  });
+
+  it('quietly sends an approved non-admin to /tabs', async () => {
+    const result = await run(adminGuard, { claims: { approved: true } });
+    expect(redirectOf(result)).toBe('/tabs');
+  });
+
+  it('sends signed-out visitors to /login', async () => {
+    const result = await run(adminGuard, null);
     expect(redirectOf(result)).toBe('/login');
   });
 });

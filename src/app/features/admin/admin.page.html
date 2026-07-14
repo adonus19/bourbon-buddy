@@ -1,0 +1,120 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/settings" text=""></ion-back-button>
+    </ion-buttons>
+    <ion-title>Owner tools</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true" class="admin-content">
+  <ion-refresher slot="fixed" (ionRefresh)="reload($any($event).target)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <div class="admin">
+    <p class="eyebrow admin__section">Access requests</p>
+
+    @if (loading() && !pending().length) {
+      <div class="admin__loading">
+        <ion-spinner name="crescent"></ion-spinner>
+      </div>
+    } @else if (!pending().length) {
+      <p class="admin__empty">No pending requests. All quiet. 🥃</p>
+    } @else {
+      @for (user of pending(); track user.id) {
+        <div class="admin__row glass-surface">
+          <div class="admin__row-body">
+            <p class="admin__row-title">{{ user.displayName }}</p>
+            <p class="admin__row-sub">{{ user.email }}</p>
+            <p class="admin__row-time">Signed up {{ when(user) }}</p>
+          </div>
+          <div class="admin__row-actions">
+            <ion-button
+              size="small"
+              (click)="approve(user)"
+              [disabled]="busyId() !== null"
+            >
+              Approve
+            </ion-button>
+            <ion-button
+              size="small"
+              fill="outline"
+              color="medium"
+              (click)="deny(user)"
+              [disabled]="busyId() !== null"
+            >
+              Deny
+            </ion-button>
+          </div>
+        </div>
+      }
+    }
+
+    <p class="eyebrow admin__section">Signup allowlist</p>
+    <p class="admin__hint">
+      Emails here get in the moment they sign up (once verified) — no approval
+      needed.
+    </p>
+
+    <form class="admin__add glass-surface" [formGroup]="form" (ngSubmit)="addEmail()">
+      <ion-input
+        class="admin__field"
+        fill="solid"
+        labelPlacement="stacked"
+        label="Email"
+        type="email"
+        inputmode="email"
+        formControlName="email"
+        placeholder="friend@example.com"
+      ></ion-input>
+      @if (form.controls.email.touched && form.controls.email.invalid) {
+        <div class="field-error">Enter a valid email address.</div>
+      }
+      <ion-input
+        class="admin__field"
+        fill="solid"
+        labelPlacement="stacked"
+        label="Note (optional)"
+        type="text"
+        formControlName="note"
+        placeholder="Mike from work"
+      ></ion-input>
+      <ion-button
+        expand="block"
+        type="submit"
+        size="small"
+        [disabled]="submittingAdd"
+      >
+        Add to allowlist
+      </ion-button>
+    </form>
+
+    @if (!entries().length && !loading()) {
+      <p class="admin__empty">No emails allowlisted yet.</p>
+    } @else {
+      @for (entry of entries(); track entry.id) {
+        <div class="admin__row glass-surface">
+          <div class="admin__row-body">
+            <p class="admin__row-title">{{ entry.id }}</p>
+            @if (entry.note) {
+              <p class="admin__row-sub">{{ entry.note }}</p>
+            }
+          </div>
+          <div class="admin__row-actions">
+            <ion-button
+              size="small"
+              fill="clear"
+              color="medium"
+              aria-label="Remove from allowlist"
+              (click)="remove(entry)"
+              [disabled]="busyId() !== null"
+            >
+              <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+            </ion-button>
+          </div>
+        </div>
+      }
+    }
+  </div>
+</ion-content>
