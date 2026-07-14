@@ -62,6 +62,14 @@ describe('InboxService', () => {
       expect(await service.unreadCount()).toBe(0);
       expect(getCountFromServer).not.toHaveBeenCalled();
     });
+
+    it('fails soft when the count query is denied (pending account, BB-211)', async () => {
+      setup('u1');
+      asMock(getCountFromServer).mockRejectedValue(
+        new Error('permission-denied')
+      );
+      expect(await service.unreadCount()).toBe(0);
+    });
   });
 
   describe('inbox$', () => {

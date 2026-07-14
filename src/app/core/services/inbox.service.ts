@@ -52,12 +52,20 @@ export class InboxService {
       this.applyAppBadge(0);
       return 0;
     }
-    const snap = await getCountFromServer(
-      query(this.col(uid), where('read', '==', false))
-    );
-    const count = snap.data().count;
-    this.applyAppBadge(count);
-    return count;
+    try {
+      const snap = await getCountFromServer(
+        query(this.col(uid), where('read', '==', false))
+      );
+      const count = snap.data().count;
+      this.applyAppBadge(count);
+      return count;
+    } catch {
+      // Fail soft: a pending (unapproved) account is denied subcollection
+      // reads by the BB-210 rules — the launch badge sync must not surface
+      // an error for them. Offline/transient failures land here too.
+      this.applyAppBadge(0);
+      return 0;
+    }
   }
 
   async markRead(id: string): Promise<void> {

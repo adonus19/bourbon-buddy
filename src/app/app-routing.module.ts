@@ -2,6 +2,7 @@ import { NgModule } from '@angular/core';
 import { PreloadAllModules, RouterModule, Routes } from '@angular/router';
 
 import { authGuard, publicOnlyGuard } from './core/guards/auth.guard';
+import { approvedGuard, pendingOnlyGuard } from './core/guards/approval.guard';
 
 const routes: Routes = [
   {
@@ -31,9 +32,19 @@ const routes: Routes = [
         (m) => m.ForgotPasswordPageModule
       ),
   },
+  // Gated access (BB-211): signed-in-but-unapproved accounts wait here.
+  // Requires auth but NOT approval; approved users are bounced to /tabs.
+  {
+    path: 'pending-approval',
+    canActivate: [pendingOnlyGuard],
+    loadChildren: () =>
+      import('./features/auth/pending-approval/pending-approval.module').then(
+        (m) => m.PendingApprovalPageModule
+      ),
+  },
   {
     path: 'settings',
-    canActivate: [authGuard],
+    canActivate: [authGuard, approvedGuard],
     loadChildren: () =>
       import('./features/settings/settings.module').then(
         (m) => m.SettingsPageModule
@@ -41,7 +52,7 @@ const routes: Routes = [
   },
   {
     path: 'entry/new',
-    canActivate: [authGuard],
+    canActivate: [authGuard, approvedGuard],
     loadChildren: () =>
       import('./features/log-entry/add-edit/add-edit-entry.module').then(
         (m) => m.AddEditEntryPageModule
@@ -49,7 +60,7 @@ const routes: Routes = [
   },
   {
     path: 'entry/:id/edit',
-    canActivate: [authGuard],
+    canActivate: [authGuard, approvedGuard],
     loadChildren: () =>
       import('./features/log-entry/add-edit/add-edit-entry.module').then(
         (m) => m.AddEditEntryPageModule
@@ -57,7 +68,7 @@ const routes: Routes = [
   },
   {
     path: 'entry/:id',
-    canActivate: [authGuard],
+    canActivate: [authGuard, approvedGuard],
     loadChildren: () =>
       import('./features/log-entry/detail/log-entry-detail.module').then(
         (m) => m.LogEntryDetailPageModule
@@ -65,7 +76,7 @@ const routes: Routes = [
   },
   {
     path: 'wishlist/new',
-    canActivate: [authGuard],
+    canActivate: [authGuard, approvedGuard],
     loadChildren: () =>
       import('./features/wishlist-entry/add-edit/add-edit-wishlist.module').then(
         (m) => m.AddEditWishlistPageModule
@@ -73,7 +84,7 @@ const routes: Routes = [
   },
   {
     path: 'spotted/new',
-    canActivate: [authGuard],
+    canActivate: [authGuard, approvedGuard],
     loadChildren: () =>
       import('./features/spotted-it/spotted-it.module').then(
         (m) => m.SpottedItPageModule
@@ -81,7 +92,7 @@ const routes: Routes = [
   },
   {
     path: 'sightings/map',
-    canActivate: [authGuard],
+    canActivate: [authGuard, approvedGuard],
     loadChildren: () =>
       import('./features/sightings-map/sightings-map.module').then(
         (m) => m.SightingsMapPageModule
@@ -89,7 +100,7 @@ const routes: Routes = [
   },
   {
     path: 'wishlist/:id/edit',
-    canActivate: [authGuard],
+    canActivate: [authGuard, approvedGuard],
     loadChildren: () =>
       import('./features/wishlist-entry/add-edit/add-edit-wishlist.module').then(
         (m) => m.AddEditWishlistPageModule
@@ -97,7 +108,7 @@ const routes: Routes = [
   },
   {
     path: 'wishlist/:id',
-    canActivate: [authGuard],
+    canActivate: [authGuard, approvedGuard],
     loadChildren: () =>
       import('./features/wishlist-entry/detail/wishlist-detail.module').then(
         (m) => m.WishlistDetailPageModule
@@ -109,13 +120,13 @@ const routes: Routes = [
   { path: 'friends-feed', redirectTo: 'tabs/social/feed', pathMatch: 'full' },
   {
     path: 'inbox',
-    canActivate: [authGuard],
+    canActivate: [authGuard, approvedGuard],
     loadChildren: () =>
       import('./features/inbox/inbox.module').then((m) => m.InboxPageModule),
   },
   {
     path: 'u/:id',
-    canActivate: [authGuard],
+    canActivate: [authGuard, approvedGuard],
     loadChildren: () =>
       import('./features/public-profile/public-profile.module').then(
         (m) => m.PublicProfilePageModule
@@ -123,7 +134,7 @@ const routes: Routes = [
   },
   {
     path: 'feed-settings',
-    canActivate: [authGuard],
+    canActivate: [authGuard, approvedGuard],
     loadChildren: () =>
       import('./features/feed-settings/feed-settings.module').then(
         (m) => m.FeedSettingsPageModule
@@ -131,7 +142,7 @@ const routes: Routes = [
   },
   {
     path: 'notification-settings',
-    canActivate: [authGuard],
+    canActivate: [authGuard, approvedGuard],
     loadChildren: () =>
       import(
         './features/notification-settings/notification-settings.module'
@@ -139,7 +150,7 @@ const routes: Routes = [
   },
   {
     path: 'tabs',
-    canActivate: [authGuard],
+    canActivate: [authGuard, approvedGuard],
     loadChildren: () =>
       import('./features/tabs/tabs.module').then((m) => m.TabsPageModule),
   },
