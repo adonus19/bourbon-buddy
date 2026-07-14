@@ -53,6 +53,9 @@ export {
 // from their own high-rated tasting tags; powers badges + sighting alerts.
 export { onLogEntryWrittenUpdateTaste } from "./taste";
 
+// Gated access (BB-210): signup decision trigger + admin approve/deny.
+export { onAuthUserCreated, approveUser, denyUser } from "./access";
+
 // Social graph (BB-101/102/103): request create, accept/decline, remove, block.
 export {
   sendFriendRequest,

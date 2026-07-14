@@ -12,7 +12,11 @@ import { logger } from "firebase-functions/v2";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 
 import { isValidLat, isValidLng } from "../shared/geohash";
-import { consumeDailyLimit, ENFORCE_APP_CHECK } from "../shared/guards";
+import {
+  consumeDailyLimit,
+  ENFORCE_APP_CHECK,
+  requireApproved,
+} from "../shared/guards";
 import {
   buildOverpassQuery,
   CACHE_TTL_MS,
@@ -32,9 +36,7 @@ const DAILY_OVERPASS_LIMIT = 25;
 export const nearbyRetailers = onCall(
   { region: "us-central1", timeoutSeconds: 30, enforceAppCheck: ENFORCE_APP_CHECK },
   async (request) => {
-    if (!request.auth?.uid) {
-      throw new HttpsError("unauthenticated", "Sign in to find nearby stores.");
-    }
+    const uid = requireApproved(request);
     const { lat, lng } = (request.data ?? {}) as { lat?: number; lng?: number };
     if (!isValidLat(lat) || !isValidLng(lng)) {
       throw new HttpsError("invalid-argument", "Valid coordinates are required.");
@@ -55,7 +57,7 @@ export const nearbyRetailers = onCall(
     // Miss/stale → this call is about to cost real money/goodwill; meter it.
     await consumeDailyLimit(
       db,
-      request.auth.uid,
+      uid,
       "nearbyRetailers",
       DAILY_OVERPASS_LIMIT,
       "Daily store-lookup limit reached. Enter the store name manually."

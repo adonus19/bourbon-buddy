@@ -23,7 +23,11 @@ import { logger } from "firebase-functions/v2";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 
 import { isPresenceVerified } from "./presence";
-import { consumeDailyLimit, ENFORCE_APP_CHECK } from "../shared/guards";
+import {
+  consumeDailyLimit,
+  ENFORCE_APP_CHECK,
+  requireApproved,
+} from "../shared/guards";
 
 export const DAILY_CONFIRMATION_LIMIT = 20;
 // Looser than the spotter's 150 m: this compares two GPS fixes (voter's and
@@ -112,10 +116,7 @@ export function voteDeltas(
 export const confirmSighting = onCall(
   { region: "us-central1", enforceAppCheck: ENFORCE_APP_CHECK },
   async (request) => {
-    const uid = request.auth?.uid;
-    if (!uid) {
-      throw new HttpsError("unauthenticated", "Sign in to confirm sightings.");
-    }
+    const uid = requireApproved(request);
     const d = (request.data ?? {}) as VoteInput;
     if (!d.sightingId || typeof d.sightingId !== "string") {
       throw new HttpsError("invalid-argument", "A sighting id is required.");

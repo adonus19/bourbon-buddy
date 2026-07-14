@@ -20,6 +20,7 @@ import {
   consumeDailyLimit,
   ENFORCE_APP_CHECK,
   requireAdmin,
+  requireApproved,
 } from "../shared/guards";
 import { CANONICAL_FLAVOR_TAGS, matchCanonicalTags } from "./flavor-taxonomy";
 import { GROQ_API_KEY, GROQ_MODEL, RateLimitError, chatJson } from "./groq";
@@ -316,10 +317,7 @@ export const enrichBottleFlavor = onCall(
     enforceAppCheck: ENFORCE_APP_CHECK,
   },
   async (request) => {
-    const uid = request.auth?.uid;
-    if (!uid) {
-      throw new HttpsError("unauthenticated", "Sign in to enrich a bottle.");
-    }
+    const uid = requireApproved(request);
     const data = request.data as { bourbonId?: string; refresh?: boolean };
     const bourbonId = data?.bourbonId;
     if (!bourbonId || typeof bourbonId !== "string") {

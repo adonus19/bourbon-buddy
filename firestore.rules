@@ -15,10 +15,49 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // User profile and ALL user-scoped subcollections
-    // (logEntries, pourSessions, wishlistEntries, sightings, articleStates).
-    match /users/{userId}/{document=**} {
-      allow read, write: if isOwner(userId);
+    // Gated access (BB-210): the app is invite-gated. Signing up mints an Auth
+    // account, but every data grant below requires the `approved: true` custom
+    // claim, set by the access trigger/callables (or the backfill script).
+    // Claims ride in the token — checking them costs zero reads. Admin passes
+    // too, so the owner can never lock themself out.
+    function isApproved() {
+      return isSignedIn()
+             && (request.auth.token.approved == true
+                 || request.auth.token.admin == true);
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
+    // Profile doc (BB-210): readable/writable by its owner EVEN WHILE PENDING —
+    // the pending screen watches it and ensureProfile writes it — but the owner
+    // may never touch `accessStatus` (only the Admin SDK writes it; a client
+    // setting it to "approved" would still lack the claim, but keeping the
+    // field honest keeps the UI honest). Admin reads power the approval queue
+    // (query: accessStatus == "pending").
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId)
+                    && !('accessStatus' in request.resource.data);
+      allow update: if isOwner(userId)
+                    && !request.resource.data.diff(resource.data)
+                        .affectedKeys().hasAny(['accessStatus']);
+      allow delete: if isOwner(userId);
+    }
+
+    // ALL user-scoped subcollections (logEntries, pourSessions,
+    // wishlistEntries, sightings, articleStates, notifications, fcmTokens,
+    // settings, friends, blocks, rateLimits): owner AND approved.
+    match /users/{userId}/{sub}/{document=**} {
+      allow read, write: if isOwner(userId) && isApproved();
+    }
+
+    // Owner-managed signup allowlist (BB-210). The admin screen reads/writes
+    // it directly (doc ID = lowercased email); the access trigger reads it via
+    // the Admin SDK. No other user has any business here.
+    match /accessAllowlist/{emailLower} {
+      allow read, write: if isAdmin();
     }
 
     // Public profile projection (BB-100): the only cross-user-readable view of
@@ -58,8 +97,8 @@ service cloud.firestore {
           && (d.friendCount is int && d.friendCount >= 0 && d.friendCount <= 100000)
           && d.updatedAt is timestamp;
       }
-      allow read: if isSignedIn();
-      allow write: if isOwner(userId) && validPublicProfile();
+      allow read: if isApproved();
+      allow write: if isOwner(userId) && isApproved() && validPublicProfile();
     }
 
     // Username reservations (BB-100): one doc per claimed handle, ID = lowercased
@@ -67,14 +106,14 @@ service cloud.firestore {
     // already exist (Firestore create semantics) and you claim it for yourself;
     // delete only your own (releases the handle). Never updated in place.
     match /usernames/{usernameLower} {
-      allow read: if isSignedIn();
+      allow read: if isApproved();
       // Handle format matches the app's rules (3-20, word chars, lowercased
       // key) so junk/squat docs can't be minted outside the claim flow (BB-193).
-      allow create: if isSignedIn()
+      allow create: if isApproved()
                     && request.resource.data.uid == request.auth.uid
                     && request.resource.data.keys().hasOnly(['uid', 'createdAt'])
                     && usernameLower.matches('^[a-z0-9_]{3,20}$');
-      allow delete: if isSignedIn()
+      allow delete: if isApproved()
                     && resource.data.uid == request.auth.uid;
       allow update: if false;
     }
@@ -123,15 +162,15 @@ service cloud.firestore {
           && (!('flavorEnrichedAt' in d) || d.flavorEnrichedAt == null
               || d.flavorEnrichedAt is timestamp);
       }
-      allow read: if isSignedIn();
-      allow create: if isSignedIn()
+      allow read: if isApproved();
+      allow create: if isApproved()
                     && request.resource.data.createdByUserId == request.auth.uid
                     && validBourbonData();
       // The creator may edit their addition (same bounds, and can't reassign
       // authorship/backdate); any signed-in user may append to the crowdsourced
       // UPC index (BB-175) — but ONLY the `upc` field, bounded, so scanning a
       // bottle you (or the AI) didn't create still teaches the index.
-      allow update: if isSignedIn()
+      allow update: if isApproved()
                     && (
                       (
                         resource.data.createdByUserId == request.auth.uid
@@ -163,7 +202,7 @@ service cloud.firestore {
       // edge, so the spotter having the reader in their /friends means the two
       // are mutually connected; removing/blocking deletes that edge and revokes
       // access immediately. Private sightings never surface to anyone else.
-      allow read: if isSignedIn()
+      allow read: if isApproved()
                   && (resource.data.spotterUid == request.auth.uid
                       || (resource.data.visibility == 'friends'
                           && exists(/databases/$(database)/documents/users/$(resource.data.spotterUid)/friends/$(request.auth.uid))));
@@ -173,7 +212,7 @@ service cloud.firestore {
       // bottle, price, store, dates, coordinates, and the server-derived
       // presence attestation (BB-191) — is immutable once logged: re-dating or
       // re-locating a sighting would forge freshness/trust signals.
-      allow update: if isSignedIn()
+      allow update: if isApproved()
                     && resource.data.spotterUid == request.auth.uid
                     && request.resource.data.diff(resource.data).affectedKeys()
                         .hasOnly(['markedStaleManually', 'visibility', 'notes',
@@ -184,7 +223,7 @@ service cloud.firestore {
                     && (request.resource.data.notes == null
                         || (request.resource.data.notes is string
                             && request.resource.data.notes.size() <= 500));
-      allow delete: if isSignedIn()
+      allow delete: if isApproved()
                     && resource.data.spotterUid == request.auth.uid;
     }
 
@@ -196,7 +235,7 @@ service cloud.firestore {
     // history); the callable and the backfill use the Admin SDK, which bypasses
     // these rules.
     match /priceHistory/{pointId} {
-      allow read: if isSignedIn()
+      allow read: if isApproved()
                   && (resource.data.spotterUid == request.auth.uid
                       || (resource.data.visibility == 'friends'
                           && exists(/databases/$(database)/documents/users/$(resource.data.spotterUid)/friends/$(request.auth.uid))));
@@ -209,12 +248,12 @@ service cloud.firestore {
     // UPDATE is denied too: accept/decline run through `respondToFriendRequest`
     // (Admin SDK). The sender may DELETE their own still-pending request (cancel).
     match /friendRequests/{requestId} {
-      allow read: if isSignedIn()
+      allow read: if isApproved()
                   && (resource.data.fromUid == request.auth.uid
                       || resource.data.toUid == request.auth.uid);
       allow create: if false;
       allow update: if false;
-      allow delete: if isSignedIn()
+      allow delete: if isApproved()
                     && resource.data.fromUid == request.auth.uid
                     && resource.data.status == 'pending';
     }
@@ -222,13 +261,13 @@ service cloud.firestore {
     // News articles: read-only for users. Writes come from Cloud Functions
     // via the Admin SDK, which bypasses these rules entirely.
     match /newsArticles/{articleId} {
-      allow read: if isSignedIn();
+      allow read: if isApproved();
       allow write: if false;
     }
 
     // Per-user news feed preferences (top-level, keyed by UID).
     match /userNewsPreferences/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read, write: if isOwner(userId) && isApproved();
     }
 
     // Anything not matched above is denied.

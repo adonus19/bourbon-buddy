@@ -12,6 +12,15 @@ service firebase.storage {
       return request.auth != null && request.auth.uid == userId;
     }
 
+    // Gated access (BB-210): uploads additionally require the `approved`
+    // custom claim (admin passes too), mirroring firestore.rules. Reads stay
+    // owner-only — a pending account can at most see its own files.
+    function isApproved() {
+      return request.auth != null
+             && (request.auth.token.approved == true
+                 || request.auth.token.admin == true);
+    }
+
     // Optional guard: images only, capped at 10 MB.
     function isValidImage() {
       return request.resource.size < 10 * 1024 * 1024
@@ -20,12 +29,12 @@ service firebase.storage {
 
     match /avatars/{userId}/{allPaths=**} {
       allow read: if isOwner(userId);
-      allow write: if isOwner(userId) && isValidImage();
+      allow write: if isOwner(userId) && isApproved() && isValidImage();
     }
 
     match /labels/{userId}/{allPaths=**} {
       allow read: if isOwner(userId);
-      allow write: if isOwner(userId) && isValidImage();
+      allow write: if isOwner(userId) && isApproved() && isValidImage();
     }
 
     // Everything else is denied.

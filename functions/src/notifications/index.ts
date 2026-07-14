@@ -10,17 +10,26 @@
 import { FieldValue, getFirestore, Timestamp } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
 import { logger } from "firebase-functions/v2";
-import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 
-import { ENFORCE_APP_CHECK } from "../shared/guards";
+import { ENFORCE_APP_CHECK, requireApproved } from "../shared/guards";
 
 export type NotificationType =
   | "sightingMatch"
   | "priceAlert"
   | "tasteMatch"
   | "friendRequest"
-  | "newsDigest";
+  | "newsDigest"
+  | "accessRequest";
+
+/**
+ * Operational types (BB-210) are delivered regardless of the user's per-type
+ * preferences and the master pause: an access request the owner never sees, or
+ * an approval the new user never learns about, breaks the gated-access flow.
+ * They still write the recoverable inbox record.
+ */
+const ALWAYS_DELIVER: ReadonlySet<NotificationType> = new Set(["accessRequest"]);
 
 export interface PushPayload {
   title: string;
@@ -53,11 +62,15 @@ export async function sendNotificationToUser(
   let badgeCount: number | null = null;
 
   if (type) {
-    const prefsSnap = await db.doc(`users/${uid}/settings/notifications`).get();
-    const prefs = prefsSnap.data() ?? {};
-    if (prefs.pausedAll || !prefs[type]) {
-      logger.info(`Skip ${type} for ${uid}: paused or not enabled.`);
-      return 0;
+    if (!ALWAYS_DELIVER.has(type)) {
+      const prefsSnap = await db
+        .doc(`users/${uid}/settings/notifications`)
+        .get();
+      const prefs = prefsSnap.data() ?? {};
+      if (prefs.pausedAll || !prefs[type]) {
+        logger.info(`Skip ${type} for ${uid}: paused or not enabled.`);
+        return 0;
+      }
     }
     // Inbox record (BB-113): written whether or not a device is reachable, so a
     // missed push is still recoverable in-app. The untyped test send is skipped.
@@ -154,10 +167,7 @@ export const cleanupOldNotifications = onSchedule(
 export const sendTestNotification = onCall(
   { region: "us-central1", enforceAppCheck: ENFORCE_APP_CHECK },
   async (request) => {
-    const uid = request.auth?.uid;
-    if (!uid) {
-      throw new HttpsError("unauthenticated", "Sign in to test notifications.");
-    }
+    const uid = requireApproved(request);
     const sent = await sendNotificationToUser(uid, {
       title: "Bourbon Buddy",
       body: "🥃 Test notification — your push is working.",

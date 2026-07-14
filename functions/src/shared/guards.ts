@@ -55,6 +55,27 @@ export async function consumeDailyLimit(
 }
 
 /**
+ * Require the caller to hold the `approved: true` custom claim (BB-210: gated
+ * access — set by the access trigger/callables or the backfill script). Every
+ * user-facing callable runs this first; admins pass regardless so the owner
+ * can never lock themself out. Returns the caller's uid.
+ */
+export function requireApproved(request: CallableRequest): string {
+  const uid = request.auth?.uid;
+  if (!uid) {
+    throw new HttpsError("unauthenticated", "Sign in first.");
+  }
+  const token = request.auth?.token;
+  if (token?.approved !== true && token?.admin !== true) {
+    throw new HttpsError(
+      "permission-denied",
+      "Your account hasn't been approved yet."
+    );
+  }
+  return uid;
+}
+
+/**
  * Require the caller to hold the `admin: true` custom claim (set via
  * functions/scripts/set-admin-claim.js). For operator tools like backfills.
  */

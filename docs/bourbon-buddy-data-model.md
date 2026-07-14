@@ -564,6 +564,47 @@ status ASC), `sightings` (bourbonId ASC, price ASC),
 
 ---
 
+# Gated Access *(Epic 21 — BB-210)*
+
+> The app is shared with friends but invite-gated. Enforcement lives in an
+> `approved: true` **custom claim** (plus the pre-existing `admin: true` claim),
+> checked by Security Rules and callables — not in these documents. The fields
+> below exist for UI state and the approval queue only.
+
+### Additive field on `/users/{userId}` *(BB-210)*
+
+```
+users/{userId}
+  // ...existing fields...
+  accessStatus:  string   // "pending" | "approved" | "denied"
+                          // Admin-SDK-written ONLY (trigger/callables/backfill);
+                          // rules reject any owner write that creates/changes it.
+                          // Absent on docs created before the rules deploy until
+                          // the backfill stamps them "approved".
+```
+
+### Collection: `/accessAllowlist/{emailLower}` *(BB-210)*
+
+Owner-managed allowlist. **Doc ID = lowercased email** (uniqueness for free).
+`onAuthUserCreated` auto-approves a new account whose verified email matches;
+`approveUser` upserts the email on manual approval so a deleted-and-recreated
+account self-heals. Read/write require the `admin` claim; managed by direct
+Firestore ops from the admin screen (no callable).
+
+```
+accessAllowlist/{emailLower}
+  note:     string | null   // e.g. "Mike from work"
+  addedAt:  Timestamp
+```
+
+### Notification type addition *(BB-210)*
+
+`users/{uid}/notifications.type` gains **`"accessRequest"`** — the admin's
+new-signup alert. Delivered regardless of per-type notification prefs
+(operational; must never be lost). Deep-links to `/admin`.
+
+---
+
 # Post-MVP Collections — Going Public (Cost, AI, Monetization & Compliance)
 
 > Schema for the public-launch epics (BB-120–BB-160). Mostly **additive fields**
@@ -700,30 +741,42 @@ Composite indexes must be defined in `firestore.indexes.json`. Key indexes:
 
 ## Firestore Security Rules (Summary)
 
-Full rules to be written in `firestore.rules`. Key principles:
+Full rules live in `firestore.rules`. Key principles (as of Epic 21 / BB-210,
+"auth user" below means **signed in AND holding the `approved` custom claim** —
+`isApproved()`; pending/denied accounts can read only their own profile doc):
 
 ```
-// User profile and all subcollections
-match /users/{userId}/{document=**} {
-  allow read, write: if request.auth != null && request.auth.uid == userId;
+// Profile doc: owner read/write even while pending (the pending screen needs
+// it), but the owner may NEVER write accessStatus; admin claim may read (the
+// approval queue queries accessStatus == "pending").
+match /users/{userId} { ... }
+
+// All user subcollections: owner AND approved
+match /users/{userId}/{sub}/{document=**} {
+  allow read, write: if isOwner(userId) && isApproved();
 }
 
-// Bourbon catalog — any auth user can read or create; only creator can update
+// Owner-managed allowlist: admin claim only
+match /accessAllowlist/{emailLower} {
+  allow read, write: if isAdmin();
+}
+
+// Bourbon catalog — any approved user can read or create; only creator updates
 match /bourbons/{bourbonId} {
-  allow read: if request.auth != null;
-  allow create: if request.auth != null;
-  allow update: if request.auth != null && request.auth.uid == resource.data.createdByUserId;
+  allow read: if isApproved();
+  allow create: if isApproved();
+  allow update: if isApproved() && request.auth.uid == resource.data.createdByUserId;
 }
 
-// News articles — any auth user can read; only admin/function SDK can write
+// News articles — any approved user can read; only admin/function SDK can write
 match /newsArticles/{articleId} {
-  allow read: if request.auth != null;
+  allow read: if isApproved();
   allow write: if false; // Cloud Functions use admin SDK, bypasses rules
 }
 
 // User news preferences — own document only
 match /userNewsPreferences/{userId} {
-  allow read, write: if request.auth != null && request.auth.uid == userId;
+  allow read, write: if isOwner(userId) && isApproved();
 }
 ```
 

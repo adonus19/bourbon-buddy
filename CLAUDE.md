@@ -79,6 +79,9 @@ Full specs live in [docs/](docs/). Read these before non-trivial work:
 - `npm run emulators` — Firebase Emulator Suite (Auth 9099, Firestore 8080,
   Storage 9199, Functions 5001, UI on). Set `useEmulators: true` to use them.
 - `npm run deploy:hosting` / `:rules` / `:indexes` / `:functions`
+- `npm run test:rules` — Firestore Security Rules tests in the emulator
+  (`tests/rules/`). Needs Java: keg-only OpenJDK lives at
+  `/usr/local/opt/openjdk/bin` — prefix PATH with it if `java` isn't found.
 - Functions: `cd functions && npm run build` (TypeScript → `lib/`, Node 20)
 
 ## Conventions
