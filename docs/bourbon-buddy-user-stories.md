@@ -1662,7 +1662,7 @@ is, **so that** the list stays useful.
 > claim) → deploy app → **deploy rules LAST**. The door only closes at the rules
 > deploy; existing sessions pick the claim up at their hourly token refresh.
 
-### BB-210 — Access Backend: Allowlist, Claims & Rules
+### BB-210 — Access Backend: Allowlist, Claims & Rules ✅
 **As the** app owner, **I want** new accounts gated behind my allowlist or my
 explicit approval, **so that** only people I've allowed can use the app.
 
@@ -1716,7 +1716,7 @@ explicit approval, **so that** only people I've allowed can use the app.
 
 ---
 
-### BB-211 — Pending-Approval Flow (Client)
+### BB-211 — Pending-Approval Flow (Client) ✅
 **As a** new user, **I want** a clear waiting screen after signup, **so that** I
 know access is coming without re-registering or guessing what's wrong.
 
@@ -1744,7 +1744,7 @@ know access is coming without re-registering or guessing what's wrong.
 
 ---
 
-### BB-212 — Admin Approvals & Allowlist Screen
+### BB-212 — Admin Approvals & Allowlist Screen ✅
 **As the** app owner, **I want** to approve/deny requests and manage the
 allowlist from my phone, **so that** I can wave friends in from anywhere.
 
@@ -1775,7 +1775,7 @@ allowlist from my phone, **so that** I can wave friends in from anywhere.
 > tooling every user can see, and an inbox users can read but never prune
 > (the server purges only items older than 30 days).
 
-### BB-213 — Remove Test-Notification Tooling
+### BB-213 — Remove Test-Notification Tooling ✅
 **As the** app owner, **I want** the dev-only "send test notification" path
 removed, **so that** shared users don't see leftover scaffolding.
 

@@ -121,4 +121,31 @@ describe('InboxService', () => {
       expect(writeBatch).not.toHaveBeenCalled();
     });
   });
+
+  describe('remove (BB-214)', () => {
+    it('batch-deletes the docs and resyncs the badge', async () => {
+      setup('u1');
+      const batch = { delete: jest.fn(), commit: jest.fn(() => Promise.resolve()) };
+      asMock(writeBatch).mockReturnValue(batch);
+      asMock(getCountFromServer).mockResolvedValue({ data: () => ({ count: 0 }) });
+
+      await service.remove(['a', 'b']);
+
+      expect(batch.delete).toHaveBeenCalledTimes(2);
+      expect(batch.commit).toHaveBeenCalled();
+      expect(getCountFromServer).toHaveBeenCalled(); // badge resync
+    });
+
+    it('no-ops with no ids', async () => {
+      setup('u1');
+      await service.remove([]);
+      expect(writeBatch).not.toHaveBeenCalled();
+    });
+
+    it('no-ops when signed out', async () => {
+      setup(null);
+      await service.remove(['a']);
+      expect(writeBatch).not.toHaveBeenCalled();
+    });
+  });
 });
