@@ -32,6 +32,7 @@ import {
   deriveDidNotPurchase,
   fieldRulesFor,
 } from './entry-field-rules';
+import { foundItPrefill } from './found-it-prefill';
 
 @Component({
   selector: 'app-add-edit-entry',
@@ -231,10 +232,11 @@ export class AddEditEntryPage {
       });
     } else if (this.sourceWishlist) {
       effect(() => {
+        // Wait for the cellar signal too — prior entries feed the prefill.
         const w = this.sourceWishlist?.();
-        if (w && !this.patched) {
+        if (w && this.logService.loaded() && !this.patched) {
           this.patched = true;
-          this.prefillFromWishlist(w);
+          void this.prefillFromWishlist(w);
         }
       });
     } else if (this.sourceRebuy) {
@@ -319,17 +321,30 @@ export class AddEditEntryPage {
     return role === 'confirm';
   }
 
-  /** Pre-fill the add-log form from a wishlist entry ("Found It — Log It"). */
-  private prefillFromWishlist(w: WishlistEntry): void {
-    this.form.patchValue({
-      bourbonName: w.bourbonName,
-      bourbonId: w.bourbonId,
-      distillery: w.distillery ?? '',
-      category: w.category ?? this.form.controls.category.value,
-      subType: w.subType ?? null,
-      personalNotes: w.externalTastingNotes ?? '',
-    });
-    void this.autoPopulateFlavors(w.bourbonId);
+  /**
+   * Pre-fill the add-log form from a wishlist entry ("Found It — Log It"),
+   * enriched with the catalog doc (proof/age/bottler/series) and the user's
+   * own prior entries for this bottle — mash bill, last rating, tasting
+   * tags/notes (BB-216). Prior tags become the "suggested" set; only when no
+   * prior entry has tags do we fall back to the AI suggestions.
+   */
+  private async prefillFromWishlist(w: WishlistEntry): Promise<void> {
+    const catalogDoc = await this.catalog.getById(w.bourbonId).catch(() => null);
+    const { patch, priorTags } = foundItPrefill(
+      w,
+      catalogDoc,
+      this.logService.entries(),
+      new Date().toISOString().slice(0, 10)
+    );
+    this.form.patchValue(patch);
+    if (patch.isNas) {
+      this.form.controls.ageStatement.disable();
+    }
+    if (priorTags) {
+      this.suggestedFlavors.set(priorTags);
+    } else {
+      void this.autoPopulateFlavors(w.bourbonId);
+    }
   }
 
   /**

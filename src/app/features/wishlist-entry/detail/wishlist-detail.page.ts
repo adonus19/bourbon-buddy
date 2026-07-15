@@ -5,17 +5,13 @@ import {
   toSignal,
 } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
-import { AlertController, ModalController, ToastController } from '@ionic/angular';
-import { Timestamp } from '@angular/fire/firestore';
+import { AlertController, ToastController } from '@ionic/angular';
 import { combineLatest, of } from 'rxjs';
 import { shareReplay, switchMap } from 'rxjs/operators';
 
 import { Sighting, WishlistEntry } from '../../../models';
 import { WishlistService } from '../../../core/services/wishlist.service';
-import {
-  SightingInput,
-  SightingService,
-} from '../../../core/services/sighting.service';
+import { SightingService } from '../../../core/services/sighting.service';
 import { CATEGORY_DISPLAY } from '../../../shared/constants/category-display';
 import {
   PRIORITY_DISPLAY,
@@ -27,8 +23,6 @@ import {
   isSightingStale,
   sightingFreshness,
 } from '../../../shared/utils/sighting';
-import { sightingErrorMessage } from '../../../shared/utils/sighting-error';
-import { SightingFormComponent } from '../../../shared/components/sighting-form/sighting-form.component';
 
 @Component({
   selector: 'app-wishlist-detail',
@@ -42,7 +36,6 @@ export class WishlistDetailPage {
   private readonly sightingService = inject(SightingService);
   private readonly router = inject(Router);
   private readonly alertCtrl = inject(AlertController);
-  private readonly modalCtrl = inject(ModalController);
   private readonly toast = inject(ToastController);
 
   readonly entryId =
@@ -138,42 +131,24 @@ export class WishlistDetailPage {
     return { text: `${pct >= 0 ? '+' : ''}${pct}%`, below: pct < 0 };
   }
 
-  async openSightingForm(): Promise<void> {
-    const modal = await this.modalCtrl.create({
-      component: SightingFormComponent,
-    });
-    await modal.present();
-    const { data, role } = await modal.onWillDismiss();
-    if (role !== 'save' || !data) {
-      return;
-    }
+  /**
+   * Report a sighting for this bottle via the one shared Spotted It form —
+   * same form as everywhere else, so detail-page sightings get the location
+   * attach / on-site attestation features too. The bottle arrives prefilled;
+   * returnTo brings the user back here after saving.
+   */
+  reportSighting(): void {
     const e = this.entry();
     if (!e?.bourbonId) {
       return;
     }
-    const input: SightingInput = {
-      storeName: (data.storeName ?? '').trim(),
-      price: Number(data.price),
-      sightingDate: Timestamp.fromDate(new Date(data.sightingDate)),
-      city: (data.city ?? '').trim() || null,
-      state: (data.state ?? '').trim() || null,
-      notes: (data.notes ?? '').trim() || null,
-    };
-    try {
-      const result = await this.sightingService.add(
-        e.bourbonId,
-        e.bourbonName,
-        input,
-        data.visibility === 'friends' ? 'friends' : 'private'
-      );
-      await this.presentToast(
-        result === 'queued'
-          ? "Saved offline — it'll sync when you're back online."
-          : 'Sighting logged. People are going to believe you.'
-      );
-    } catch (err) {
-      await this.presentToast(sightingErrorMessage(err));
-    }
+    void this.router.navigate(['/spotted/new'], {
+      queryParams: {
+        bourbonId: e.bourbonId,
+        bourbonName: e.bourbonName,
+        returnTo: `/wishlist/${this.entryId}`,
+      },
+    });
   }
 
   async toggleStale(s: Sighting): Promise<void> {
