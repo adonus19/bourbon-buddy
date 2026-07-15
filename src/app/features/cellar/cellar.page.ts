@@ -27,6 +27,7 @@ import {
   matchesFilter,
   matchesSearch,
 } from './log-filter';
+import { EntryGroup, groupEntriesByPeriod } from './entry-groups';
 import { LogFilterModalComponent } from './filter-modal/log-filter-modal.component';
 
 type SortKey = 'date' | 'rating' | 'name' | 'distillery' | 'proof';
@@ -85,6 +86,37 @@ export class CellarPage implements ViewWillEnter {
     );
   });
 
+  /**
+   * Per-group expand/collapse overrides, keyed by EntryGroup.key. Absent key →
+   * default state (newest group open, the rest collapsed). Cleared on segment
+   * change so each tab starts from the default.
+   */
+  private readonly groupToggles = signal<ReadonlyMap<string, boolean>>(
+    new Map()
+  );
+
+  /**
+   * Journal/Graveyard collapse into time-period sections (BB-171-style pure
+   * derivation — nothing stored). Only when sorted by date with no search or
+   * filter narrowing the list: under a name/rating sort month sections are
+   * meaningless, and collapsed groups would hide search hits. Null → render
+   * the flat list.
+   */
+  readonly sections = computed<(EntryGroup & { open: boolean })[] | null>(
+    () => {
+      const view = this.view();
+      if (view === 'shelf' || this.sort() !== 'date' || this.hasQuery()) {
+        return null;
+      }
+      const groups = groupEntriesByPeriod(this.visibleEntries(), view);
+      const toggles = this.groupToggles();
+      return groups.map((g, i) => ({
+        ...g,
+        open: toggles.get(g.key) ?? i === 0,
+      }));
+    }
+  );
+
   readonly sortedEntries = computed<LogEntry[]>(() => {
     const list = [...this.entries()];
     switch (this.sort()) {
@@ -132,6 +164,11 @@ export class CellarPage implements ViewWillEnter {
 
   setView(value: CellarView): void {
     this.view.set(value);
+    this.groupToggles.set(new Map());
+  }
+
+  toggleGroup(key: string, open: boolean): void {
+    this.groupToggles.update((m) => new Map(m).set(key, !open));
   }
 
   /** Swipe action: kill a bottle straight from the Shelf, with an Undo toast. */

@@ -58,6 +58,35 @@ h1, h2, h3, .font-display {
   color: var(--color-text-secondary);
 }
 
+/* Collapsible section header — an eyebrow that toggles its section's body.
+ * Pair with `<button class="section-toggle" [attr.aria-expanded]="open()">`
+ * wrapping a `.eyebrow` span, an optional `__count`, and a `__chevron` icon
+ * that gets `--open` when expanded. */
+.section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+
+  &__count {
+    color: var(--color-text-secondary);
+    margin-left: 4px;
+  }
+
+  &__chevron {
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    transition: transform 0.2s ease;
+
+    &--open {
+      transform: rotate(180deg);
+    }
+  }
+}
+
 /* Required-field marker — the * appended to a required input's label.
  * Pair with `<span slot="label">Label <span class="required-mark">*</span></span>`. */
 .required-mark {
