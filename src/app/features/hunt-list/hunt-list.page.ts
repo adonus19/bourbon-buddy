@@ -26,6 +26,7 @@ import {
   wishlistChips,
 } from './wishlist-filter';
 import { WishlistFilterModalComponent } from './filter-modal/wishlist-filter-modal.component';
+import { BottleLookupComponent } from './bottle-lookup/bottle-lookup.component';
 
 type WishlistSort = 'priority' | 'name' | 'msrp' | 'best';
 
@@ -150,6 +151,14 @@ export class HuntListPage implements ViewWillEnter {
 
   applyFilter(next: WishlistFilter): void {
     this.filter.set(next);
+  }
+
+  /** Look up any catalog bottle — the in-store tasting-notes check (BB-217). */
+  async openLookup(): Promise<void> {
+    const modal = await this.modalCtrl.create({
+      component: BottleLookupComponent,
+    });
+    await modal.present();
   }
 
   async openFilter(): Promise<void> {

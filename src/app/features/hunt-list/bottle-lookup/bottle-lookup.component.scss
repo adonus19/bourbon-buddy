@@ -1,0 +1,32 @@
+.lookup {
+  --padding-start: 16px;
+  --padding-end: 16px;
+  --padding-top: 12px;
+}
+
+.lookup__lead {
+  margin: 0 0 16px;
+  color: var(--ion-color-medium);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.lookup__scan {
+  margin-bottom: 16px;
+}
+
+.lookup__busy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: var(--ion-color-medium);
+  font-size: 0.9rem;
+}
+
+.lookup__hint {
+  margin-top: 16px;
+  color: var(--ion-color-medium);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}

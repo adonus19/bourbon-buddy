@@ -4,7 +4,7 @@ import { ModalController, ToastController } from '@ionic/angular';
 import {
   ACTIVE_WISHLIST_STATUSES,
   Bourbon,
-  MentionedBottle,
+  BourbonCategory,
 } from '../../../models';
 import { BourbonCatalogService } from '../../../core/services/bourbon-catalog.service';
 import { TasteMatchService } from '../../../core/services/taste-match.service';
@@ -12,11 +12,23 @@ import { WishlistService } from '../../../core/services/wishlist.service';
 import { CATEGORY_DISPLAY } from '../../constants/category-display';
 
 /**
+ * Minimal bottle identity the preview sheet needs. Both a Dispatch
+ * `MentionedBottle` and a mapped catalog `Bourbon` satisfy it, so any surface
+ * with a bottle in hand can open the sheet (BB-217).
+ */
+export interface BottlePreviewInput {
+  name: string;
+  bourbonId?: string | null;
+  distillery?: string | null;
+  category?: BourbonCategory | null;
+}
+
+/**
  * Bottle preview sheet (BB-198): tapping a "Bottles mentioned" chip in the
- * Dispatch feed opens this modal instead of blind-adding to the hunt list —
- * you see the bottle's flavor profile and its similar bottles, then choose.
- * One catalog getDoc per open; the similar-bottles child reuses the same
- * precomputed data (BB-197). Also the future home of the Taste Match badge.
+ * Dispatch feed — or a Hunt List lookup result (BB-217) — opens this modal
+ * instead of blind-adding to the hunt list: you see the bottle's flavor
+ * profile and its similar bottles, then choose. One catalog getDoc per open;
+ * the similar-bottles child reuses the same precomputed data (BB-197).
  */
 @Component({
   selector: 'app-bottle-preview-sheet',
@@ -31,7 +43,7 @@ export class BottlePreviewSheetComponent {
   private readonly modalCtrl = inject(ModalController);
   private readonly toastCtrl = inject(ToastController);
 
-  @Input({ required: true }) bottle!: MentionedBottle;
+  @Input({ required: true }) bottle!: BottlePreviewInput;
 
   readonly catalogBottle = signal<Bourbon | null>(null);
   readonly loaded = signal(false);
