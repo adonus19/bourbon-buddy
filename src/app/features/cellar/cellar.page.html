@@ -136,32 +136,72 @@
       </span>
     </div>
 
-    <div class="cellar-list">
-      @for (e of visibleEntries(); track e.id) {
-        <ion-item-sliding>
-          <ion-item
-            class="cellar-item"
-            [routerLink]="['/entry', e.id]"
-            [detail]="false"
-            lines="none"
-            button
-          >
-            <app-log-entry-card [entry]="e"></app-log-entry-card>
-          </ion-item>
-          @if (view() === 'shelf') {
-            <ion-item-options side="end">
-              <ion-item-option
-                color="dark"
-                (click)="killFromList(e)"
-                aria-label="Kill bottle"
-              >
-                <ion-icon slot="icon-only" name="skull-outline"></ion-icon>
-              </ion-item-option>
-            </ion-item-options>
-          }
-        </ion-item-sliding>
-      }
-    </div>
+    @if (sections(); as groups) {
+      <div class="cellar-groups">
+        @for (g of groups; track g.key) {
+          <section class="cellar-group">
+            <button
+              type="button"
+              class="section-toggle cellar-group__head"
+              [attr.aria-expanded]="g.open"
+              [attr.aria-controls]="'cellar-group-' + g.key"
+              (click)="toggleGroup(g.key, g.open)"
+            >
+              <span class="eyebrow">{{ g.label }}</span>
+              <span class="section-toggle__count">{{ g.entries.length }}</span>
+              <ion-icon
+                class="section-toggle__chevron"
+                [class.section-toggle__chevron--open]="g.open"
+                name="chevron-down-outline"
+                aria-hidden="true"
+              ></ion-icon>
+            </button>
+            @if (g.open) {
+              <div class="cellar-list cellar-list--grouped" [id]="'cellar-group-' + g.key">
+                @for (e of g.entries; track e.id) {
+                  <ion-item
+                    class="cellar-item"
+                    [routerLink]="['/entry', e.id]"
+                    [detail]="false"
+                    lines="none"
+                    button
+                  >
+                    <app-log-entry-card [entry]="e"></app-log-entry-card>
+                  </ion-item>
+                }
+              </div>
+            }
+          </section>
+        }
+      </div>
+    } @else {
+      <div class="cellar-list">
+        @for (e of visibleEntries(); track e.id) {
+          <ion-item-sliding>
+            <ion-item
+              class="cellar-item"
+              [routerLink]="['/entry', e.id]"
+              [detail]="false"
+              lines="none"
+              button
+            >
+              <app-log-entry-card [entry]="e"></app-log-entry-card>
+            </ion-item>
+            @if (view() === 'shelf') {
+              <ion-item-options side="end">
+                <ion-item-option
+                  color="dark"
+                  (click)="killFromList(e)"
+                  aria-label="Kill bottle"
+                >
+                  <ion-icon slot="icon-only" name="skull-outline"></ion-icon>
+                </ion-item-option>
+              </ion-item-options>
+            }
+          </ion-item-sliding>
+        }
+      </div>
+    }
   }
 
   <ion-fab slot="fixed" vertical="bottom" horizontal="end">

@@ -5,7 +5,7 @@
     </ion-buttons>
     @if (entry()) {
       <ion-buttons slot="end">
-        <ion-button [routerLink]="['/entry', entryId, 'edit']" aria-label="Edit">
+        <ion-button (click)="goToEdit()" aria-label="Edit">
           <ion-icon slot="icon-only" name="create-outline"></ion-icon>
         </ion-button>
         <ion-button (click)="confirmDelete()" color="danger" aria-label="Delete">
@@ -209,7 +209,26 @@
       @if (isPurchasedBottle()) {
         <div class="section">
           <div class="detail__section-head">
-            <p class="eyebrow">Pours</p>
+            <button
+              type="button"
+              class="section-toggle"
+              [attr.aria-expanded]="poursOpen()"
+              aria-controls="pours-body"
+              (click)="togglePours()"
+            >
+              <span class="eyebrow">
+                Pours
+                @if (pours().length) {
+                  <span class="section-toggle__count">{{ pours().length }}</span>
+                }
+              </span>
+              <ion-icon
+                class="section-toggle__chevron"
+                [class.section-toggle__chevron--open]="poursOpen()"
+                name="chevron-down-outline"
+                aria-hidden="true"
+              ></ion-icon>
+            </button>
             <ion-button
               class="detail__log-dram"
               fill="clear"
@@ -222,36 +241,40 @@
             </ion-button>
           </div>
 
-          @if (averagePourRating() !== null) {
-            <p class="detail__meta">
-              Average pour {{ averagePourRating() }}★ across
-              {{ pours().length }}
-              {{ pours().length === 1 ? 'pour' : 'pours' }}
-            </p>
-          }
+          @if (poursOpen()) {
+            <div id="pours-body">
+              @if (averagePourRating() !== null) {
+                <p class="detail__meta">
+                  Average pour {{ averagePourRating() }}★ across
+                  {{ pours().length }}
+                  {{ pours().length === 1 ? 'pour' : 'pours' }}
+                </p>
+              }
 
-          @if (pours().length === 0) {
-            <p class="detail__empty">No pours logged yet.</p>
-          } @else {
-            <div class="pours">
-              @for (p of pours(); track p.id) {
-                <div class="pour">
-                  <div class="pour__top">
-                    <span class="pour__date">
-                      {{ p.pourDate.toDate() | date: 'mediumDate' }}
-                    </span>
-                    @if (p.rating != null) {
-                      <app-rating-widget
-                        [rating]="p.rating"
-                        [size]="15"
-                      ></app-rating-widget>
-                    }
-                  </div>
-                  @if (p.settingNotes) {
-                    <div class="pour__setting">{{ p.settingNotes }}</div>
-                  }
-                  @if (p.tastingNotes) {
-                    <div class="pour__notes">{{ p.tastingNotes }}</div>
+              @if (pours().length === 0) {
+                <p class="detail__empty">No pours logged yet.</p>
+              } @else {
+                <div class="pours">
+                  @for (p of pours(); track p.id) {
+                    <div class="pour">
+                      <div class="pour__top">
+                        <span class="pour__date">
+                          {{ p.pourDate.toDate() | date: 'mediumDate' }}
+                        </span>
+                        @if (p.rating != null) {
+                          <app-rating-widget
+                            [rating]="p.rating"
+                            [size]="15"
+                          ></app-rating-widget>
+                        }
+                      </div>
+                      @if (p.settingNotes) {
+                        <div class="pour__setting">{{ p.settingNotes }}</div>
+                      }
+                      @if (p.tastingNotes) {
+                        <div class="pour__notes">{{ p.tastingNotes }}</div>
+                      }
+                    </div>
                   }
                 </div>
               }

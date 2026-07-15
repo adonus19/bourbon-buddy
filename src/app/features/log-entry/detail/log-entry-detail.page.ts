@@ -1,9 +1,10 @@
-import { Component, computed, effect, inject } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
   ActionSheetController,
   AlertController,
+  LoadingController,
   ModalController,
   ToastController,
 } from '@ionic/angular';
@@ -47,6 +48,7 @@ export class LogEntryDetailPage {
   private readonly alertCtrl = inject(AlertController);
   private readonly actionSheet = inject(ActionSheetController);
   private readonly modalCtrl = inject(ModalController);
+  private readonly loadingCtrl = inject(LoadingController);
   private readonly toast = inject(ToastController);
   private readonly onboarding = inject(OnboardingService);
 
@@ -105,6 +107,9 @@ export class LogEntryDetailPage {
   readonly pours = toSignal(this.pourService.sessionsFor(this.entryId), {
     initialValue: [] as PourSession[],
   });
+
+  /** Pours list collapses by default — it can get long and is secondary info. */
+  readonly poursOpen = signal(false);
   readonly averagePourRating = computed(() => {
     const rated = this.pours().filter((p) => p.rating != null);
     if (!rated.length) {
@@ -212,6 +217,28 @@ export class LogEntryDetailPage {
     }
   }
 
+  /**
+   * The edit page lives in a lazy-loaded module, so the first navigation can
+   * stall for a few seconds while the chunk downloads. Show a loading overlay
+   * until the router finishes activating the page.
+   */
+  async goToEdit(): Promise<void> {
+    const loading = await this.loadingCtrl.create({
+      message: 'Opening editor…',
+      spinner: 'crescent',
+    });
+    await loading.present();
+    try {
+      await this.router.navigate(['/entry', this.entryId, 'edit']);
+    } finally {
+      await loading.dismiss();
+    }
+  }
+
+  togglePours(): void {
+    this.poursOpen.update((open) => !open);
+  }
+
   async openPourForm(): Promise<void> {
     const modal = await this.modalCtrl.create({
       component: PourFormComponent,
@@ -229,6 +256,7 @@ export class LogEntryDetailPage {
     };
     try {
       await this.pourService.add(this.entryId, input);
+      this.poursOpen.set(true);
       await this.presentToast('Dram logged. Sláinte.');
     } catch {
       await this.presentToast("Couldn't save the pour. Try again.");
