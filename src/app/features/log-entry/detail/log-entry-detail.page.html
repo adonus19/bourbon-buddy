@@ -212,6 +212,7 @@
             <button
               type="button"
               class="section-toggle"
+              [class.section-toggle--card]="!poursOpen()"
               [attr.aria-expanded]="poursOpen()"
               aria-controls="pours-body"
               (click)="togglePours()"

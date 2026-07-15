@@ -72,7 +72,19 @@
   z-index: 2;
   width: 100%;
   padding: 12px 16px;
-  background: var(--color-bg-primary);
+
+  // Expanded → flat sticky header; solid so cards scroll under it cleanly.
+  &:not(.section-toggle--card) {
+    background: var(--color-bg-primary);
+  }
+
+  // Collapsed → glass card ("closed drawer"), inset to the list gutters.
+  // Surface/border/radius come from the global .section-toggle--card.
+  &.section-toggle--card {
+    width: calc(100% - 32px);
+    margin: 4px 16px 12px;
+    padding: 14px 16px;
+  }
 }
 
 // The card supplies its own surface/padding; the wrapping ion-item is a

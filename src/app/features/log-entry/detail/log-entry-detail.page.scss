@@ -117,6 +117,12 @@ app-similar-bottles {
   .eyebrow {
     margin: 0;
   }
+
+  // Collapsed Pours → the toggle card fills the row, Log a Dram beside it.
+  .section-toggle--card {
+    flex: 1;
+    margin-right: 10px;
+  }
 }
 
 .detail__log-dram {
