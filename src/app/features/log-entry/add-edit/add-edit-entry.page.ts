@@ -27,6 +27,11 @@ import { BarcodeScannerService } from '../../../core/services/barcode-scanner.se
 import { StorageService } from '../../../core/services/storage.service';
 import { WishlistService } from '../../../core/services/wishlist.service';
 import { AuthService } from '../../../core/auth/auth.service';
+import {
+  EntryFieldRules,
+  deriveDidNotPurchase,
+  fieldRulesFor,
+} from './entry-field-rules';
 
 @Component({
   selector: 'app-add-edit-entry',
@@ -145,7 +150,6 @@ export class AddEditEntryPage {
     series: [''],
     // How you got it
     entryType: ['drink'],
-    didNotPurchase: [false],
     purchasePrice: [null as number | null],
     purchaseLocation: [''],
     purchaseDate: [null as string | null],
@@ -166,12 +170,27 @@ export class AddEditEntryPage {
     entryDate: [new Date().toISOString().slice(0, 10)], // YYYY-MM-DD
   });
 
-  // Reactive view of entryType so the template can show bottle-remaining only
-  // for purchased bottles.
+  // Reactive view of entryType: it alone drives which acquisition fields show
+  // (BB-215) — there is no "Didn't purchase" toggle anymore.
   private readonly entryTypeValue = signal(this.form.controls.entryType.value);
-  readonly isPurchasedBottle = computed(
-    () => this.entryTypeValue() === 'bottle_purchased'
-  );
+
+  // Legacy escape hatch: in edit mode, a field the type rules would hide stays
+  // visible when the stored entry has a value there, so nothing is dropped
+  // silently on save.
+  private readonly legacyFields = signal<Partial<EntryFieldRules>>({});
+  readonly fieldRules = computed<EntryFieldRules>(() => {
+    const rules = fieldRulesFor(
+      (this.entryTypeValue() as EntryType) ?? 'drink'
+    );
+    const legacy = this.legacyFields();
+    return {
+      price: rules.price || !!legacy.price,
+      bottleSize: rules.bottleSize || !!legacy.bottleSize,
+      where: rules.where,
+      dateLabel: rules.dateLabel ?? legacy.dateLabel ?? null,
+      remaining: rules.remaining || !!legacy.remaining,
+    };
+  });
 
   // Reactive view of subType so the template can reveal the barrel-label
   // (store-pick) field only for single barrels (BB-195).
@@ -381,7 +400,6 @@ export class AddEditEntryPage {
       barrelLabel: e.barrelLabel ?? '',
       series: e.series ?? '',
       entryType: e.entryType,
-      didNotPurchase: e.didNotPurchase,
       purchasePrice: e.purchasePrice ?? null,
       purchaseLocation: e.purchaseLocation ?? '',
       purchaseDate: e.purchaseDate ? this.tsToDateStr(e.purchaseDate) : null,
@@ -405,10 +423,15 @@ export class AddEditEntryPage {
     if (e.isNas) {
       this.form.controls.ageStatement.disable();
     }
-    if (e.didNotPurchase) {
-      this.form.controls.purchasePrice.disable();
-      this.form.controls.purchaseLocation.disable();
-    }
+    // Keep populated fields visible even when this entry type would hide them
+    // (legacy entries saved before BB-215).
+    const rules = fieldRulesFor(e.entryType);
+    this.legacyFields.set({
+      price: !rules.price && e.purchasePrice != null,
+      bottleSize: !rules.bottleSize && e.bottleSizeMl != null,
+      dateLabel: !rules.dateLabel && e.purchaseDate ? 'Date' : null,
+      remaining: !rules.remaining && e.bottleRemainingPct != null,
+    });
     this.existingPhotoUrl.set(e.labelPhotoUrl ?? null);
   }
 
@@ -495,19 +518,6 @@ export class AddEditEntryPage {
     }
   }
 
-  onDidNotPurchaseToggle(checked: boolean): void {
-    const { purchasePrice, purchaseLocation } = this.form.controls;
-    if (checked) {
-      purchasePrice.setValue(null);
-      purchaseLocation.setValue('');
-      purchasePrice.disable();
-      purchaseLocation.disable();
-    } else {
-      purchasePrice.enable();
-      purchaseLocation.enable();
-    }
-  }
-
   setRating(value: number): void {
     this.form.controls.rating.setValue(value);
     this.form.controls.rating.markAsDirty();
@@ -547,7 +557,10 @@ export class AddEditEntryPage {
         }));
 
       const entryType = (v.entryType as EntryType) ?? 'drink';
-      const bottleRemainingPct = this.isPurchasedBottle()
+      // Effective visibility (type rules + legacy overrides): hidden fields are
+      // nulled so the stored entry matches what the form showed.
+      const visible = this.fieldRules();
+      const bottleRemainingPct = visible.remaining
         ? this.numOrNull(v.bottleRemainingPct)
         : null;
       // Owned bottles carry an explicit lifecycle status (BB-191); a fresh entry
@@ -577,13 +590,11 @@ export class AddEditEntryPage {
         barrelLabel: this.strOrNull(v.barrelLabel),
         series: this.strOrNull(v.series),
         entryType,
-        didNotPurchase: v.didNotPurchase ?? false,
-        purchasePrice: v.didNotPurchase ? null : this.numOrNull(v.purchasePrice),
-        purchaseLocation: v.didNotPurchase
-          ? null
-          : this.strOrNull(v.purchaseLocation),
-        purchaseDate: this.toTimestamp(v.purchaseDate),
-        bottleSizeMl: this.numOrNull(v.bottleSizeMl),
+        didNotPurchase: deriveDidNotPurchase(entryType),
+        purchasePrice: visible.price ? this.numOrNull(v.purchasePrice) : null,
+        purchaseLocation: this.strOrNull(v.purchaseLocation),
+        purchaseDate: visible.dateLabel ? this.toTimestamp(v.purchaseDate) : null,
+        bottleSizeMl: visible.bottleSize ? this.numOrNull(v.bottleSizeMl) : null,
         bottleRemainingPct,
         bottleStatus,
         repurchaseOfEntryId: this.repurchaseOfEntryId,

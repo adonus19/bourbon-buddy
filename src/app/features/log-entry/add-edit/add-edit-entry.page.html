@@ -209,38 +209,36 @@
       }
     </ion-select>
 
-    <ion-item class="entry__toggle" lines="none">
-      <ion-toggle
-        formControlName="didNotPurchase"
-        (ionChange)="onDidNotPurchaseToggle($event.detail.checked)"
-        >Didn't purchase it</ion-toggle
-      >
-    </ion-item>
-
-    <div class="entry__row">
-      <ion-input
-        class="entry__field"
-        fill="solid"
-        label="Price"
-        labelPlacement="stacked"
-        type="number"
-        inputmode="decimal"
-        formControlName="purchasePrice"
-      ></ion-input>
-      <ion-select
-        class="entry__field"
-        fill="solid"
-        label="Bottle size"
-        labelPlacement="stacked"
-        interface="action-sheet"
-        placeholder="—"
-        formControlName="bottleSizeMl"
-      >
-        @for (size of bottleSizes; track size) {
-          <ion-select-option [value]="size">{{ size }} mL</ion-select-option>
+    @if (fieldRules().price || fieldRules().bottleSize) {
+      <div class="entry__row">
+        @if (fieldRules().price) {
+          <ion-input
+            class="entry__field"
+            fill="solid"
+            label="Price"
+            labelPlacement="stacked"
+            type="number"
+            inputmode="decimal"
+            formControlName="purchasePrice"
+          ></ion-input>
         }
-      </ion-select>
-    </div>
+        @if (fieldRules().bottleSize) {
+          <ion-select
+            class="entry__field"
+            fill="solid"
+            label="Bottle size"
+            labelPlacement="stacked"
+            interface="action-sheet"
+            placeholder="—"
+            formControlName="bottleSizeMl"
+          >
+            @for (size of bottleSizes; track size) {
+              <ion-select-option [value]="size">{{ size }} mL</ion-select-option>
+            }
+          </ion-select>
+        }
+      </div>
+    }
 
     <ion-input
       class="entry__field"
@@ -250,16 +248,18 @@
       formControlName="purchaseLocation"
     ></ion-input>
 
-    <ion-input
-      class="entry__field"
-      fill="solid"
-      label="Purchase date"
-      labelPlacement="stacked"
-      type="date"
-      formControlName="purchaseDate"
-    ></ion-input>
+    @if (fieldRules().dateLabel; as dateLabel) {
+      <ion-input
+        class="entry__field"
+        fill="solid"
+        [label]="dateLabel"
+        labelPlacement="stacked"
+        type="date"
+        formControlName="purchaseDate"
+      ></ion-input>
+    }
 
-    @if (isPurchasedBottle()) {
+    @if (fieldRules().remaining) {
       <ion-select
         class="entry__field"
         fill="solid"
