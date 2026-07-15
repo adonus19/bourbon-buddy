@@ -85,6 +85,20 @@ h1, h2, h3, .font-display {
       transform: rotate(180deg);
     }
   }
+
+  /* Collapsed state — the header renders as a glass card (a "closed drawer")
+   * so it reads as a container holding content, not a bare label. Bind with
+   * `[class.section-toggle--card]="!open()"` so it relaxes to the flat
+   * eyebrow header while the section is expanded. */
+  &--card {
+    @extend .glass-surface;
+    width: 100%;
+    padding: 14px 16px;
+
+    .section-toggle__count {
+      margin-left: auto;
+    }
+  }
 }
 
 /* Required-field marker — the * appended to a required input's label.

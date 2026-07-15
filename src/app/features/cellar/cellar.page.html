@@ -143,6 +143,7 @@
             <button
               type="button"
               class="section-toggle cellar-group__head"
+              [class.section-toggle--card]="!g.open"
               [attr.aria-expanded]="g.open"
               [attr.aria-controls]="'cellar-group-' + g.key"
               (click)="toggleGroup(g.key, g.open)"
