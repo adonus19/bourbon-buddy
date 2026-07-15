@@ -43,19 +43,35 @@ interface Testable {
   form: { controls: Record<string, { value: unknown }> };
 }
 
-function configure(geo: Partial<GeolocationService>): SpottedItPage {
+function configure(
+  geo: Partial<GeolocationService>,
+  opts: {
+    queryParams?: Record<string, string>;
+    router?: Partial<Router>;
+    sightings?: Partial<SightingService>;
+  } = {}
+): SpottedItPage {
   TestBed.configureTestingModule({
     imports: [ReactiveFormsModule],
     declarations: [SpottedItPage],
     schemas: [NO_ERRORS_SCHEMA],
     providers: [
       { provide: BourbonCatalogService, useValue: {} },
-      { provide: SightingService, useValue: {} },
+      { provide: SightingService, useValue: opts.sightings ?? {} },
       { provide: BarcodeScannerService, useValue: {} },
       { provide: GeolocationService, useValue: geo },
       { provide: AuthService, useValue: { profile: () => null } },
-      { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: { get: () => null } } } },
-      { provide: Router, useValue: {} },
+      {
+        provide: ActivatedRoute,
+        useValue: {
+          snapshot: {
+            queryParamMap: {
+              get: (k: string) => opts.queryParams?.[k] ?? null,
+            },
+          },
+        },
+      },
+      { provide: Router, useValue: opts.router ?? {} },
       { provide: ToastController, useValue: { create: async () => ({ present: async () => undefined }) } },
     ],
   });
@@ -98,5 +114,56 @@ describe('SpottedItPage — nearby retailer picker (BB-187)', () => {
     // Both present: both are set.
     c.selectStore({ name: 'B', lat: 1, lng: 2, kind: 'wine', city: 'Lowell', state: 'MA' });
     expect(c.form.controls['city'].value).toBe('Lowell');
+  });
+});
+
+describe('SpottedItPage — bottle-context deep link', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  it('prefills the bottle from bourbonName/bourbonId query params', () => {
+    const c = testable(
+      configure({}, { queryParams: { bourbonName: 'Eagle Rare', bourbonId: 'er10' } })
+    );
+    expect(c.form.controls['bourbonName'].value).toBe('Eagle Rare');
+    expect(c.form.controls['bourbonId'].value).toBe('er10');
+  });
+
+  it('leaves the form empty without query params', () => {
+    const c = testable(configure({}));
+    expect(c.form.controls['bourbonName'].value).toBe('');
+    expect(c.form.controls['bourbonId'].value).toBe('');
+  });
+
+  async function saveWith(returnTo?: string): Promise<jest.Mock> {
+    const navigateByUrl = jest.fn().mockResolvedValue(true);
+    const page = configure(
+      {},
+      {
+        queryParams: {
+          bourbonName: 'Eagle Rare',
+          bourbonId: 'er10',
+          ...(returnTo ? { returnTo } : {}),
+        },
+        router: { navigateByUrl } as Partial<Router>,
+        sightings: { add: jest.fn().mockResolvedValue('saved') },
+      }
+    );
+    page.form.patchValue({ storeName: 'Total Wine', price: 39.99 });
+    await page.save();
+    return navigateByUrl;
+  }
+
+  it('returns to returnTo after saving (back to the wishlist detail)', async () => {
+    const navigateByUrl = await saveWith('/wishlist/abc123');
+    expect(navigateByUrl).toHaveBeenCalledWith('/wishlist/abc123', {
+      replaceUrl: true,
+    });
+  });
+
+  it('falls back to the Hunt List without a returnTo', async () => {
+    const navigateByUrl = await saveWith();
+    expect(navigateByUrl).toHaveBeenCalledWith('/tabs/hunt-list', {
+      replaceUrl: true,
+    });
   });
 });

@@ -42,6 +42,21 @@ export class SpottedItPage {
   saving = false;
   private autoScanned = false;
 
+  // Arriving from a bottle context (e.g. a wishlist detail's "Report a
+  // Sighting"): the bottle comes prefilled and returnTo brings the user back
+  // where they started instead of the Hunt List.
+  private readonly returnTo = this.route.snapshot.queryParamMap.get('returnTo');
+
+  constructor() {
+    const bourbonName = this.route.snapshot.queryParamMap.get('bourbonName');
+    if (bourbonName) {
+      this.form.patchValue({
+        bourbonName,
+        bourbonId: this.route.snapshot.queryParamMap.get('bourbonId') ?? '',
+      });
+    }
+  }
+
   // Opt-in location (BB-177). Captured when the user enables the toggle; passed
   // to the sighting on save. Coordinates are never shown as raw numbers.
   readonly attachLocation = signal(false);
@@ -274,7 +289,10 @@ export class SpottedItPage {
           ? "Saved offline — it'll sync when you're back online."
           : 'Spotted it. Sighting logged.'
       );
-      await this.router.navigateByUrl('/tabs/hunt-list', { replaceUrl: true });
+      await this.router.navigateByUrl(
+        this.returnTo?.startsWith('/') ? this.returnTo : '/tabs/hunt-list',
+        { replaceUrl: true }
+      );
     } catch (err) {
       await this.presentToast(sightingErrorMessage(err));
     } finally {

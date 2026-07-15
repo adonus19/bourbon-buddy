@@ -12,7 +12,6 @@ import { BourbonAutocompleteComponent } from './components/bourbon-autocomplete/
 import { LogEntryCardComponent } from './components/log-entry-card/log-entry-card.component';
 import { LabelPhotoPickerComponent } from './components/label-photo-picker/label-photo-picker.component';
 import { WishlistCardComponent } from './components/wishlist-card/wishlist-card.component';
-import { SightingFormComponent } from './components/sighting-form/sighting-form.component';
 import { PourFormComponent } from './components/pour-form/pour-form.component';
 import { ChipInputComponent } from './components/chip-input/chip-input.component';
 import { MetricCardComponent } from './components/metric-card/metric-card.component';
@@ -41,7 +40,6 @@ const COMPONENTS = [
   LogEntryCardComponent,
   LabelPhotoPickerComponent,
   WishlistCardComponent,
-  SightingFormComponent,
   PourFormComponent,
   ChipInputComponent,
   MetricCardComponent,
