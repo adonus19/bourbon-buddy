@@ -104,10 +104,10 @@
         <p class="eyebrow">How I got it</p>
         <div class="kv">
           <span class="kv__row">{{ entryTypeLabel() }}</span>
-          @if (!e.didNotPurchase && e.purchasePrice != null) {
+          @if (e.purchasePrice != null) {
             <span class="kv__row">${{ e.purchasePrice }}</span>
           }
-          @if (!e.didNotPurchase && e.purchaseLocation) {
+          @if (e.purchaseLocation) {
             <span class="kv__row">{{ e.purchaseLocation }}</span>
           }
           @if (e.bottleSizeMl) {
