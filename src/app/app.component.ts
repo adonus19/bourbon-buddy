@@ -1,4 +1,6 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
+import { NavigationEnd, NavigationError, Router } from '@angular/router';
+import { filter, take } from 'rxjs/operators';
 
 import { AppUpdateService } from './core/services/app-update.service';
 import { InboxService } from './core/services/inbox.service';
@@ -12,6 +14,30 @@ import { InboxService } from './core/services/inbox.service';
 export class AppComponent implements OnInit {
   private readonly inbox = inject(InboxService);
   private readonly appUpdate = inject(AppUpdateService);
+  private readonly router = inject(Router);
+
+  // Boot splash (BB-218): fading = CSS opacity transition running;
+  // gone = removed from the DOM. Flips on the first *settled* navigation —
+  // NavigationEnd (a page actually rendered) or NavigationError (never trap
+  // the user behind the splash). Guard redirects emit NavigationCancel and
+  // are deliberately ignored: their follow-up navigation still ends.
+  readonly bootSplashFading = signal(false);
+  readonly bootSplashGone = signal(false);
+
+  constructor() {
+    this.router.events
+      .pipe(
+        filter(
+          (e) => e instanceof NavigationEnd || e instanceof NavigationError
+        ),
+        take(1)
+      )
+      .subscribe(() => {
+        this.bootSplashFading.set(true);
+        // Matches the 400ms opacity transition in the index.html style block.
+        setTimeout(() => this.bootSplashGone.set(true), 450);
+      });
+  }
 
   ngOnInit(): void {
     this.appUpdate.init();
