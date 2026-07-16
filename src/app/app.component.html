@@ -4,3 +4,22 @@
 
 <!-- Guided walkthrough / contextual tips; renders only when a step is active. -->
 <app-onboarding-overlay></app-onboarding-overlay>
+
+<!-- Boot splash (BB-218): Angular-side twin of the static copy in index.html
+     (same classes, styled by the inline block there). Bootstrap swaps the
+     static copy for this one in the same frame; it stays up through the
+     auth-guard wait and the first lazy chunk, then fades when the first
+     navigation settles. -->
+@if (!bootSplashGone()) {
+  <div
+    class="boot-splash"
+    [class.boot-splash--hide]="bootSplashFading()"
+    aria-hidden="true"
+  >
+    <span class="boot-splash__wordmark">
+      <span class="boot-splash__bourbon">Bourbon</span
+      ><span class="boot-splash__buddy">Buddy</span>
+    </span>
+    <span class="boot-splash__pour"></span>
+  </div>
+}

@@ -44,10 +44,92 @@
        via @fontsource (bundled into styles.css, BB-192) — no render-blocking
        third-party request on cold start, and the service worker can cache
        them like any other asset. -->
+
+  <!-- Boot splash (BB-218). Inline so it paints on the very first frame,
+       before styles.css or any JS: the OS splash dismisses at first paint,
+       and without this the user stares at a bare background while the bundle
+       parses. The static copy below lives inside <app-root>, so Angular
+       swaps it for the identical copy in app.component.html at bootstrap
+       (same classes, styled by this block → seamless); that copy then fades
+       once the first route actually renders. Colors are hard-coded on
+       purpose — the theme's CSS variables aren't loaded yet. -->
+  <style>
+    .boot-splash {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 28px;
+      background: #141210;
+      opacity: 1;
+      transition: opacity 400ms ease;
+    }
+
+    .boot-splash--hide {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .boot-splash__wordmark {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 34px;
+      line-height: 1;
+      color: #c8873a;
+      white-space: nowrap;
+    }
+
+    .boot-splash__bourbon {
+      font-weight: 700;
+    }
+
+    .boot-splash__buddy {
+      font-weight: 400;
+      font-style: italic;
+      margin-left: 0.25em;
+    }
+
+    .boot-splash__pour {
+      width: 44px;
+      height: 3px;
+      border-radius: 3px;
+      background: #8a5c28;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .boot-splash__pour::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      width: 40%;
+      border-radius: 3px;
+      background: #e8a85a;
+      animation: boot-splash-pour 1.2s ease-in-out infinite alternate;
+    }
+
+    @keyframes boot-splash-pour {
+      from { transform: translateX(-100%); }
+      to   { transform: translateX(250%); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .boot-splash__pour::after { animation: none; width: 100%; opacity: 0.6; }
+    }
+  </style>
 </head>
 
 <body>
-  <app-root></app-root>
+  <app-root>
+    <div class="boot-splash" aria-hidden="true">
+      <span class="boot-splash__wordmark">
+        <span class="boot-splash__bourbon">Bourbon</span><span class="boot-splash__buddy">Buddy</span>
+      </span>
+      <span class="boot-splash__pour"></span>
+    </div>
+  </app-root>
 </body>
 
 </html>
