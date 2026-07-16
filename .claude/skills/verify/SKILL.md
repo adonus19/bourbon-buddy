@@ -35,5 +35,13 @@ Gotchas:
   `ion-button:has-text("Got it")` before screenshotting.
 - Console shows repeated 403s + `requestStorageAccess` errors against the
   emulators (App Check/reCAPTCHA noise) — pre-existing, not a finding.
+- Icon-only toolbar buttons: Ionic moves `aria-label` off the `ion-button`
+  host, so select via `ion-button:has(ion-icon[name="..."])` — and click the
+  button, not the inner icon (the button intercepts pointer events).
+- A fresh user gets the first-run tour overlay on the tabs; dismiss with the
+  "Skip" button before tapping anything.
+- Stacked ion-modals: `modalCtrl.dismiss()` targets the TOP overlay; after a
+  child sheet closes, wait for `onDidDismiss` (not `onWillDismiss`) before
+  dismissing the parent, or you dismiss the wrong one.
 - Teardown: `pkill -f "ng serve --port"` and `pkill -f "emulators:start"`,
   and revert `useEmulators`.

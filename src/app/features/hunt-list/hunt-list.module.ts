@@ -6,6 +6,7 @@ import { RouterModule } from '@angular/router';
 import { SharedModule } from '../../shared/shared.module';
 import { HuntListPage } from './hunt-list.page';
 import { WishlistFilterModalComponent } from './filter-modal/wishlist-filter-modal.component';
+import { BottleLookupComponent } from './bottle-lookup/bottle-lookup.component';
 
 @NgModule({
   imports: [
@@ -14,6 +15,6 @@ import { WishlistFilterModalComponent } from './filter-modal/wishlist-filter-mod
     SharedModule,
     RouterModule.forChild([{ path: '', component: HuntListPage }]),
   ],
-  declarations: [HuntListPage, WishlistFilterModalComponent],
+  declarations: [HuntListPage, WishlistFilterModalComponent, BottleLookupComponent],
 })
 export class HuntListPageModule {}

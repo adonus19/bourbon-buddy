@@ -1,0 +1,44 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button (click)="close()">Close</ion-button>
+    </ion-buttons>
+    <ion-title>Look up a bottle</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="lookup">
+  <p class="lookup__lead">
+    In a store, staring at a bottle? See what we know about it — tasting
+    profile, similar bottles — before you buy.
+  </p>
+
+  <ion-button
+    class="lookup__scan"
+    type="button"
+    fill="outline"
+    expand="block"
+    (click)="scanBarcode()"
+  >
+    <ion-icon slot="start" name="barcode-outline"></ion-icon>
+    Scan barcode
+  </ion-button>
+
+  @if (lookingUp()) {
+    <div class="lookup__busy">
+      <ion-spinner name="dots"></ion-spinner>
+      Looking up bottle…
+    </div>
+  }
+
+  <app-bourbon-autocomplete
+    label="Bourbon / whiskey name"
+    placeholder="Start typing a name…"
+    (selected)="openBottle($event)"
+  ></app-bourbon-autocomplete>
+
+  <p class="lookup__hint">
+    Results come from the shared bottle catalog. If a bottle has no tasting
+    notes yet, we'll say so — nothing here is guessed.
+  </p>
+</ion-content>
