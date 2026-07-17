@@ -31,11 +31,11 @@ import {
   parseExtractionResponse,
 } from "./extraction";
 import {
+  applyArticleSeed,
   articleFlavorSeed,
   FlavorTags,
-  mergeFlavorTags,
+  profileProvenance,
   profileToTags,
-  sameTags,
 } from "./flavor-enrichment";
 
 // AI Flavor Enrichment (BB-185) — canonical-constrained tasting notes, cached
@@ -61,7 +61,10 @@ const EXTRACTION_MODEL = "llama-3.3-70b-versatile";
 // v2: article-stated facts (proof/ageYears/msrp/releaseType).
 // v3: articleType classification + per-bottle verdict (BB-220) — press-release
 //     flavor seeding stops, so re-extraction under v3 also matters for trust.
-const EXTRACTION_PROMPT_VERSION = 3;
+// v4: no prompt change — processing change (BB-222): press-release notes are
+//     harvested again, into marketingTagCounts. Bumped to re-sweep v3 PRs
+//     whose flavor cues were discarded.
+const EXTRACTION_PROMPT_VERSION = 4;
 // Range-guide articles can list 10+ expressions, so keep this generous.
 const MAX_BOTTLES = 12;
 // v2 adds four fact fields per bottle; 768 clipped long multi-bottle replies.
@@ -456,15 +459,19 @@ async function processArticle(
     // tasting notes in the article. Best-effort — never fail extraction for it.
     // Seeded before the chip is built so a bottle first created here still
     // carries flavor tags for the Taste Match badge (BB-199).
-    // Press releases never seed (BB-220): their "tasting notes" are the
-    // producer's marketing copy, not an evaluation.
+    // Press releases seed ONLY the marketing tier (BB-222): their notes are
+    // recorded as producer claims, never merged into the profile arrays.
     let seeded: FlavorTags | null = null;
-    if (articleType !== "press_release") {
-      try {
-        seeded = await seedArticleFlavor(db, match.id, raw.flavor);
-      } catch (err) {
-        logger.warn(`Flavor seed failed for ${match.id}`, err);
-      }
+    try {
+      seeded = await seedArticleFlavor(
+        db,
+        match.id,
+        raw.flavor,
+        ref.id,
+        articleType !== "press_release"
+      );
+    } catch (err) {
+      logger.warn(`Flavor seed failed for ${match.id}`, err);
     }
     // A verdict is a critic signal — cache it on the catalog doc (BB-220).
     // Best-effort like the flavor seed; keyed by articleId so re-runs are safe.
@@ -635,14 +642,18 @@ async function matchOrCreateCatalog(
 
 /**
  * Merges an article's tasting notes into a catalog bottle's flavor profile
- * (BB-185 feed a). Accumulates rather than overwrites — multiple reviews build a
- * consensus profile, and article cues never lock out or clobber a fuller feed-(b)
- * profile. Best-effort; only runs for the rare review article that carries notes.
+ * (BB-185 feed a) with trust-tiered provenance (BB-222). Evaluative articles
+ * accumulate into the arrays + `tagCounts`; press releases record claims in
+ * `marketingTagCounts` only. Idempotent per articleId, so the versioned
+ * re-sweep never double-counts. Best-effort; returns the profile's array tags
+ * (for the feed chip) or null when the bottle still has none.
  */
 async function seedArticleFlavor(
   db: FirebaseFirestore.Firestore,
   bourbonId: string,
-  rawFlavor: unknown
+  rawFlavor: unknown,
+  articleId: string,
+  evaluative: boolean
 ): Promise<FlavorTags | null> {
   const seed = articleFlavorSeed(rawFlavor);
   if (!seed) {
@@ -650,20 +661,27 @@ async function seedArticleFlavor(
   }
   const ref = db.collection("bourbons").doc(bourbonId);
   const snap = await ref.get();
-  const existing = profileToTags(snap.get("flavorProfile"));
-  const merged = mergeFlavorTags(existing, seed);
-  if (sameTags(existing, merged)) {
+  const profile = snap.get("flavorProfile");
+  const existing = profileToTags(profile);
+  const res = applyArticleSeed(
+    existing,
+    profileProvenance(profile),
+    seed,
+    articleId,
+    evaluative
+  );
+  if (!res.changed) {
     return hasTags(existing) ? existing : null; // nothing new — skip the write
   }
   // Carry the generation prompt version through (BB-196) — an article seed
   // augments a profile, it doesn't regenerate it, so the version must survive
   // or the force sweep would re-upgrade this bottle forever.
-  const promptVersion = (
-    snap.get("flavorProfile") as { promptVersion?: unknown } | undefined
-  )?.promptVersion;
+  const promptVersion = (profile as { promptVersion?: unknown } | undefined)
+    ?.promptVersion;
   await ref.update({
     flavorProfile: {
-      ...merged,
+      ...res.tags,
+      ...res.provenance,
       source: "ai",
       model: EXTRACTION_MODEL,
       ...(promptVersion !== undefined ? { promptVersion } : {}),
@@ -671,7 +689,7 @@ async function seedArticleFlavor(
     },
     flavorEnrichedAt: FieldValue.serverTimestamp(),
   });
-  return merged;
+  return hasTags(res.tags) ? res.tags : null;
 }
 
 /**

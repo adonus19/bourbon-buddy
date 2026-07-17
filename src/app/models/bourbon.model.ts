@@ -15,6 +15,13 @@ export interface FlavorProfile {
   source: 'ai';
   model: string; // provenance, e.g. 'llama-3.1-8b-instant'
   generatedAt: Timestamp;
+  // Trust-tier provenance (BB-222), absent on legacy profiles. tagCounts =
+  // review/listicle mentions (load-bearing); marketingTagCounts = producer
+  // claims (display-only, weak corroborator — never in the arrays above).
+  tagCounts?: Record<string, number>;
+  marketingTagCounts?: Record<string, number>;
+  seededArticleIds?: string[];
+  reviewCount?: number;
 }
 
 /**

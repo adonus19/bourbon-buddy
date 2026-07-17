@@ -173,6 +173,124 @@ export function articleFlavorSeed(rawFlavor: unknown): FlavorTags | null {
   return hasAnyTags(tags) ? tags : null;
 }
 
+// ————— Flavor tag provenance (BB-222) —————
+//
+// The trust ladder (owner decision 2026-07-17): user-confirmed (BB-188, later)
+// > review/listicle mentions (enter the arrays, counted in tagCounts) > AI
+// feed-b suggestions (arrays only, uncounted) > marketing claims (counted in
+// marketingTagCounts, NEVER in the arrays — so they can't consume the stage
+// cap or feed Taste Match / Similar Bottles). Marketing acts as a weak
+// corroborator at display time only.
+
+/** Per-article idempotency window. Old ids fall off; their counts remain. */
+export const SEEDED_IDS_CAP = 30;
+
+export interface FlavorProvenance {
+  tagCounts: Record<string, number>; // non-marketing article mentions per tag
+  marketingTagCounts: Record<string, number>; // press-release claims per tag
+  seededArticleIds: string[]; // articles already counted (idempotency)
+  reviewCount: number; // non-marketing articles that seeded
+}
+
+/** Read provenance out of a stored profile, tolerating legacy/garbage shapes. */
+export function profileProvenance(profile: unknown): FlavorProvenance {
+  const p = (profile ?? {}) as Record<string, unknown>;
+  const counts = (v: unknown): Record<string, number> => {
+    if (!v || typeof v !== "object" || Array.isArray(v)) {
+      return {};
+    }
+    const out: Record<string, number> = {};
+    for (const [tag, n] of Object.entries(v as Record<string, unknown>)) {
+      if (typeof n === "number" && Number.isFinite(n) && n > 0) {
+        out[tag] = n;
+      }
+    }
+    return out;
+  };
+  const reviewCount = p["reviewCount"];
+  return {
+    tagCounts: counts(p["tagCounts"]),
+    marketingTagCounts: counts(p["marketingTagCounts"]),
+    seededArticleIds: Array.isArray(p["seededArticleIds"])
+      ? (p["seededArticleIds"] as unknown[]).filter(
+          (x): x is string => typeof x === "string"
+        )
+      : [],
+    reviewCount:
+      typeof reviewCount === "number" && reviewCount > 0 ? reviewCount : 0,
+  };
+}
+
+/** Whether any provenance exists — guards against nulling it away. */
+export function hasProvenance(p: FlavorProvenance): boolean {
+  return (
+    p.reviewCount > 0 ||
+    p.seededArticleIds.length > 0 ||
+    Object.keys(p.tagCounts).length > 0 ||
+    Object.keys(p.marketingTagCounts).length > 0
+  );
+}
+
+export interface SeedResult {
+  tags: FlavorTags;
+  provenance: FlavorProvenance;
+  changed: boolean;
+}
+
+/**
+ * Apply one article's tasting notes to a bottle's profile state (BB-222).
+ * Pure. Evaluative articles merge into the arrays and count in `tagCounts`;
+ * marketing (press-release) articles count ONLY in `marketingTagCounts`.
+ * Idempotent per articleId; a tag counts once per article no matter how many
+ * stages mention it.
+ */
+export function applyArticleSeed(
+  tags: FlavorTags,
+  provenance: FlavorProvenance,
+  seed: FlavorTags,
+  articleId: string,
+  evaluative: boolean
+): SeedResult {
+  if (provenance.seededArticleIds.includes(articleId)) {
+    return { tags, provenance, changed: false };
+  }
+  const seedTags = [...new Set([...seed.nose, ...seed.palate, ...seed.finish])];
+  if (seedTags.length === 0) {
+    return { tags, provenance, changed: false };
+  }
+  const bump = (m: Record<string, number>): Record<string, number> => {
+    const next = { ...m };
+    for (const t of seedTags) {
+      next[t] = (next[t] ?? 0) + 1;
+    }
+    return next;
+  };
+  const seededArticleIds = [...provenance.seededArticleIds, articleId].slice(
+    -SEEDED_IDS_CAP
+  );
+  if (evaluative) {
+    return {
+      tags: mergeFlavorTags(tags, seed),
+      provenance: {
+        ...provenance,
+        tagCounts: bump(provenance.tagCounts),
+        reviewCount: provenance.reviewCount + 1,
+        seededArticleIds,
+      },
+      changed: true,
+    };
+  }
+  return {
+    tags,
+    provenance: {
+      ...provenance,
+      marketingTagCounts: bump(provenance.marketingTagCounts),
+      seededArticleIds,
+    },
+    changed: true,
+  };
+}
+
 /** Prompt the model then sanitize its reply to canonical tags. */
 export async function generateFlavorTags(
   bottle: BottleContext,
@@ -265,9 +383,29 @@ export async function applyEnrichment(
     return { status: "cached", flavorProfile: bottle.flavorProfile ?? null };
   }
 
+  // Provenance (BB-222) survives every regeneration — counts record what
+  // articles said, which no feed-b generation can un-say.
+  const provenance = profileProvenance(bottle.flavorProfile);
+
   // Record the attempt either way (a retry-cooldown for the sweep). Store null
-  // only when there's genuinely nothing — never wipe existing tags.
+  // only when there's genuinely nothing — never wipe existing tags, and never
+  // wipe provenance (a marketing-only bottle has empty arrays but real claims).
   if (!hasAnyTags(chosen)) {
+    if (hasProvenance(provenance)) {
+      const flavorProfile = {
+        ...chosen,
+        ...provenance,
+        source: "ai" as const,
+        model: GROQ_MODEL,
+        promptVersion: FLAVOR_PROMPT_VERSION,
+        generatedAt: Timestamp.now(),
+      };
+      await ref.update({
+        flavorProfile,
+        flavorEnrichedAt: FieldValue.serverTimestamp(),
+      });
+      return { status: "empty", flavorProfile };
+    }
     await ref.update({
       flavorProfile: null,
       flavorEnrichedAt: FieldValue.serverTimestamp(),
@@ -277,6 +415,7 @@ export async function applyEnrichment(
 
   const flavorProfile = {
     ...chosen,
+    ...provenance,
     source: "ai" as const,
     model: GROQ_MODEL,
     promptVersion: FLAVOR_PROMPT_VERSION,

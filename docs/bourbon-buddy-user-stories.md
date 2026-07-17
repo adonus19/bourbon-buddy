@@ -1893,20 +1893,47 @@ release or a real review, **so that** marketing copy never poses as consensus.
 
 ---
 
-### BB-222 — Flavor Tag Provenance
+### BB-222 — Flavor Tag Provenance *(expanded 2026-07-17: marketing tier)*
 **As a** user, **I want** to see how many reviews mention each note ("Banana
-×3"), **so that** I can tell consensus from a single writer's take.
+×3") and what the producer merely *claims*, **so that** I can tell consensus
+from a single writer's take — and both from marketing.
+
+**Context (owner decision, 2026-07-17):** marketing notes aren't lies, but
+their bias is one-directional (never "young"/"thin"/"hot"), so they'd push
+profiles toward the same dessert-sweet center. They're captured as the
+lowest-trust tier and act only as a **weak corroborator**.
 
 **AC:**
-- `flavorProfile` gains `tagCounts`, `seededArticleIds` (idempotency, cap ~30),
-  `reviewCount` — arrays unchanged, fully backward-compatible.
-- `seedArticleFlavor` increments counts once per article; AI-generated (feed-b)
-  tags carry **no** count — counts mean *a human wrote this*.
-- UI: chips ordered by count, "×N" badge at N ≥ 2; profile source line reads
-  "Based on N reviews" vs "AI-suggested".
+- `flavorProfile` gains `tagCounts` (review/listicle mentions),
+  `marketingTagCounts` (press-release claims), `seededArticleIds`
+  (shared idempotency, cap ~30), `reviewCount` — arrays unchanged,
+  backward-compatible; enrichment regeneration must **carry provenance
+  through**, never clobber it.
+- Seeding: evaluative articles merge into the arrays AND increment
+  `tagCounts` (+ `reviewCount`); press releases increment **only**
+  `marketingTagCounts` — never the arrays, so marketing can't consume the
+  6-tag stage cap or feed Taste Match / Similar Bottles.
+- **Weak corroborator:** a marketing mention adds display weight to a tag a
+  review already mentions; marketing-only tags render as a separate
+  "Distillery says …" row, visibly apart from earned consensus.
+- AI-generated (feed-b) tags carry **no** count — counts mean *a human wrote
+  this*.
+- UI: stage tags ordered by weight, "×N" badge at review-count ≥ 2; source
+  line reads "Based on N reviews" vs "AI-suggested".
+- Extraction version bump so recent press releases are re-harvested by the
+  sweep.
 - Taste-match weighting by count is explicitly deferred (see taste-match design).
 
-**SP:** 3
+**SP:** 4
+
+---
+
+### BB-188 — Crowdsourced Flavor Aggregation *(promoted from backlog 2026-07-17)*
+Promoted into Epic 23 now that the user base is growing: users' own
+**confirmed** tags become the **top** trust tier (`userTagCounts`), above
+reviews > marketing > AI-suggested. Original story below in the Backlog
+section; needs a design pass (per-user dedupe, trigger vs. scheduled sweep,
+privacy) before scoping. Runs **after** BB-221.
 
 ---
 

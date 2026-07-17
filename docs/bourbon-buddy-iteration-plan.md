@@ -557,10 +557,21 @@ provenance counts. All in the existing one-call-per-article budget
       `extractionVersion` + versioned re-sweep ✅
 - [x] **BB-220** — `articleType` classification + per-bottle `verdict`;
       press-release flavor seeds dropped; provenance chip in Dispatch ✅
+- [x] **BB-222** ✅ — Per-tag provenance counts on `flavorProfile` — **reordered
+      before BB-221 and expanded (2026-07-17):** marketing (press-release)
+      notes are captured again, but as a separate lowest-trust tier
+      (`marketingTagCounts`) shown as "Distillery says…" — never entering the
+      profile arrays, and acting only as a **weak corroborator** (adds weight
+      to a tag a review already mentions; marketing-only tags are display-only,
+      never feeding Taste Match / Similar Bottles). Review mentions stay the
+      load-bearing tier (`tagCounts`, "×N" badges, "Based on N reviews").
 - [ ] **BB-221** — Numeric ratings: raw-string extraction, server-side
       `parseRating`, idempotent `criticSignals` map, `app-critic-summary` UI
-- [ ] **BB-222** — Per-tag provenance counts on `flavorProfile`
-      (`tagCounts` / `seededArticleIds`), chip ordering + "×N" badges
+- [ ] **BB-188** — Crowdsourced flavor aggregation — **promoted from backlog
+      (2026-07-17; user base is growing):** blend users' own confirmed tags
+      into the catalog as the TOP trust tier (`userTagCounts`), above reviews >
+      marketing > AI-suggested. Design pass needed (per-user dedupe, trigger vs
+      sweep) before scoping.
 
 ### Iteration R13 — My Stores (Epic 24, ~9 SP)
 **Goal:** a private retailer notebook — manual price-tier + specialties +

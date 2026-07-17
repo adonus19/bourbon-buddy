@@ -1,5 +1,7 @@
 import {
+  applyArticleSeed,
   applyEnrichment,
+  profileProvenance,
   articleFlavorSeed,
   buildFlavorPrompt,
   FLAVOR_PROMPT_VERSION,
@@ -140,6 +142,171 @@ describe("shouldSweepEnrich (BB-185 proactive backfill)", () => {
     expect(
       shouldSweepEnrich({ flavorProfile: thin, flavorEnrichedAt: at }, NOW, COOLDOWN)
     ).toBe(true);
+  });
+});
+
+describe("profileProvenance (BB-222)", () => {
+  it("defaults everything on a missing or legacy profile", () => {
+    for (const profile of [null, undefined, { nose: ["Vanilla"] }]) {
+      expect(profileProvenance(profile)).toEqual({
+        tagCounts: {},
+        marketingTagCounts: {},
+        seededArticleIds: [],
+        reviewCount: 0,
+      });
+    }
+  });
+
+  it("reads stored provenance and drops garbage values", () => {
+    const p = profileProvenance({
+      tagCounts: { Banana: 3, Oak: "many", Corn: -1 },
+      marketingTagCounts: { Vanilla: 2 },
+      seededArticleIds: ["a1", 7, "a2"],
+      reviewCount: 3,
+    });
+    expect(p.tagCounts).toEqual({ Banana: 3 });
+    expect(p.marketingTagCounts).toEqual({ Vanilla: 2 });
+    expect(p.seededArticleIds).toEqual(["a1", "a2"]);
+    expect(p.reviewCount).toBe(3);
+  });
+});
+
+describe("applyArticleSeed (BB-222 trust tiers)", () => {
+  const empty: { nose: string[]; palate: string[]; finish: string[] } = {
+    nose: [],
+    palate: [],
+    finish: [],
+  };
+  const noProv = profileProvenance(null);
+  const seed = { nose: ["Banana"], palate: ["Banana", "Corn"], finish: [] };
+
+  it("evaluative: merges arrays, counts tags once each, bumps reviewCount", () => {
+    const res = applyArticleSeed(empty, noProv, seed, "a1", true);
+    expect(res.changed).toBe(true);
+    expect(res.tags.palate).toEqual(["Banana", "Corn"]);
+    // Banana appears in two stages but counts once — counts are per article.
+    expect(res.provenance.tagCounts).toEqual({ Banana: 1, Corn: 1 });
+    expect(res.provenance.reviewCount).toBe(1);
+    expect(res.provenance.seededArticleIds).toEqual(["a1"]);
+    expect(res.provenance.marketingTagCounts).toEqual({});
+  });
+
+  it("marketing: counts claims only — arrays and reviewCount untouched", () => {
+    const existing = { nose: ["Oak"], palate: [], finish: [] };
+    const res = applyArticleSeed(existing, noProv, seed, "pr1", false);
+    expect(res.changed).toBe(true);
+    expect(res.tags).toEqual(existing); // never enters the profile arrays
+    expect(res.provenance.marketingTagCounts).toEqual({ Banana: 1, Corn: 1 });
+    expect(res.provenance.tagCounts).toEqual({});
+    expect(res.provenance.reviewCount).toBe(0);
+    expect(res.provenance.seededArticleIds).toEqual(["pr1"]);
+  });
+
+  it("is idempotent per article (re-extraction never double-counts)", () => {
+    const first = applyArticleSeed(empty, noProv, seed, "a1", true);
+    const again = applyArticleSeed(
+      first.tags,
+      first.provenance,
+      seed,
+      "a1",
+      true
+    );
+    expect(again.changed).toBe(false);
+    expect(again.provenance.tagCounts).toEqual({ Banana: 1, Corn: 1 });
+  });
+
+  it("accumulates counts across distinct articles", () => {
+    const first = applyArticleSeed(empty, noProv, seed, "a1", true);
+    const second = applyArticleSeed(
+      first.tags,
+      first.provenance,
+      { nose: ["Banana"], palate: [], finish: [] },
+      "a2",
+      true
+    );
+    expect(second.provenance.tagCounts).toEqual({ Banana: 2, Corn: 1 });
+    expect(second.provenance.reviewCount).toBe(2);
+  });
+
+  it("no-ops on an empty seed", () => {
+    const res = applyArticleSeed(empty, noProv, empty, "a1", true);
+    expect(res.changed).toBe(false);
+    expect(res.provenance.seededArticleIds).toEqual([]);
+  });
+
+  it("caps seededArticleIds, dropping the oldest", () => {
+    let tags = empty;
+    let prov = noProv;
+    for (let i = 0; i < 32; i++) {
+      const res = applyArticleSeed(
+        tags,
+        prov,
+        { nose: ["Oak"], palate: [], finish: [] },
+        `a${i}`,
+        true
+      );
+      tags = res.tags;
+      prov = res.provenance;
+    }
+    expect(prov.seededArticleIds).toHaveLength(30);
+    expect(prov.seededArticleIds[0]).toBe("a2");
+    expect(prov.seededArticleIds[29]).toBe("a31");
+  });
+});
+
+describe("applyEnrichment — provenance carry-through (BB-222)", () => {
+  const provenance = {
+    tagCounts: { Banana: 2 },
+    marketingTagCounts: { Vanilla: 1 },
+    seededArticleIds: ["a1", "pr1"],
+    reviewCount: 2,
+  };
+
+  it("keeps provenance fields when regenerating a profile", async () => {
+    const ref = { update: jest.fn().mockResolvedValue(undefined) };
+    await applyEnrichment(
+      ref,
+      {
+        name: "Jimmy Red",
+        flavorProfile: { nose: ["Banana"], palate: [], finish: [], ...provenance },
+      },
+      false,
+      async () => ({ nose: ["Corn"], palate: ["Oak"], finish: ["Char"] })
+    );
+    const written = ref.update.mock.calls[0][0].flavorProfile;
+    expect(written.tagCounts).toEqual({ Banana: 2 });
+    expect(written.marketingTagCounts).toEqual({ Vanilla: 1 });
+    expect(written.seededArticleIds).toEqual(["a1", "pr1"]);
+    expect(written.reviewCount).toBe(2);
+  });
+
+  it("never nulls a profile that still carries provenance", async () => {
+    // A marketing-only bottle: empty arrays but real claims. An empty
+    // generation must not wipe the claims by writing flavorProfile: null.
+    const ref = { update: jest.fn().mockResolvedValue(undefined) };
+    await applyEnrichment(
+      ref,
+      {
+        name: "Obscure Bottle",
+        flavorProfile: { nose: [], palate: [], finish: [], ...provenance },
+      },
+      false,
+      async () => ({ nose: [], palate: [], finish: [] })
+    );
+    const written = ref.update.mock.calls[0][0].flavorProfile;
+    expect(written).not.toBeNull();
+    expect(written.marketingTagCounts).toEqual({ Vanilla: 1 });
+    expect(written.nose).toEqual([]);
+  });
+
+  it("still writes null when there are no tags and no provenance", async () => {
+    const ref = { update: jest.fn().mockResolvedValue(undefined) };
+    await applyEnrichment(ref, { name: "Nobody Knows" }, false, async () => ({
+      nose: [],
+      palate: [],
+      finish: [],
+    }));
+    expect(ref.update.mock.calls[0][0].flavorProfile).toBeNull();
   });
 });
 
