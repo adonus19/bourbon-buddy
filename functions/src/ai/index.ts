@@ -53,8 +53,15 @@ const GROQ_API_KEY = defineSecret("GROQ_API_KEY");
 // the feed produces. Flavor enrichment stays on 8b (see groq.ts) so the two
 // features don't share a rate-limit budget.
 const EXTRACTION_MODEL = "llama-3.3-70b-versatile";
+// Bump when the extraction prompt/response shape changes enough that already-
+// processed articles are worth re-extracting (BB-219). Articles carry the
+// version they were extracted with; the sweep re-processes older ones.
+// v2: article-stated facts (proof/ageYears/msrp/releaseType).
+const EXTRACTION_PROMPT_VERSION = 2;
 // Range-guide articles can list 10+ expressions, so keep this generous.
 const MAX_BOTTLES = 12;
+// v2 adds four fact fields per bottle; 768 clipped long multi-bottle replies.
+const MAX_OUTPUT_TOKENS = 1024;
 // Feed the model the real article body, not just the teaser (BB-130 fix). ~5k
 // chars ≈ 1.3k input tokens — enough to catch bottles named deep in a review.
 const MAX_TEXT_CHARS = 5000;
@@ -345,7 +352,17 @@ async function sweepUnprocessed(
   let rateLimited = false;
   for (const doc of snap.docs) {
     const data = doc.data();
-    if (!opts.force && data.bottlesExtractedAt) {
+    // Skip only articles extracted with the CURRENT prompt version (BB-219):
+    // a version bump re-extracts old ones gradually, paced like a backfill.
+    // Pre-versioning docs count as v1. Safe to re-run: mentionedBottles is
+    // rebuilt, flavor seeding merges, and fact backfill is null-only.
+    const version =
+      typeof data.extractionVersion === "number" ? data.extractionVersion : 1;
+    if (
+      !opts.force &&
+      data.bottlesExtractedAt &&
+      version >= EXTRACTION_PROMPT_VERSION
+    ) {
       skipped++;
       continue; // already extracted (force re-extracts anyway)
     }
@@ -427,7 +444,7 @@ async function processArticle(
     // parseExtractionResponse (BB-195).
     const category = raw.category;
     const distillery = raw.distillery?.trim() || null;
-    const match = await matchOrCreateCatalog(db, key, name, distillery, category);
+    const match = await matchOrCreateCatalog(db, key, name, distillery, category, raw);
     // Feed (a), BB-185: seed the bottle's catalog flavor profile from any
     // tasting notes in the article. Best-effort — never fail extraction for it.
     // Seeded before the chip is built so a bottle first created here still
@@ -453,8 +470,41 @@ async function processArticle(
   await ref.update({
     mentionedBottles: bottles,
     bottlesExtractedAt: FieldValue.serverTimestamp(),
+    extractionVersion: EXTRACTION_PROMPT_VERSION,
   });
   return bottles.length;
+}
+
+/**
+ * Null-only backfill of article-stated facts onto a matched catalog doc
+ * (BB-219): an article may fill a blank, but never overwrites an existing
+ * value — human/admin edits always win. `isNas: true` is a human statement
+ * that the bottle has no age, so ageStatement is skipped in that case.
+ */
+async function backfillCatalogFacts(
+  doc: FirebaseFirestore.QueryDocumentSnapshot,
+  facts: ExtractedBottle
+): Promise<void> {
+  const patch: Record<string, number | string> = {};
+  if (facts.proof != null && doc.get("proof") == null) {
+    patch.proof = facts.proof;
+  }
+  if (
+    facts.ageYears != null &&
+    doc.get("ageStatement") == null &&
+    doc.get("isNas") !== true
+  ) {
+    patch.ageStatement = facts.ageYears;
+  }
+  if (facts.msrp != null && doc.get("msrp") == null) {
+    patch.msrp = facts.msrp;
+  }
+  if (facts.releaseType != null && doc.get("releaseType") == null) {
+    patch.releaseType = facts.releaseType;
+  }
+  if (Object.keys(patch).length > 0) {
+    await doc.ref.update(patch);
+  }
 }
 
 /**
@@ -468,11 +518,14 @@ async function matchOrCreateCatalog(
   key: string,
   name: string,
   distillery: string | null,
-  category: string | null
+  category: string | null,
+  facts: ExtractedBottle
 ): Promise<{ id: string; flavorTags: ReturnType<typeof profileToTags> | null }> {
-  const fromDoc = (
+  const fromDoc = async (
     doc: FirebaseFirestore.QueryDocumentSnapshot
-  ): { id: string; flavorTags: ReturnType<typeof profileToTags> | null } => {
+  ): Promise<{ id: string; flavorTags: ReturnType<typeof profileToTags> | null }> => {
+    // Article-stated facts fill blanks on the matched entry (BB-219).
+    await backfillCatalogFacts(doc, facts);
     const tags = profileToTags(doc.get("flavorProfile"));
     const hasAny = tags.nose.length + tags.palate.length + tags.finish.length > 0;
     return { id: doc.id, flavorTags: hasAny ? tags : null };
@@ -518,10 +571,11 @@ async function matchOrCreateCatalog(
     bottler: null,
     category: category ?? null,
     subType: null,
-    ageStatement: null,
+    ageStatement: facts.ageYears ?? null,
     isNas: false,
-    proof: null,
-    msrp: null,
+    proof: facts.proof ?? null,
+    msrp: facts.msrp ?? null,
+    releaseType: facts.releaseType ?? null,
     series: null,
     createdAt: FieldValue.serverTimestamp(),
     createdByUserId: "system:ai",
@@ -591,7 +645,7 @@ async function extractBottleNames(
     body: JSON.stringify({
       model: EXTRACTION_MODEL,
       temperature: 0,
-      max_tokens: 768,
+      max_tokens: MAX_OUTPUT_TOKENS,
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: EXTRACTION_SYSTEM_PROMPT },
@@ -610,5 +664,6 @@ async function extractBottleNames(
     choices?: { message?: { content?: string } }[];
   };
   const content = body.choices?.[0]?.message?.content ?? "{}";
-  return parseExtractionResponse(content);
+  // The article text doubles as the verbatim-fact verifier (BB-219).
+  return parseExtractionResponse(content, text);
 }

@@ -1822,6 +1822,163 @@ removed by the user; the server purges only items older than 30 days.
 
 ---
 
+## Epic 23: Article Intelligence *(R12 — agreed 2026-07-16)*
+
+> Origin: the Jimmy Red problem — an article promised vanilla/cinnamon/sweet;
+> the bottle drank young and banana-forward. The lesson: extraction can't
+> recover what a writer omitted, and press-release notes are marketing. So this
+> epic (a) classifies sources and gates trust accordingly, (b) extracts the
+> verifiable facts articles *do* carry, and (c) makes consensus visible.
+> Everything rides the existing one-call-per-article extraction (BB-130);
+> every new field passes a deterministic server-side guard — the LLM finds,
+> the code decides.
+
+### BB-219 — Fact Extraction & Catalog Backfill
+**As a** user, **I want** the catalog filled with the proof, age, MSRP, and
+release type that articles state, **so that** AI-created bottles aren't all-null
+and Value Score / enrichment get real inputs.
+
+**AC:**
+- Extraction prompt returns per bottle: `proof`, `ageYears`, `msrp`,
+  `releaseType` — only when explicitly stated, else null.
+- Deterministic guards (pure, spec'd like `isProductName`): numeric values must
+  appear **verbatim** in the article text (word-bounded); ranges clamped
+  (proof 60–160, age 1–50, msrp $10–$10k); msrp requires a `$`-adjacent match;
+  `releaseType` validated against the enum set.
+- Catalog writes are **null-only** — an article never overwrites a human-set
+  value. `Bourbon` model gains `releaseType: string | null`.
+- `extractionVersion` written with `bottlesExtractedAt`; the 30-min sweep also
+  re-extracts articles with `extractionVersion < current` (rate-paced, capped).
+- `max_tokens` 768 → 1024. Functions build + tests green.
+
+**SP:** 4
+
+---
+
+### BB-220 — Article Classification & Verdict
+**As a** user, **I want** to know whether tasting notes came from a press
+release or a real review, **so that** marketing copy never poses as consensus.
+
+**AC:**
+- Article-level `articleType`: `press_release | independent_review | listicle |
+  news`, stored on the article doc; small provenance chip in Dispatch.
+- Per-bottle `verdict`: `rave | positive | mixed | negative | null`; kept only
+  from `independent_review` / `listicle` — enforced in
+  `parseExtractionResponse`, not the prompt.
+- `seedArticleFlavor` is **not called** for `press_release` articles.
+- Verdicts stored on `mentionedBottles[]` and rolled into the BB-221
+  `criticSignals` structure (built here, scores join later).
+
+**SP:** 3
+
+---
+
+### BB-221 — Critic Ratings
+**As a** user, **I want** printed review scores standardized on the bottle,
+**so that** discovery can compare bottles on more than flavor tags.
+
+**AC:**
+- Model returns `rating` as the **raw printed string** ("92/100", "4.5 stars",
+  "B+") or null — never a bare number.
+- Server-side pure `parseRating(raw, text)`: verifies `raw` appears verbatim in
+  the article, parses per-scale via regex + fixed letter-grade map, normalizes
+  to 0–100; unrecognized scale → dropped.
+- `criticSignals` map on `/bourbons` keyed by `articleId` (idempotent under
+  re-extraction; cap ~20, evict oldest).
+- `app-critic-summary` (SharedModule, presentational) on wishlist detail +
+  bottle lookup: verdict counts as words; **no numeric average below 2 scores**.
+- Consumes already-loaded bourbon docs — zero new listeners.
+
+**SP:** 3
+
+---
+
+### BB-222 — Flavor Tag Provenance
+**As a** user, **I want** to see how many reviews mention each note ("Banana
+×3"), **so that** I can tell consensus from a single writer's take.
+
+**AC:**
+- `flavorProfile` gains `tagCounts`, `seededArticleIds` (idempotency, cap ~30),
+  `reviewCount` — arrays unchanged, fully backward-compatible.
+- `seedArticleFlavor` increments counts once per article; AI-generated (feed-b)
+  tags carry **no** count — counts mean *a human wrote this*.
+- UI: chips ordered by count, "×N" badge at N ≥ 2; profile source line reads
+  "Based on N reviews" vs "AI-suggested".
+- Taste-match weighting by count is explicitly deferred (see taste-match design).
+
+**SP:** 3
+
+---
+
+## Epic 24: My Stores *(R13 — agreed 2026-07-16)*
+
+> A private retailer notebook: what a store gets, when trucks land, whether
+> they price fair. Manual judgment up front, computed evidence beside it —
+> never replacing it (owner's call: article/mentioned prices are unreliable;
+> `priceTier` stays manual, always). No rules change: the owner-only wildcard
+> already covers `/users/{uid}/stores`.
+
+### BB-223 — Store Notes: Model, List & Form
+**As a** user, **I want** to keep notes per liquor store, **so that** hard-won
+intel (picks, drops, pricing) isn't lost in my head.
+
+**AC:**
+- `StoreNote` model (`store-note.model.ts`, models barrel): name,
+  `nameNormalized`, `placeId?`, city/state, `priceTier` (manual enum:
+  underpriced/fair/overpriced), `specialties[]` chips, `shipmentNotes`, `notes`,
+  timestamps. Identity: `placeId` first, else `nameNormalized + city`.
+- `StoreNotesService` (core, signal state-holder): one collection listener,
+  readonly `stores()` signal, explicit CRUD methods.
+- Lazy `features/stores` module; routes `/stores`, `/stores/new`,
+  `/stores/:id/edit` (dual-mode Reactive Form), authGuarded, mirroring
+  `wishlist-entry`.
+- Hunt List toolbar: `storefront-outline` button beside bottle lookup →
+  `/stores` (mind the R11 toolbar-button gotchas).
+- Tests: service CRUD, form validation, identity matching.
+
+**SP:** 4
+
+---
+
+### BB-224 — Store Detail: Intel + Evidence
+**As a** user, **I want** my sighting history to back up my read on a store,
+**so that** my price-tier gut call has receipts.
+
+**AC:**
+- `/stores/:id`: intel section (tier chip, specialties, shipment/general notes)
+  + **evidence section** computed from own `/priceHistory`
+  (`spotterUid == me && storeName == name`): visit count, last seen, bottles
+  spotted, avg % vs MSRP (where catalog msrp exists — BB-219 synergy).
+- Live (≤30d) sightings at this store listed below.
+- Evidence displayed *next to* the manual tier, never auto-setting it.
+- Composite index added: `priceHistory (spotterUid ASC, storeName ASC,
+  sightingDate DESC)`.
+- Evidence math in pure, spec'd helpers.
+
+**SP:** 3
+
+---
+
+### BB-225 — Sighting → Store Handoff
+**As a** user, **I want** to be offered a store note right after logging a
+sighting somewhere new, **so that** the notebook builds itself as I hunt.
+
+**AC:**
+- After a sighting saves with no matching store note (placeId, else
+  `nameNormalized + city`, checked against the loaded `stores()` signal — zero
+  extra reads), the confirmation toast gains **"Add store intel"** →
+  `/stores/new?name=…&city=…&state=…&placeId=…` prefilled. Dismissible; never
+  blocks the sighting flow; separate form page, never inline fields.
+- Store form offers "recent stores" suggestions from own `/priceHistory`
+  (distinct store/city/placeId) to tap instead of typing.
+- Shipment-day *inference* from sighting timestamps: explicitly out of scope
+  (insufficient samples per store for one user); free-text `shipmentNotes` is
+  the record.
+
+**SP:** 2
+
+---
+
 # Backlog (Not Yet Iteration-Scoped)
 
 ### BB-188 — Crowdsourced Flavor Aggregation

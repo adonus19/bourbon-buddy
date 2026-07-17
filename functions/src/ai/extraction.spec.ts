@@ -1,4 +1,8 @@
-import { isProductName, parseExtractionResponse } from "./extraction";
+import {
+  isProductName,
+  numberAppearsInText,
+  parseExtractionResponse,
+} from "./extraction";
 
 /** Wraps bottle objects in the JSON envelope the model returns. */
 const envelope = (bottles: unknown[]): string => JSON.stringify({ bottles });
@@ -21,6 +25,10 @@ describe("parseExtractionResponse (whiskey-only filter, BB-195)", () => {
         distillery: "Buffalo Trace",
         category: "bourbon",
         flavor: null,
+        proof: null,
+        ageYears: null,
+        msrp: null,
+        releaseType: null,
       },
     ]);
   });
@@ -113,6 +121,10 @@ describe("parseExtractionResponse (whiskey-only filter, BB-195)", () => {
         distillery: null,
         category: "bourbon",
         flavor: { nose: ["vanilla"], palate: ["cherry"], finish: ["oak"] },
+        proof: null,
+        ageYears: null,
+        msrp: null,
+        releaseType: null,
       },
     ]);
   });
@@ -123,6 +135,114 @@ describe("parseExtractionResponse (whiskey-only filter, BB-195)", () => {
 
   it("throws on malformed JSON so the article stays retryable", () => {
     expect(() => parseExtractionResponse("not json")).toThrow();
+  });
+});
+
+describe("numberAppearsInText (verbatim fact guard, BB-219)", () => {
+  it("finds a bare integer with digit boundaries", () => {
+    expect(numberAppearsInText(90, "bottled at 90 proof")).toBe(true);
+    expect(numberAppearsInText(90, "released in 1905")).toBe(false);
+    expect(numberAppearsInText(90, "at 190 proof")).toBe(false);
+    expect(numberAppearsInText(12, "Weller 12 Year")).toBe(true);
+  });
+
+  it("finds a decimal exactly, not its integer prefix", () => {
+    expect(numberAppearsInText(93.7, "comes in at 93.7 proof")).toBe(true);
+    expect(numberAppearsInText(93, "comes in at 93.7 proof")).toBe(false);
+    expect(numberAppearsInText(93.7, "comes in at 93 proof")).toBe(false);
+  });
+
+  it("matches thousands with or without a comma", () => {
+    expect(numberAppearsInText(1299, "priced at $1,299 per bottle")).toBe(true);
+    expect(numberAppearsInText(1299, "priced at $1299 per bottle")).toBe(true);
+  });
+
+  it("requires a leading $ when asked (msrp guard)", () => {
+    expect(numberAppearsInText(60, "an MSRP of $60", true)).toBe(true);
+    expect(numberAppearsInText(60, "aged 60 months", true)).toBe(false);
+    expect(numberAppearsInText(59.99, "for $59.99 this fall", true)).toBe(true);
+  });
+});
+
+describe("parseExtractionResponse — fact fields (BB-219)", () => {
+  const bottle = (facts: Record<string, unknown>) => ({
+    name: "Old Fitzgerald Bottled-in-Bond",
+    spirit: "whiskey",
+    category: "bourbon",
+    ...facts,
+  });
+
+  it("keeps facts whose numbers appear verbatim in the article text", () => {
+    const text =
+      "Old Fitzgerald Bottled-in-Bond returns this spring: 100 proof, aged 11 " +
+      "years, with a suggested price of $110.";
+    const out = parseExtractionResponse(
+      envelope([bottle({ proof: 100, ageYears: 11, msrp: 110 })]),
+      text
+    );
+    expect(out[0].proof).toBe(100);
+    expect(out[0].ageYears).toBe(11);
+    expect(out[0].msrp).toBe(110);
+  });
+
+  it("nulls facts the article text never states (invented numbers)", () => {
+    const out = parseExtractionResponse(
+      envelope([bottle({ proof: 100, ageYears: 11, msrp: 110 })]),
+      "Old Fitzgerald Bottled-in-Bond returns this spring."
+    );
+    expect(out[0].proof).toBeNull();
+    expect(out[0].ageYears).toBeNull();
+    expect(out[0].msrp).toBeNull();
+  });
+
+  it("nulls an msrp whose number appears without a dollar sign", () => {
+    const out = parseExtractionResponse(
+      envelope([bottle({ msrp: 110 })]),
+      "a batch of 110 barrels was selected"
+    );
+    expect(out[0].msrp).toBeNull();
+  });
+
+  it("nulls out-of-range facts even when the number is in the text", () => {
+    const out = parseExtractionResponse(
+      envelope([bottle({ proof: 40, ageYears: 200, msrp: 5 })]),
+      "just 40 stores got it; the distillery is 200 years old; a $5 raffle"
+    );
+    expect(out[0].proof).toBeNull(); // below 60-proof floor
+    expect(out[0].ageYears).toBeNull(); // above 50-year ceiling
+    expect(out[0].msrp).toBeNull(); // below $10 floor
+  });
+
+  it("nulls non-numeric fact values from a malformed reply", () => {
+    const out = parseExtractionResponse(
+      envelope([bottle({ proof: "100 proof", ageYears: [11], msrp: "$110" })]),
+      "100 proof, aged 11 years, $110"
+    );
+    expect(out[0].proof).toBeNull();
+    expect(out[0].ageYears).toBeNull();
+    expect(out[0].msrp).toBeNull();
+  });
+
+  it("keeps a valid releaseType and nulls anything off-enum", () => {
+    const out = parseExtractionResponse(
+      envelope([
+        bottle({ releaseType: "limited" }),
+        { ...bottle({ releaseType: "collectible" }), name: "Weller 12 Year" },
+      ]),
+      ""
+    );
+    expect(out[0].releaseType).toBe("limited");
+    expect(out[1].releaseType).toBeNull();
+  });
+
+  it("defaults every fact to null when the model omits them (old-style reply)", () => {
+    const out = parseExtractionResponse(envelope([bottle({})]));
+    expect(out[0]).toMatchObject({
+      proof: null,
+      ageYears: null,
+      msrp: null,
+      releaseType: null,
+    });
   });
 });
 

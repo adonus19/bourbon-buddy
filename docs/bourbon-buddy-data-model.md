@@ -661,6 +661,73 @@ bourbons/{bourbonId}
 as canonical, set `canonicalId` on the loser, fold its name into `aliases`, and
 repoint references. Sighting Match (BB-112) and stats group on the canonical id.
 
+### Additive fields — Article Intelligence *(Epic 23 — BB-219…BB-222, planned)*
+
+Richer signals from the existing one-call-per-article extraction (BB-130). All
+model output passes deterministic server-side guards (in the spirit of
+`isProductName`): numeric facts must appear **verbatim** in the article text and
+land only in **currently-null** catalog fields (an article never overwrites a
+human-set value); ratings are extracted as the raw printed string and parsed by
+code, never trusted as a model-reported number.
+
+```
+newsArticles/{articleId}
+  // ...existing fields...
+  articleType:        "press_release" | "independent_review" | "listicle" | "news"   // BB-220
+  extractionVersion:  number          // prompt version; sweep re-extracts when < current (BB-219)
+  mentionedBottles[]  gains:
+    verdict:          "rave" | "positive" | "mixed" | "negative" | null   // BB-220; review/listicle only
+    rating:           { score: number, raw: string } | null               // BB-221; score normalized 0–100
+
+bourbons/{bourbonId}
+  // ...existing fields...
+  releaseType:    string | null      // "flagship" | "annual" | "limited" | "single_barrel" (BB-219)
+  // proof, ageStatement, msrp — existing fields, backfilled null-only from articles (BB-219)
+  criticSignals:  map<articleId, { score: number | null, verdict: string | null,
+                                   sourceName: string, at: Timestamp }>   // BB-221; keyed by
+                  // articleId so re-extraction overwrites instead of double-counting; cap ~20.
+                  // Averages/counts derived client-side (no numeric avg shown under 2 scores).
+  flavorProfile   gains (BB-222, backward-compatible):
+    tagCounts:        map<tag, number>   // per-tag article-mention counts ("Banana ×3")
+    seededArticleIds: array<string>      // idempotency guard for count increments (cap ~30)
+    reviewCount:      number
+```
+
+**Seeding policy (BB-220):** flavor seeds and verdicts from `press_release`
+articles are **dropped** — marketing notes never enter the consensus profile.
+`tagCounts` counts only human-written mentions; AI-generated (BB-185 feed-b)
+tags carry no count.
+
+### Subcollection: `/users/{userId}/stores/{storeId}` *(Epic 24 — BB-223…BB-225, planned)*
+
+Private per-user retailer notebook ("My Stores"). Covered by the existing
+owner-only wildcard rule for `/users/{userId}/{sub}/{document=**}` — **no rules
+change needed**.
+
+```
+users/{userId}/stores/{storeId}
+  name:            string
+  nameNormalized:  string            // dedupe/match key
+  placeId:         string | null     // OSM id when created from the BB-187 retailer picker
+  city:            string | null
+  state:           string | null
+  priceTier:       "underpriced" | "fair" | "overpriced" | null   // ALWAYS manual (user judgment)
+  specialties:     array<string>     // "store-picks" | "allocated" | "barrel-picks" | "rare-finds"
+  shipmentNotes:   string | null     // free text ("truck Tuesdays, allocated drop 1st Thursday")
+  notes:           string | null
+  createdAt:       Timestamp
+  updatedAt:       Timestamp
+```
+
+**Identity:** match by `placeId` when present, else `nameNormalized + city`
+(a note is per *location*, not per chain). **Evidence, not inference:** the
+store detail page computes visits / last-seen / avg % vs MSRP from the user's
+own `/priceHistory` points (durable; sightings purge at 30 days) and shows it
+*next to* the manual `priceTier`, never replacing it. Shipment-day inference
+from sighting timestamps was considered and rejected (too few samples per store
+for one user). Query needs one composite index: `priceHistory (spotterUid ASC,
+storeName ASC, sightingDate DESC)`.
+
 ### Account deletion *(BB-151)*
 
 No new collection — a Cloud Function fan-out deletes the Auth user and every

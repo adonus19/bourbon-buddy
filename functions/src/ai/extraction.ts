@@ -23,6 +23,24 @@ export const VALID_CATEGORIES = new Set([
   "world_other",
 ]);
 
+// Release cadence values the model may return (BB-219); anything else → null.
+export const VALID_RELEASE_TYPES = new Set([
+  "flagship",
+  "annual",
+  "limited",
+  "single_barrel",
+]);
+
+// Sanity ranges for article-stated facts (BB-219). Values outside these are
+// dropped even when verbatim in the text — they're some *other* number the
+// model misattributed (barrel counts, anniversaries, raffle tickets).
+const PROOF_MIN = 60;
+const PROOF_MAX = 160;
+const AGE_MIN = 1;
+const AGE_MAX = 50;
+const MSRP_MIN = 10;
+const MSRP_MAX = 10000;
+
 export interface ExtractedBottle {
   name: string;
   distillery: string | null;
@@ -30,6 +48,12 @@ export interface ExtractedBottle {
   // Raw flavor cues the article attributes to this bottle (BB-185 feed a);
   // mapped to canonical tags server-side. Absent/empty for non-review articles.
   flavor?: unknown;
+  // Article-stated facts (BB-219), each verified verbatim-in-text and
+  // range-clamped before it's trusted; null-only backfilled onto the catalog.
+  proof: number | null;
+  ageYears: number | null;
+  msrp: number | null;
+  releaseType: string | null;
 }
 
 export const EXTRACTION_SYSTEM_PROMPT =
@@ -55,6 +79,16 @@ export const EXTRACTION_SYSTEM_PROMPT =
   "words it uses per stage (e.g. vanilla, oak, cherry, smoke). MOST articles " +
   "are announcements with NO tasting notes — for those use empty arrays. Never " +
   "invent flavors. " +
+  "Each bottle also carries \"proof\": number|null, \"ageYears\": number|null, " +
+  "\"msrp\": number|null, \"releaseType\": \"flagship\"|\"annual\"|\"limited\"|" +
+  "\"single_barrel\"|null. " +
+  "proof/ageYears/msrp: ONLY when the text explicitly states them for THIS " +
+  "bottle — copy the number exactly as printed, never estimate, convert, or " +
+  "carry over from another bottle. msrp is the suggested/retail price in USD " +
+  "stated in the text. " +
+  "releaseType: flagship (core year-round product), annual (recurring yearly " +
+  "release), limited (one-time or allocated release), single_barrel — or null " +
+  "when the text doesn't say. " +
   "A product is something a shopper could ask for BY NAME at a store: a brand " +
   "plus (usually) an expression. It must be named in the text as a product. " +
   "NEVER turn a description of whiskey into a product name. From \"sources " +
@@ -68,7 +102,8 @@ export const EXTRACTION_SYSTEM_PROMPT =
   "NOT a product. " +
   "Most articles announce news and name no bottle at all — returning an empty " +
   "array is the common, correct answer. Prefer omitting a doubtful bottle over " +
-  "including it. Do NOT include price or invent details. No duplicates.";
+  "including it. Never invent details; every number must be copied from the " +
+  "text. No duplicates.";
 
 /**
  * Whiskey vocabulary, qualifiers, and grammar words. A name built only from
@@ -154,14 +189,67 @@ export function isProductName(name: string): boolean {
 }
 
 /**
+ * Whether a number appears verbatim in the text (BB-219): digit-bounded, exact
+ * decimal (93 never matches "93.7" and vice versa), tolerant of a thousands
+ * comma ($1,299 ↔ 1299). With `requireDollar`, a `$` must immediately precede
+ * it — the msrp guard, so "110 barrels" can't validate a $110 price.
+ *
+ * This is the anti-hallucination line for facts: the model may only COPY
+ * numbers, because anything not literally printed in the article is dropped.
+ * (Necessary, not sufficient — the range clamps catch misattributed numbers.)
+ */
+export function numberAppearsInText(
+  value: number,
+  text: string,
+  requireDollar = false
+): boolean {
+  if (!Number.isFinite(value) || !text) {
+    return false;
+  }
+  const [int, frac] = String(value).split(".");
+  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ",?");
+  // Not followed by another digit, or by a decimal fraction ("93" ≠ "93.7") —
+  // but a sentence-ending period is fine.
+  const core = grouped + (frac ? `\\.${frac}` : "") + "(?!\\d)(?!\\.\\d)";
+  const re = requireDollar
+    ? new RegExp(`\\$\\s?${core}`)
+    : new RegExp(`(?<![\\d.,])${core}`);
+  return re.test(text);
+}
+
+/** A model-reported fact, kept only when in range and verbatim in the text. */
+function verifiedFact(
+  raw: unknown,
+  text: string,
+  min: number,
+  max: number,
+  requireDollar = false
+): number | null {
+  if (typeof raw !== "number" || !Number.isFinite(raw)) {
+    return null;
+  }
+  if (raw < min || raw > max) {
+    return null;
+  }
+  return numberAppearsInText(raw, text, requireDollar) ? raw : null;
+}
+
+/**
  * Parses the model's JSON reply into whiskey-only `ExtractedBottle`s.
+ *
+ * `sourceText` is the article text the model read; fact fields (BB-219) are
+ * kept only when their numbers appear verbatim in it, so omitting it simply
+ * nulls every fact.
  *
  * Shape problems (missing array, non-object entries, blank names) degrade to
  * fewer bottles, but malformed JSON throws — the caller treats that as an
  * extraction failure so the article stays unmarked and gets retried by the
  * sweep instead of being cached as "extracted, zero bottles".
  */
-export function parseExtractionResponse(content: string): ExtractedBottle[] {
+export function parseExtractionResponse(
+  content: string,
+  sourceText = ""
+): ExtractedBottle[] {
   const parsed = JSON.parse(content) as { bottles?: unknown };
   if (!Array.isArray(parsed.bottles)) {
     return [];
@@ -178,6 +266,14 @@ export function parseExtractionResponse(content: string): ExtractedBottle[] {
           ? (b["category"] as string)
           : null,
       flavor: b["flavor"] ?? null,
+      proof: verifiedFact(b["proof"], sourceText, PROOF_MIN, PROOF_MAX),
+      ageYears: verifiedFact(b["ageYears"], sourceText, AGE_MIN, AGE_MAX),
+      msrp: verifiedFact(b["msrp"], sourceText, MSRP_MIN, MSRP_MAX, true),
+      releaseType:
+        typeof b["releaseType"] === "string" &&
+        VALID_RELEASE_TYPES.has(b["releaseType"] as string)
+          ? (b["releaseType"] as string)
+          : null,
     }))
     .filter((b) => b.name.trim().length > 0)
     .filter((b) => isProductName(b.name));
