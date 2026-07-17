@@ -532,6 +532,51 @@ clean up notification loose ends.
 then **Crowdsourced Flavor Aggregation (BB-188)**, **Nearby Venue Picker
 (BB-189)**, and **News Full-Text Search (BB-190)**.
 
+### Iteration R11 — Hunt Lookup & Form Polish *(shipped, doc'd retroactively)*
+**Stories:** BB-215 ✅, BB-216 ✅, BB-217 ✅, BB-218 (boot splash — in flight)
+Catalog lookup from the Hunt List, Found-It prefill, and form polish. Recorded
+here for continuity; this iteration predates its doc entry.
+
+## Active Roadmap — Article Intelligence & My Stores — agreed 2026-07-16
+
+> Full stories + acceptance criteria live under **Epics 23–24** in
+> [bourbon-buddy-user-stories.md](bourbon-buddy-user-stories.md). The two tracks
+> are independent and may interleave; within each track, order = dependency
+> order. Check items off as they ship.
+
+### Iteration R12 — Article Intelligence (Epic 23, ~13 SP)
+**Goal:** extract more standardized signal from the articles the AI already
+reads — hard facts to backfill the catalog, article-type classification that
+gates flavor/verdict trust (press releases never seed the consensus profile),
+critic ratings parsed deterministically from printed strings, and per-tag
+provenance counts. All in the existing one-call-per-article budget
+(`max_tokens` 768 → 1024).
+
+- [ ] **BB-219** — Fact extraction + null-only catalog backfill (proof /
+      ageStatement / msrp / releaseType), verbatim-in-text guards,
+      `extractionVersion` + versioned re-sweep
+- [ ] **BB-220** — `articleType` classification + per-bottle `verdict`;
+      press-release flavor seeds dropped; provenance chip in Dispatch
+- [ ] **BB-221** — Numeric ratings: raw-string extraction, server-side
+      `parseRating`, idempotent `criticSignals` map, `app-critic-summary` UI
+- [ ] **BB-222** — Per-tag provenance counts on `flavorProfile`
+      (`tagCounts` / `seededArticleIds`), chip ordering + "×N" badges
+
+### Iteration R13 — My Stores (Epic 24, ~9 SP)
+**Goal:** a private retailer notebook — manual price-tier + specialties +
+shipment/allocation notes per store, backed by *computed evidence* from the
+user's own `/priceHistory` (visits, last seen, avg % vs MSRP). Nav entry in the
+Hunt List toolbar next to bottle lookup. No Security Rules change (existing
+owner-only subcollection wildcard covers `/users/{uid}/stores`).
+
+- [ ] **BB-223** — `StoreNote` model + `StoreNotesService` (signal state-holder),
+      list page, dual-mode form (`/stores`, `/stores/new`, `/stores/:id/edit`),
+      Hunt toolbar entry
+- [ ] **BB-224** — Store detail page: intel + evidence panel from `/priceHistory`
+      (+ composite index `spotterUid ASC, storeName ASC, sightingDate DESC`)
+- [ ] **BB-225** — Sighting → store handoff: post-save "Add store intel" toast →
+      prefilled `/stores/new`; recent-store suggestions in the store form
+
 ---
 
 ## Backlog (Post-MVP / Future Phases)
