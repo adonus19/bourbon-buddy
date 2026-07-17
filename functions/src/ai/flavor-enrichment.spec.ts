@@ -384,17 +384,21 @@ describe("generateFlavorTags (prompt → model → sanitize)", () => {
     global.fetch = realFetch;
   });
 
-  it("prompts Groq and returns only canonical tags from its reply", async () => {
+  it("prompts the model and returns only canonical tags from its reply", async () => {
+    // Gemini API reply shape (BB-226), with Gemma's trailing-fence quirk.
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       status: 200,
       json: () =>
         Promise.resolve({
-          choices: [
+          candidates: [
             {
-              message: {
-                content:
-                  '{"nose":["vanilla","made-up"],"palate":["dark cherry"],"finish":["oak"]}',
+              content: {
+                parts: [
+                  {
+                    text: '{"nose":["vanilla","made-up"],"palate":["dark cherry"],"finish":["oak"]}\n```',
+                  },
+                ],
               },
             },
           ],

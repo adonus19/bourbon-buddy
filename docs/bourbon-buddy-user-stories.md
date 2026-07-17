@@ -1928,6 +1928,37 @@ lowest-trust tier and act only as a **weak corroborator**.
 
 ---
 
+### BB-226 — AI Provider Migration: Groq → Gemini API *(inserted 2026-07-17)*
+**As the** app owner, **I want** the AI pipeline off Groq's deprecated Llama
+models before their 2026-08-16 shutdown, **so that** extraction and enrichment
+keep working.
+
+**Context:** Groq deprecated `llama-3.1-8b-instant` + `llama-3.3-70b-versatile`
+(2026-06-17). Live testing (2026-07-17) drove the model choice: Gemma 4's
+"structured output" is prompt steering (trailing ``` fence 3/3 trials);
+`gemini-3.1-flash-lite` does true constrained decoding; `gemma-4-26b-a4b-it`
+degenerates into repetition loops on the flavor task; `gemma-4-31b-it` is
+clean and differentiated.
+
+**AC:**
+- `gemini.ts` client (generateText/chatJson, `stripJsonFences`, RateLimitError
+  on 429); `groq.ts` deleted. Extraction → `gemini-3.1-flash-lite` with
+  `EXTRACTION_RESPONSE_SCHEMA`; enrichment → `gemma-4-31b-it` with a flavor
+  schema (**always** send Gemma a schema) and an 800-token cap.
+- Separate models = separate free-tier buckets (limits are per model), keeping
+  extraction and enrichment budgets isolated. Pacing: extraction sweep 6s
+  (RPD 500 binds); flavor sweep unchanged 12s.
+- All parse-side guards unchanged and provider-agnostic; full suites green.
+- Secret `GEMINI_API_KEY` in Secret Manager; `GROQ_API_KEY` retained until
+  cutover verified; **rotate the Gemini key post-merge** (transited chat).
+- Live smoke test: extraction (facts verbatim-verified, verdict gated,
+  articleType classified) + enrichment (canonical, differentiated tags) both
+  green against the real API.
+
+**SP:** 3
+
+---
+
 ### BB-188 — Crowdsourced Flavor Aggregation *(promoted from backlog 2026-07-17)*
 Promoted into Epic 23 now that the user base is growing: users' own
 **confirmed** tags become the **top** trust tier (`userTagCounts`), above

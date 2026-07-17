@@ -565,6 +565,13 @@ provenance counts. All in the existing one-call-per-article budget
       to a tag a review already mentions; marketing-only tags are display-only,
       never feeding Taste Match / Similar Bottles). Review mentions stay the
       load-bearing tier (`tagCounts`, "×N" badges, "Based on N reviews").
+- [x] **BB-226** ✅ — **Provider migration (inserted 2026-07-17, urgent):**
+      Groq shuts down our Llama models 2026-08-16. AI pipeline moved to the
+      Gemini API — extraction on `gemini-3.1-flash-lite` (schema-constrained
+      decoding; free tier 15 RPM / 250K TPM / 500 RPD, RPD binds), flavor
+      enrichment on `gemma-4-31b-it` (+ fence-stripper; schema required or it
+      answers in prose; the 26b-a4b variant degenerates — do not use). Secret
+      `GEMINI_API_KEY`; rotate the key post-merge (it transited chat).
 - [ ] **BB-221** — Numeric ratings: raw-string extraction, server-side
       `parseRating`, idempotent `criticSignals` map, `app-critic-summary` UI
 - [ ] **BB-188** — Crowdsourced flavor aggregation — **promoted from backlog

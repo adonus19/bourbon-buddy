@@ -135,6 +135,54 @@ export const EXTRACTION_SYSTEM_PROMPT =
   "text. No duplicates.";
 
 /**
+ * Gemini responseSchema for the extraction reply (BB-226): constrained
+ * decoding on gemini-3.1-flash-lite guarantees parseable JSON in the right
+ * shape. It does NOT replace the parse-side guards below — enums here stop
+ * malformed JSON, not misjudged content (verbatim-fact checks, isProductName,
+ * and verdict gating still decide what's true).
+ */
+export const EXTRACTION_RESPONSE_SCHEMA: Record<string, unknown> = {
+  type: "OBJECT",
+  properties: {
+    articleType: {
+      type: "STRING",
+      enum: [...VALID_ARTICLE_TYPES],
+    },
+    bottles: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          name: { type: "STRING" },
+          spirit: { type: "STRING", enum: ["whiskey", "other"] },
+          distillery: { type: "STRING", nullable: true },
+          category: { type: "STRING", enum: [...VALID_CATEGORIES], nullable: true },
+          proof: { type: "NUMBER", nullable: true },
+          ageYears: { type: "NUMBER", nullable: true },
+          msrp: { type: "NUMBER", nullable: true },
+          releaseType: {
+            type: "STRING",
+            enum: [...VALID_RELEASE_TYPES],
+            nullable: true,
+          },
+          verdict: { type: "STRING", enum: [...VALID_VERDICTS], nullable: true },
+          flavor: {
+            type: "OBJECT",
+            properties: {
+              nose: { type: "ARRAY", items: { type: "STRING" } },
+              palate: { type: "ARRAY", items: { type: "STRING" } },
+              finish: { type: "ARRAY", items: { type: "STRING" } },
+            },
+          },
+        },
+        required: ["name", "spirit"],
+      },
+    },
+  },
+  required: ["articleType", "bottles"],
+};
+
+/**
  * Whiskey vocabulary, qualifiers, and grammar words. A name built only from
  * these is a description of whiskey, not a whiskey you can buy.
  */
