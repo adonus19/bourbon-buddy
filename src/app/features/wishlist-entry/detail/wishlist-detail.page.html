@@ -192,6 +192,8 @@
         ></app-price-history>
       </div>
 
+      <app-critic-summary [signals]="criticSignals()" />
+
       <app-similar-bottles [bourbonId]="e.bourbonId" />
     </div>
   } @else {

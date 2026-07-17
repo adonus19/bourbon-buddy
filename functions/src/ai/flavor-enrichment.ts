@@ -23,7 +23,7 @@ import {
   requireApproved,
 } from "../shared/guards";
 import { CANONICAL_FLAVOR_TAGS, matchCanonicalTags } from "./flavor-taxonomy";
-import { GROQ_API_KEY, GROQ_MODEL, RateLimitError, chatJson } from "./groq";
+import { FLAVOR_MODEL, GEMINI_API_KEY, RateLimitError, chatJson } from "./gemini";
 // Deliberate require-cycle with ./similarity (it uses our pure tag helpers,
 // we call its recompute at request time) — safe because neither side touches
 // the other at module-init.
@@ -40,6 +40,19 @@ export const FLAVOR_PROMPT_VERSION = 2;
 // returned the single most-stereotypical profile per category. Some sampling
 // variety plus the distinguishing fields below is what separates bottles.
 const FLAVOR_TEMPERATURE = 0.4;
+
+// Gemma needs a schema to stay in JSON at all (BB-226): with responseMimeType
+// alone it answers in markdown prose. The schema steers shape; tag validity is
+// still enforced by matchCanonicalTags, never trusted to the model.
+const FLAVOR_RESPONSE_SCHEMA: Record<string, unknown> = {
+  type: "OBJECT",
+  properties: {
+    nose: { type: "ARRAY", items: { type: "STRING" } },
+    palate: { type: "ARRAY", items: { type: "STRING" } },
+    finish: { type: "ARRAY", items: { type: "STRING" } },
+  },
+  required: ["nose", "palate", "finish"],
+};
 
 export interface FlavorTags {
   nose: string[];
@@ -291,13 +304,25 @@ export function applyArticleSeed(
   };
 }
 
+// Gemma writes chattier JSON than the old 8b (whitespace, long tag runs) and
+// truncates mid-string at 400 output tokens (observed live) — parse then fails.
+const FLAVOR_MAX_TOKENS = 800;
+
 /** Prompt the model then sanitize its reply to canonical tags. */
 export async function generateFlavorTags(
   bottle: BottleContext,
   apiKey: string
 ): Promise<FlavorTags> {
   const { system, user } = buildFlavorPrompt(bottle);
-  const raw = await chatJson(apiKey, system, user, 400, FLAVOR_TEMPERATURE);
+  const raw = await chatJson(
+    apiKey,
+    FLAVOR_MODEL,
+    system,
+    user,
+    FLAVOR_MAX_TOKENS,
+    FLAVOR_TEMPERATURE,
+    FLAVOR_RESPONSE_SCHEMA
+  );
   return sanitizeFlavorTags(raw);
 }
 
@@ -339,8 +364,8 @@ export interface EnrichResult {
 }
 
 /**
- * The enrichment decision + write, decoupled from Firestore/Groq/onCall so it's
- * unit-testable. `generate` is injected (the onCall binds the real Groq call).
+ * The enrichment decision + write, decoupled from Firestore/model/onCall so it's
+ * unit-testable. `generate` is injected (the onCall binds the real model call).
  *
  * Gate is ADEQUACY, not mere existence (BB-185): a thin/partial profile is
  * upgraded rather than locked, and the freshly generated tags are MERGED into
@@ -396,7 +421,7 @@ export async function applyEnrichment(
         ...chosen,
         ...provenance,
         source: "ai" as const,
-        model: GROQ_MODEL,
+        model: FLAVOR_MODEL,
         promptVersion: FLAVOR_PROMPT_VERSION,
         generatedAt: Timestamp.now(),
       };
@@ -417,7 +442,7 @@ export async function applyEnrichment(
     ...chosen,
     ...provenance,
     source: "ai" as const,
-    model: GROQ_MODEL,
+    model: FLAVOR_MODEL,
     promptVersion: FLAVOR_PROMPT_VERSION,
     generatedAt: Timestamp.now(),
   };
@@ -437,14 +462,14 @@ export async function applyEnrichment(
     flavorProfile: {
       ...chosen,
       source: "ai",
-      model: GROQ_MODEL,
+      model: FLAVOR_MODEL,
       promptVersion: FLAVOR_PROMPT_VERSION,
     },
   };
 }
 
 // A non-refresh call on an already-adequate bottle returns the cached profile,
-// so organic use is self-limiting. `refresh: true` forces a new Groq generation
+// so organic use is self-limiting. `refresh: true` forces a new model generation
 // + write every time — that's the loopable cost vector, so it gets a daily
 // per-user budget (BB-190).
 const DAILY_REFRESH_LIMIT = 10;
@@ -452,7 +477,7 @@ const DAILY_REFRESH_LIMIT = 10;
 export const enrichBottleFlavor = onCall(
   {
     region: "us-central1",
-    secrets: [GROQ_API_KEY],
+    secrets: [GEMINI_API_KEY],
     enforceAppCheck: ENFORCE_APP_CHECK,
   },
   async (request) => {
@@ -483,7 +508,7 @@ export const enrichBottleFlavor = onCall(
 
     try {
       const result = await applyEnrichment(ref, bottle, refresh, (b) =>
-        generateFlavorTags(b, GROQ_API_KEY.value())
+        generateFlavorTags(b, GEMINI_API_KEY.value())
       );
       if (result.status !== "cached") {
         logger.info(`Flavor enrichment ${result.status} for ${bourbonId}.`);
@@ -506,8 +531,9 @@ export const enrichBottleFlavor = onCall(
 // standard even before anyone logs them, so the seeded DB has solid notes. ---
 
 const SWEEP_LIMIT = 300; // catalog docs scanned per run (newest first)
-// Pacing to stay well under the free-tier ~6K TPM: a flavor prompt is ~600
-// tokens, so ~5 calls/min (12s) is comfortably safe.
+// Pacing under Gemma's free tier (live numbers 2026-07-17: 30 RPM / ~16K TPM /
+// ~14K RPD — TPM binds). A flavor call is ~1.2K tokens, so 12s spacing
+// (5/min ≈ 6K TPM) leaves plenty of headroom for on-demand enrichment calls.
 const FLAVOR_SWEEP_SPACING_MS = 12000;
 // Don't re-hit the model on a bottle it just couldn't place; retry only after
 // this cooldown (data/model may improve).
@@ -604,12 +630,12 @@ export const sweepFlavorEnrichment = onSchedule(
   {
     schedule: "every 60 minutes",
     region: "us-central1",
-    secrets: [GROQ_API_KEY],
+    secrets: [GEMINI_API_KEY],
     timeoutSeconds: 540,
   },
   async () => {
     const db = getFirestore();
-    const res = await sweepEnrichInadequate(db, GROQ_API_KEY.value(), SWEEP_LIMIT);
+    const res = await sweepEnrichInadequate(db, GEMINI_API_KEY.value(), SWEEP_LIMIT);
     logger.info(
       `Flavor sweep: scanned ${res.scanned}, enriched ${res.enriched}` +
         (res.rateLimited ? " (stopped: rate limited)." : ".")
@@ -624,7 +650,7 @@ export const sweepFlavorEnrichment = onSchedule(
 export const backfillFlavorEnrichment = onCall(
   {
     region: "us-central1",
-    secrets: [GROQ_API_KEY],
+    secrets: [GEMINI_API_KEY],
     timeoutSeconds: 540,
     enforceAppCheck: ENFORCE_APP_CHECK,
   },
@@ -640,7 +666,7 @@ export const backfillFlavorEnrichment = onCall(
     const db = getFirestore();
     const res = await sweepEnrichInadequate(
       db,
-      GROQ_API_KEY.value(),
+      GEMINI_API_KEY.value(),
       limit,
       data?.force === true
     );

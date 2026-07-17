@@ -72,6 +72,10 @@ export interface ExtractedBottle {
   // The writer's opinion of this bottle (BB-220); kept only from evaluative
   // article types (independent_review / listicle) — never from marketing copy.
   verdict: string | null;
+  // The printed review score AS WRITTEN (BB-221): "92/100", "4.5 stars", "B+"
+  // — a raw string, never a bare number, so the model can't invent a scale.
+  // Evaluative-gated like verdict; normalized to 0-100 later by parseRating.
+  rating: string | null;
 }
 
 export const EXTRACTION_SYSTEM_PROMPT =
@@ -118,6 +122,11 @@ export const EXTRACTION_SYSTEM_PROMPT =
   "\"negative\"|null — the AUTHOR'S OWN opinion of this bottle from their " +
   "evaluation (rave = exceptional, glowing). Marketing claims, producer " +
   "quotes, and neutral announcements are NOT opinions: verdict is null there. " +
+  "Each bottle also carries \"rating\": string|null — the review SCORE for " +
+  "this bottle EXACTLY as printed, e.g. \"92/100\", \"4.5 stars\", \"9.2/10\", " +
+  "\"B+\", \"90 points\". Copy the whole score string verbatim; NEVER convert " +
+  "it to a bare number or invent a scale. null unless the text prints a score " +
+  "for THIS bottle. " +
   "A product is something a shopper could ask for BY NAME at a store: a brand " +
   "plus (usually) an expression. It must be named in the text as a product. " +
   "NEVER turn a description of whiskey into a product name. From \"sources " +
@@ -133,6 +142,55 @@ export const EXTRACTION_SYSTEM_PROMPT =
   "array is the common, correct answer. Prefer omitting a doubtful bottle over " +
   "including it. Never invent details; every number must be copied from the " +
   "text. No duplicates.";
+
+/**
+ * Gemini responseSchema for the extraction reply (BB-226): constrained
+ * decoding on gemini-3.1-flash-lite guarantees parseable JSON in the right
+ * shape. It does NOT replace the parse-side guards below — enums here stop
+ * malformed JSON, not misjudged content (verbatim-fact checks, isProductName,
+ * and verdict gating still decide what's true).
+ */
+export const EXTRACTION_RESPONSE_SCHEMA: Record<string, unknown> = {
+  type: "OBJECT",
+  properties: {
+    articleType: {
+      type: "STRING",
+      enum: [...VALID_ARTICLE_TYPES],
+    },
+    bottles: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          name: { type: "STRING" },
+          spirit: { type: "STRING", enum: ["whiskey", "other"] },
+          distillery: { type: "STRING", nullable: true },
+          category: { type: "STRING", enum: [...VALID_CATEGORIES], nullable: true },
+          proof: { type: "NUMBER", nullable: true },
+          ageYears: { type: "NUMBER", nullable: true },
+          msrp: { type: "NUMBER", nullable: true },
+          releaseType: {
+            type: "STRING",
+            enum: [...VALID_RELEASE_TYPES],
+            nullable: true,
+          },
+          verdict: { type: "STRING", enum: [...VALID_VERDICTS], nullable: true },
+          rating: { type: "STRING", nullable: true },
+          flavor: {
+            type: "OBJECT",
+            properties: {
+              nose: { type: "ARRAY", items: { type: "STRING" } },
+              palate: { type: "ARRAY", items: { type: "STRING" } },
+              finish: { type: "ARRAY", items: { type: "STRING" } },
+            },
+          },
+        },
+        required: ["name", "spirit"],
+      },
+    },
+  },
+  required: ["articleType", "bottles"],
+};
 
 /**
  * Whiskey vocabulary, qualifiers, and grammar words. A name built only from
@@ -325,6 +383,13 @@ export function parseExtractionResponse(
         typeof b["verdict"] === "string" &&
         VALID_VERDICTS.has(b["verdict"] as string)
           ? (b["verdict"] as string)
+          : null,
+      // Raw printed score, evaluative-gated like verdict — a "score" in a press
+      // release is marketing. Left as the printed string; parseRating does the
+      // verbatim check + normalization against the article text downstream.
+      rating:
+        evaluative && typeof b["rating"] === "string" && b["rating"].trim()
+          ? (b["rating"] as string)
           : null,
     }))
     .filter((b) => b.name.trim().length > 0)

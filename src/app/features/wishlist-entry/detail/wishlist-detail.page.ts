@@ -6,12 +6,18 @@ import {
 } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AlertController, ToastController } from '@ionic/angular';
-import { combineLatest, of } from 'rxjs';
-import { shareReplay, switchMap } from 'rxjs/operators';
+import { combineLatest, from, of } from 'rxjs';
+import {
+  distinctUntilChanged,
+  map,
+  shareReplay,
+  switchMap,
+} from 'rxjs/operators';
 
-import { Sighting, WishlistEntry } from '../../../models';
+import { CriticSignal, Sighting, WishlistEntry } from '../../../models';
 import { WishlistService } from '../../../core/services/wishlist.service';
 import { SightingService } from '../../../core/services/sighting.service';
+import { BourbonCatalogService } from '../../../core/services/bourbon-catalog.service';
 import { CATEGORY_DISPLAY } from '../../../shared/constants/category-display';
 import {
   PRIORITY_DISPLAY,
@@ -34,6 +40,7 @@ export class WishlistDetailPage {
   private readonly route = inject(ActivatedRoute);
   private readonly wishlist = inject(WishlistService);
   private readonly sightingService = inject(SightingService);
+  private readonly catalog = inject(BourbonCatalogService);
   private readonly router = inject(Router);
   private readonly alertCtrl = inject(AlertController);
   private readonly toast = inject(ToastController);
@@ -58,6 +65,20 @@ export class WishlistDetailPage {
   );
   private readonly sightings = toSignal(this.sightings$, {
     initialValue: [] as Sighting[],
+  });
+
+  // Critic signals (BB-221) for the app-critic-summary section: ONE getDoc when
+  // the bottle changes (never a listener), fed from the already-loaded entry's
+  // bourbonId — distinctUntilChanged keeps a wishlist edit from re-reading it.
+  private readonly criticSignals$ = toObservable(this.entry).pipe(
+    map((e) => e?.bourbonId ?? null),
+    distinctUntilChanged(),
+    switchMap((id) => (id ? from(this.catalog.getById(id)) : of(null))),
+    map((b) => b?.criticSignals ?? null),
+    shareReplay({ bufferSize: 1, refCount: true })
+  );
+  readonly criticSignals = toSignal(this.criticSignals$, {
+    initialValue: null as Record<string, CriticSignal> | null,
   });
 
   constructor() {

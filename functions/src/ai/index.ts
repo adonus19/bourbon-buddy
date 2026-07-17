@@ -7,15 +7,14 @@
  * or per refresh — so the cost is flat and tiny no matter how many people read
  * it. The client reads the cached `mentionedBottles` field; no per-user AI cost.
  *
- * Provider: Groq (free tier, OpenAI-compatible). Chosen over Gemini free tier
- * for its far higher daily request cap (~1k RPD on llama-3.3-70b-versatile vs
- * ~200) and no region/billing-project free-tier traps. The key is a Secret
- * Manager secret (GROQ_API_KEY), never in code. All model-specific code lives in
+ * Provider: Gemini API (BB-226 — Groq's Llama models shut down 2026-08-16).
+ * Extraction runs on gemini-3.1-flash-lite with schema-constrained decoding;
+ * model/limit rationale lives in ./gemini.ts. The key is a Secret Manager
+ * secret (GEMINI_API_KEY), never in code. All model-specific code lives in
  * `extractBottleNames`, so swapping providers again is a one-function change.
  */
 import { FieldValue, getFirestore, Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
-import { defineSecret } from "firebase-functions/params";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
@@ -25,11 +24,19 @@ import { normalizeBottleName } from "../shared/normalize";
 import { buildModelText, fetchArticleBody } from "./article-text";
 import { upsertCriticSignal } from "./critic-signals";
 import {
+  EXTRACTION_RESPONSE_SCHEMA,
   EXTRACTION_SYSTEM_PROMPT,
   ExtractedBottle,
   parseArticleType,
   parseExtractionResponse,
 } from "./extraction";
+import {
+  EXTRACTION_MODEL,
+  GEMINI_API_KEY,
+  RateLimitError,
+  generateText,
+} from "./gemini";
+import { parseRating } from "./rating";
 import {
   applyArticleSeed,
   articleFlavorSeed,
@@ -46,15 +53,11 @@ export {
   backfillFlavorEnrichment,
 } from "./flavor-enrichment";
 
-const GROQ_API_KEY = defineSecret("GROQ_API_KEY");
-
-// Free-tier: 30 RPM, 14.4k RPD, fast. Swap here if limits/models change.
-// Extraction is a judgment call — deciding that "award-winning bourbon" is prose
-// and not a bottle (BB-201). The 8b model can't hold that line; 70b can. Its free
-// tier is 1k requests/day (vs 14.4k), which is far more than the ~50 articles/day
-// the feed produces. Flavor enrichment stays on 8b (see groq.ts) so the two
+// Extraction is a judgment call — deciding that "award-winning bourbon" is
+// prose and not a bottle (BB-201) — and its output feeds JSON.parse, so it
+// runs on the Gemini model with real constrained decoding (BB-226; model +
+// limit rationale in ./gemini.ts). Flavor enrichment runs on Gemma so the two
 // features don't share a rate-limit budget.
-const EXTRACTION_MODEL = "llama-3.3-70b-versatile";
 // Bump when the extraction prompt/response shape changes enough that already-
 // processed articles are worth re-extracting (BB-219). Articles carry the
 // version they were extracted with; the sweep re-processes older ones.
@@ -77,12 +80,13 @@ const MAX_TEXT_CHARS = 5000;
 const MIN_BODY_CHARS = 600;
 const BACKFILL_DEFAULT = 15;
 const BACKFILL_MAX = 60;
-// Pacing for the batch sweeps to stay under the free-tier 6K tokens/min (TPM)
-// cap — the binding limit. With ~5k-char inputs a call is ~1.6k tokens, so
-// ~3 calls/min (18s spacing) keeps us safely under 6K TPM. Bursting faster just
-// 429s and stalls; steady pacing is faster end-to-end. (The realtime onCreate
-// path isn't paced — a lone 429 there is deferred to the sweep on purpose.)
-const BACKFILL_SPACING_MS = 18000;
+// Pacing for the batch sweeps. flash-lite free tier (live numbers 2026-07-17):
+// 15 RPM / 250K TPM / 500 RPD — RPD binds, not TPM. 6s spacing = 10/min, under
+// RPM with headroom for the unpaced onCreate path; a full 200-article catch-up
+// sweep costs 200 of the 500 RPD, fine as a burst. Bursting faster just 429s
+// and stalls; steady pacing is faster end-to-end. (The realtime onCreate path
+// isn't paced — a lone 429 there is deferred to the sweep on purpose.)
+const BACKFILL_SPACING_MS = 6000;
 const SWEEP_LIMIT = 200; // recent articles scanned per scheduled sweep
 // Chip-flavor refresh: articles scanned per run, and Firestore's getAll batch cap.
 const FLAVOR_REFRESH_LIMIT = 150;
@@ -102,13 +106,6 @@ interface MentionedBottle {
   verdict: string | null;
 }
 
-/** Thrown when the model returns 429 so callers can back off / stop early. */
-class RateLimitError extends Error {
-  constructor() {
-    super("model_rate_limited");
-  }
-}
-
 const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -117,7 +114,7 @@ export const extractBottlesFromArticle = onDocumentCreated(
   {
     document: "newsArticles/{articleId}",
     region: "us-central1",
-    secrets: [GROQ_API_KEY],
+    secrets: [GEMINI_API_KEY],
     // Cap concurrency so a bulk RSS fetch (dozens of new docs at once) doesn't
     // fire dozens of simultaneous model calls and blow the free-tier RPM.
     maxInstances: 2,
@@ -130,7 +127,7 @@ export const extractBottlesFromArticle = onDocumentCreated(
       getFirestore(),
       event.data.ref,
       event.data.data(),
-      GROQ_API_KEY.value()
+      GEMINI_API_KEY.value()
     );
     if (n >= 0) {
       logger.info(`Extracted ${n} bottle(s) for ${event.params.articleId}.`);
@@ -143,7 +140,7 @@ export const extractBottlesFromArticle = onDocumentCreated(
 
 /**
  * Bounded backfill / test tool: extract bottles for the most recent articles
- * that haven't been processed yet. Admin-only (BB-190): it burns Groq quota and
+ * that haven't been processed yet. Admin-only (BB-190): it burns model quota and
  * catalog writes at will, so it's an operator tool, not a user feature.
  */
 const REPROCESS_MAX_HOURS = 48; // forced-reprocess window ceiling
@@ -151,7 +148,7 @@ const REPROCESS_MAX_HOURS = 48; // forced-reprocess window ceiling
 export const backfillArticleBottles = onCall(
   {
     region: "us-central1",
-    secrets: [GROQ_API_KEY],
+    secrets: [GEMINI_API_KEY],
     timeoutSeconds: 540,
     enforceAppCheck: ENFORCE_APP_CHECK,
   },
@@ -176,7 +173,7 @@ export const backfillArticleBottles = onCall(
         ? Date.now() - Math.min(sinceHours, REPROCESS_MAX_HOURS) * 3600_000
         : undefined;
 
-    const res = await sweepUnprocessed(getFirestore(), GROQ_API_KEY.value(), limit, {
+    const res = await sweepUnprocessed(getFirestore(), GEMINI_API_KEY.value(), limit, {
       force,
       sinceMs,
     });
@@ -199,13 +196,13 @@ export const sweepArticleBottles = onSchedule(
   {
     schedule: "every 30 minutes",
     region: "us-central1",
-    secrets: [GROQ_API_KEY],
+    secrets: [GEMINI_API_KEY],
     timeoutSeconds: 540,
   },
   async () => {
     const res = await sweepUnprocessed(
       getFirestore(),
-      GROQ_API_KEY.value(),
+      GEMINI_API_KEY.value(),
       SWEEP_LIMIT
     );
     logger.info(
@@ -224,7 +221,7 @@ export const sweepArticleBottles = onSchedule(
  * the enrichment sweep reaches them — so their cached flavor stays null and the
  * badge never appears. This backfills it: recent articles only, catalog reads
  * deduped by bourbonId, and a write only when a chip actually gained tags.
- * No model calls, so it's free of the Groq pacing the extraction sweeps need.
+ * No model calls, so it's free of the model-call pacing the extraction sweeps need.
  */
 export const refreshArticleBottleFlavor = onSchedule(
   {
@@ -473,12 +470,17 @@ async function processArticle(
     } catch (err) {
       logger.warn(`Flavor seed failed for ${match.id}`, err);
     }
-    // A verdict is a critic signal — cache it on the catalog doc (BB-220).
-    // Best-effort like the flavor seed; keyed by articleId so re-runs are safe.
-    if (raw.verdict) {
+    // A verdict (BB-220) or a printed score (BB-221) is a critic signal — cache
+    // it on the catalog doc. parseRating verifies the raw score verbatim against
+    // the same article text the extraction read, then normalizes it to 0-100
+    // (unrecognized scale → null). Best-effort like the flavor seed; keyed by
+    // articleId so re-runs are safe.
+    const score = raw.rating ? parseRating(raw.rating, text) : null;
+    if (raw.verdict || score != null) {
       try {
         await recordCriticSignal(db, match.id, ref.id, {
           verdict: raw.verdict,
+          score,
           sourceName: (article.sourceName as string) ?? "",
         });
       } catch (err) {
@@ -517,14 +519,16 @@ async function recordCriticSignal(
   db: FirebaseFirestore.Firestore,
   bourbonId: string,
   articleId: string,
-  signal: { verdict: string; sourceName: string }
+  signal: { verdict: string | null; score: number | null; sourceName: string }
 ): Promise<void> {
   const ref = db.collection("bourbons").doc(bourbonId);
   const snap = await ref.get();
   const existing =
     (snap.get("criticSignals") as Parameters<typeof upsertCriticSignal>[0]) ?? {};
+  // A score-less re-extraction keeps any score already on file (upsertCriticSignal
+  // handles that); a verdict-less signal (score but no opinion) is still valid.
   const next = upsertCriticSignal(existing, articleId, {
-    score: null,
+    score: signal.score,
     verdict: signal.verdict,
     sourceName: signal.sourceName,
     at: Timestamp.now(),
@@ -693,45 +697,26 @@ async function seedArticleFlavor(
 }
 
 /**
- * The ONLY model-specific code. Calls Groq (OpenAI-compatible) and returns the
- * bottles it found, each with an optional distillery + category to pre-fill the
- * hunt-list form. JSON object output for robust parsing, temp 0, hard output
- * cap. Deliberately does NOT ask for price/MSRP (news snippets rarely carry a
- * reliable price, and a hallucinated one is worse than a blank field). Throws
- * RateLimitError on 429.
+ * The ONLY model-specific code. Calls the Gemini API (BB-226) with the
+ * extraction responseSchema — constrained decoding guarantees parseable JSON,
+ * while every judgment guard (isProductName, verbatim facts, verdict gating)
+ * still runs in the parsers. Temp 0, hard output cap. Throws RateLimitError
+ * on 429. An empty (e.g. safety-blocked) reply degrades to "no bottles" and
+ * is cached, matching the old provider's behavior — no retry loops.
  */
 async function extractBottleNames(
   text: string,
   apiKey: string
 ): Promise<{ articleType: string; bottles: ExtractedBottle[] }> {
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
+  const content =
+    (await generateText(apiKey, {
       model: EXTRACTION_MODEL,
+      system: EXTRACTION_SYSTEM_PROMPT,
+      user: `TEXT:\n${text}`,
+      maxTokens: MAX_OUTPUT_TOKENS,
       temperature: 0,
-      max_tokens: MAX_OUTPUT_TOKENS,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: EXTRACTION_SYSTEM_PROMPT },
-        { role: "user", content: `TEXT:\n${text}` },
-      ],
-    }),
-  });
-
-  if (res.status === 429) {
-    throw new RateLimitError();
-  }
-  if (!res.ok) {
-    throw new Error(`Groq ${res.status}: ${await res.text()}`);
-  }
-  const body = (await res.json()) as {
-    choices?: { message?: { content?: string } }[];
-  };
-  const content = body.choices?.[0]?.message?.content ?? "{}";
+      responseSchema: EXTRACTION_RESPONSE_SCHEMA,
+    })) || "{}";
   // The article text doubles as the verbatim-fact verifier (BB-219).
   return {
     articleType: parseArticleType(content),

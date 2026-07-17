@@ -1,0 +1,86 @@
+:host {
+  display: block;
+}
+
+.critic {
+  padding: 16px;
+
+  &__body {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    margin-top: 12px;
+  }
+
+  &__score {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+  }
+
+  &__score-num {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--color-amber-light);
+  }
+
+  &__score-scale {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+  }
+
+  &__score-count {
+    margin-left: 4px;
+    font-size: 12px;
+    color: var(--color-text-secondary);
+  }
+
+  &__verdicts {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  &__verdict {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: capitalize;
+    background: var(--color-bg-elevated);
+    color: var(--color-text-secondary);
+    border: 1px solid transparent;
+
+    &-count {
+      font-family: var(--font-display);
+      font-weight: 700;
+    }
+
+    // Verdict tint via a per-class accent, kept subtle (border + text only).
+    &--rave {
+      color: var(--color-amber-light);
+      border-color: var(--color-amber-dim);
+    }
+    &--positive {
+      color: var(--color-success);
+      border-color: color-mix(in srgb, var(--color-success) 45%, transparent);
+    }
+    &--mixed {
+      color: var(--color-text-secondary);
+      border-color: color-mix(in srgb, var(--color-text-secondary) 35%, transparent);
+    }
+    &--negative {
+      color: var(--color-error);
+      border-color: color-mix(in srgb, var(--color-error) 45%, transparent);
+    }
+  }
+}
