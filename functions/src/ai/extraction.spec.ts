@@ -1,11 +1,13 @@
 import {
   isProductName,
   numberAppearsInText,
+  parseArticleType,
   parseExtractionResponse,
 } from "./extraction";
 
 /** Wraps bottle objects in the JSON envelope the model returns. */
-const envelope = (bottles: unknown[]): string => JSON.stringify({ bottles });
+const envelope = (bottles: unknown[], articleType?: string): string =>
+  JSON.stringify(articleType ? { articleType, bottles } : { bottles });
 
 describe("parseExtractionResponse (whiskey-only filter, BB-195)", () => {
   it("keeps bottles the model marks as whiskey", () => {
@@ -29,6 +31,7 @@ describe("parseExtractionResponse (whiskey-only filter, BB-195)", () => {
         ageYears: null,
         msrp: null,
         releaseType: null,
+        verdict: null,
       },
     ]);
   });
@@ -125,6 +128,7 @@ describe("parseExtractionResponse (whiskey-only filter, BB-195)", () => {
         ageYears: null,
         msrp: null,
         releaseType: null,
+        verdict: null,
       },
     ]);
   });
@@ -243,6 +247,65 @@ describe("parseExtractionResponse — fact fields (BB-219)", () => {
       msrp: null,
       releaseType: null,
     });
+  });
+});
+
+describe("parseArticleType (source classification, BB-220)", () => {
+  it("returns each valid type as-is", () => {
+    for (const t of ["press_release", "independent_review", "listicle", "news"]) {
+      expect(parseArticleType(envelope([], t))).toBe(t);
+    }
+  });
+
+  it("defaults a missing or invalid type to news", () => {
+    expect(parseArticleType(envelope([]))).toBe("news");
+    expect(parseArticleType(envelope([], "advertorial"))).toBe("news");
+    expect(parseArticleType(JSON.stringify({ articleType: 7, bottles: [] }))).toBe(
+      "news"
+    );
+  });
+
+  it("throws on malformed JSON so the article stays retryable", () => {
+    expect(() => parseArticleType("not json")).toThrow();
+  });
+});
+
+describe("parseExtractionResponse — verdict gating (BB-220)", () => {
+  const reviewed = (verdict: unknown) => ({
+    name: "Russell's Reserve 13",
+    spirit: "whiskey",
+    category: "bourbon",
+    verdict,
+  });
+
+  it("keeps a verdict from an independent review or listicle", () => {
+    const fromReview = parseExtractionResponse(
+      envelope([reviewed("rave")], "independent_review")
+    );
+    expect(fromReview[0].verdict).toBe("rave");
+    const fromListicle = parseExtractionResponse(
+      envelope([reviewed("mixed")], "listicle")
+    );
+    expect(fromListicle[0].verdict).toBe("mixed");
+  });
+
+  it("drops a verdict from a press release or plain news", () => {
+    // Marketing copy has no critical opinion — a verdict extracted from it is
+    // noise by definition, enforced here rather than trusted to the prompt.
+    const fromPr = parseExtractionResponse(
+      envelope([reviewed("rave")], "press_release")
+    );
+    expect(fromPr[0].verdict).toBeNull();
+    const fromNews = parseExtractionResponse(envelope([reviewed("positive")]));
+    expect(fromNews[0].verdict).toBeNull();
+  });
+
+  it("nulls an off-enum verdict even from a review", () => {
+    const out = parseExtractionResponse(
+      envelope([reviewed("meh"), reviewed(5)], "independent_review")
+    );
+    expect(out[0].verdict).toBeNull();
+    expect(out[1].verdict).toBeNull();
   });
 });
 

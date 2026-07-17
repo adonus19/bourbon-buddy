@@ -151,6 +151,13 @@
                   }
                   {{ a.sourceName }}
                   @if (relTime(a)) { · {{ relTime(a) }} }
+                  @if (typeLabel(a); as label) {
+                    <span
+                      class="article__type"
+                      [class.article__type--pr]="a.articleType === 'press_release'"
+                      >{{ label }}</span
+                    >
+                  }
                 </p>
                 @if (a.excerpt) {
                   <p class="article__excerpt">{{ a.excerpt }}</p>

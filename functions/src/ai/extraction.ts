@@ -31,6 +31,21 @@ export const VALID_RELEASE_TYPES = new Set([
   "single_barrel",
 ]);
 
+// Source classification (BB-220). Trust flows from it: flavor seeds and
+// verdicts from press releases are marketing, not evaluation, and are dropped.
+export const VALID_ARTICLE_TYPES = new Set([
+  "press_release",
+  "independent_review",
+  "listicle",
+  "news",
+]);
+
+// Article types whose tasting language reflects an actual critical evaluation.
+export const EVALUATIVE_TYPES = new Set(["independent_review", "listicle"]);
+
+// Per-bottle opinion values (BB-220); anything else → null.
+export const VALID_VERDICTS = new Set(["rave", "positive", "mixed", "negative"]);
+
 // Sanity ranges for article-stated facts (BB-219). Values outside these are
 // dropped even when verbatim in the text — they're some *other* number the
 // model misattributed (barrel counts, anniversaries, raffle tickets).
@@ -54,6 +69,9 @@ export interface ExtractedBottle {
   ageYears: number | null;
   msrp: number | null;
   releaseType: string | null;
+  // The writer's opinion of this bottle (BB-220); kept only from evaluative
+  // article types (independent_review / listicle) — never from marketing copy.
+  verdict: string | null;
 }
 
 export const EXTRACTION_SYSTEM_PROMPT =
@@ -62,10 +80,17 @@ export const EXTRACTION_SYSTEM_PROMPT =
   "Tennessee, American single malt, scotch, Irish, Japanese, and other world " +
   "whiskies). EXCLUDE every other drink: tequila, mezcal, gin, vodka, rum, " +
   "brandy, cognac, liqueurs, canned or ready-to-drink cocktails, beer, cider, " +
-  "wine, and hard seltzer. Reply ONLY with JSON: {\"bottles\": [{\"name\": " +
+  "wine, and hard seltzer. Reply ONLY with JSON: {\"articleType\": " +
+  "\"press_release\"|\"independent_review\"|\"listicle\"|\"news\", " +
+  "\"bottles\": [{\"name\": " +
   "string, \"spirit\": \"whiskey\"|\"other\", \"distillery\": string|null, " +
   "\"category\": string|null, \"flavor\": {\"nose\": string[], \"palate\": " +
   "string[], \"finish\": string[]}}]}. " +
+  "articleType — classify the TEXT itself: press_release (announcement written " +
+  "from or echoing the producer's marketing — promotional tone, company " +
+  "quotes, no critical evaluation), independent_review (a writer's own " +
+  "critical tasting or evaluation), listicle (ranked roundup like \"best " +
+  "bourbons\"), news (anything else: industry, business, people, events). " +
   "name: the specific product (release/expression/bottling) as written, e.g. " +
   "\"Weller 12 Year\" or \"E.H. Taylor Small Batch\". " +
   "spirit: \"whiskey\" if the product is any style of whiskey, otherwise " +
@@ -89,6 +114,10 @@ export const EXTRACTION_SYSTEM_PROMPT =
   "releaseType: flagship (core year-round product), annual (recurring yearly " +
   "release), limited (one-time or allocated release), single_barrel — or null " +
   "when the text doesn't say. " +
+  "Each bottle also carries \"verdict\": \"rave\"|\"positive\"|\"mixed\"|" +
+  "\"negative\"|null — the AUTHOR'S OWN opinion of this bottle from their " +
+  "evaluation (rave = exceptional, glowing). Marketing claims, producer " +
+  "quotes, and neutral announcements are NOT opinions: verdict is null there. " +
   "A product is something a shopper could ask for BY NAME at a store: a brand " +
   "plus (usually) an expression. It must be named in the text as a product. " +
   "NEVER turn a description of whiskey into a product name. From \"sources " +
@@ -235,11 +264,27 @@ function verifiedFact(
 }
 
 /**
+ * The model's source classification for the article (BB-220), defaulting to
+ * "news" when missing or off-enum — the least-trusted bucket, so a flaky
+ * classification can only ever *withhold* signal, never fake it. Malformed
+ * JSON throws, same retry semantics as `parseExtractionResponse`.
+ */
+export function parseArticleType(content: string): string {
+  const parsed = JSON.parse(content) as { articleType?: unknown };
+  return typeof parsed.articleType === "string" &&
+    VALID_ARTICLE_TYPES.has(parsed.articleType)
+    ? parsed.articleType
+    : "news";
+}
+
+/**
  * Parses the model's JSON reply into whiskey-only `ExtractedBottle`s.
  *
  * `sourceText` is the article text the model read; fact fields (BB-219) are
  * kept only when their numbers appear verbatim in it, so omitting it simply
- * nulls every fact.
+ * nulls every fact. Verdicts (BB-220) are kept only when the reply's own
+ * articleType is evaluative (independent_review / listicle) — a "verdict"
+ * lifted from marketing copy is dropped here, not left to the prompt.
  *
  * Shape problems (missing array, non-object entries, blank names) degrade to
  * fewer bottles, but malformed JSON throws — the caller treats that as an
@@ -254,6 +299,7 @@ export function parseExtractionResponse(
   if (!Array.isArray(parsed.bottles)) {
     return [];
   }
+  const evaluative = EVALUATIVE_TYPES.has(parseArticleType(content));
   return parsed.bottles
     .filter((b): b is Record<string, unknown> => !!b && typeof b === "object")
     .filter((b) => isWhiskey(b))
@@ -273,6 +319,12 @@ export function parseExtractionResponse(
         typeof b["releaseType"] === "string" &&
         VALID_RELEASE_TYPES.has(b["releaseType"] as string)
           ? (b["releaseType"] as string)
+          : null,
+      verdict:
+        evaluative &&
+        typeof b["verdict"] === "string" &&
+        VALID_VERDICTS.has(b["verdict"] as string)
+          ? (b["verdict"] as string)
           : null,
     }))
     .filter((b) => b.name.trim().length > 0)

@@ -23,9 +23,11 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { ENFORCE_APP_CHECK, requireAdmin } from "../shared/guards";
 import { normalizeBottleName } from "../shared/normalize";
 import { buildModelText, fetchArticleBody } from "./article-text";
+import { upsertCriticSignal } from "./critic-signals";
 import {
   EXTRACTION_SYSTEM_PROMPT,
   ExtractedBottle,
+  parseArticleType,
   parseExtractionResponse,
 } from "./extraction";
 import {
@@ -57,7 +59,9 @@ const EXTRACTION_MODEL = "llama-3.3-70b-versatile";
 // processed articles are worth re-extracting (BB-219). Articles carry the
 // version they were extracted with; the sweep re-processes older ones.
 // v2: article-stated facts (proof/ageYears/msrp/releaseType).
-const EXTRACTION_PROMPT_VERSION = 2;
+// v3: articleType classification + per-bottle verdict (BB-220) — press-release
+//     flavor seeding stops, so re-extraction under v3 also matters for trust.
+const EXTRACTION_PROMPT_VERSION = 3;
 // Range-guide articles can list 10+ expressions, so keep this generous.
 const MAX_BOTTLES = 12;
 // v2 adds four fact fields per bottle; 768 clipped long multi-bottle replies.
@@ -91,6 +95,8 @@ interface MentionedBottle {
   // Catalog flavor tags at extraction time (BB-199): lets feed chips show the
   // Taste Match badge without a per-chip read. Null when no profile exists yet.
   flavor: { nose: string[]; palate: string[]; finish: string[] } | null;
+  // The writer's opinion of this bottle (BB-220); review/listicle articles only.
+  verdict: string | null;
 }
 
 /** Thrown when the model returns 429 so callers can back off / stop early. */
@@ -421,8 +427,9 @@ async function processArticle(
   }
 
   let extracted: ExtractedBottle[];
+  let articleType: string;
   try {
-    extracted = await extractBottleNames(text, apiKey);
+    ({ articleType, bottles: extracted } = await extractBottleNames(text, apiKey));
   } catch (err) {
     if (err instanceof RateLimitError) {
       return RATE_LIMITED; // caller decides whether to stop / retry later
@@ -449,11 +456,27 @@ async function processArticle(
     // tasting notes in the article. Best-effort — never fail extraction for it.
     // Seeded before the chip is built so a bottle first created here still
     // carries flavor tags for the Taste Match badge (BB-199).
+    // Press releases never seed (BB-220): their "tasting notes" are the
+    // producer's marketing copy, not an evaluation.
     let seeded: FlavorTags | null = null;
-    try {
-      seeded = await seedArticleFlavor(db, match.id, raw.flavor);
-    } catch (err) {
-      logger.warn(`Flavor seed failed for ${match.id}`, err);
+    if (articleType !== "press_release") {
+      try {
+        seeded = await seedArticleFlavor(db, match.id, raw.flavor);
+      } catch (err) {
+        logger.warn(`Flavor seed failed for ${match.id}`, err);
+      }
+    }
+    // A verdict is a critic signal — cache it on the catalog doc (BB-220).
+    // Best-effort like the flavor seed; keyed by articleId so re-runs are safe.
+    if (raw.verdict) {
+      try {
+        await recordCriticSignal(db, match.id, ref.id, {
+          verdict: raw.verdict,
+          sourceName: (article.sourceName as string) ?? "",
+        });
+      } catch (err) {
+        logger.warn(`Critic signal failed for ${match.id}`, err);
+      }
     }
     bottles.push({
       name,
@@ -461,6 +484,7 @@ async function processArticle(
       distillery,
       category,
       flavor: seeded ?? match.flavorTags,
+      verdict: raw.verdict,
     });
     if (bottles.length >= MAX_BOTTLES) {
       break;
@@ -471,8 +495,34 @@ async function processArticle(
     mentionedBottles: bottles,
     bottlesExtractedAt: FieldValue.serverTimestamp(),
     extractionVersion: EXTRACTION_PROMPT_VERSION,
+    articleType,
   });
   return bottles.length;
+}
+
+/**
+ * Upserts one article's opinion of a bottle into the catalog's `criticSignals`
+ * map (BB-220). Read-modify-write is fine here: verdicts are rare (reviews
+ * only) and the map is tiny; `upsertCriticSignal` caps it and keeps an
+ * existing BB-221 score when re-runs carry none.
+ */
+async function recordCriticSignal(
+  db: FirebaseFirestore.Firestore,
+  bourbonId: string,
+  articleId: string,
+  signal: { verdict: string; sourceName: string }
+): Promise<void> {
+  const ref = db.collection("bourbons").doc(bourbonId);
+  const snap = await ref.get();
+  const existing =
+    (snap.get("criticSignals") as Parameters<typeof upsertCriticSignal>[0]) ?? {};
+  const next = upsertCriticSignal(existing, articleId, {
+    score: null,
+    verdict: signal.verdict,
+    sourceName: signal.sourceName,
+    at: Timestamp.now(),
+  });
+  await ref.update({ criticSignals: next });
 }
 
 /**
@@ -635,7 +685,7 @@ async function seedArticleFlavor(
 async function extractBottleNames(
   text: string,
   apiKey: string
-): Promise<ExtractedBottle[]> {
+): Promise<{ articleType: string; bottles: ExtractedBottle[] }> {
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -665,5 +715,8 @@ async function extractBottleNames(
   };
   const content = body.choices?.[0]?.message?.content ?? "{}";
   // The article text doubles as the verbatim-fact verifier (BB-219).
-  return parseExtractionResponse(content, text);
+  return {
+    articleType: parseArticleType(content),
+    bottles: parseExtractionResponse(content, text),
+  };
 }

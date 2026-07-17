@@ -109,6 +109,26 @@
     margin: 0 0 6px;
   }
 
+  // Source-classification tag (BB-220): quiet pill, amber for evaluative
+  // sources; press releases stay muted so marketing never looks endorsed.
+  &__type {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 7px;
+    border-radius: 9px;
+    border: 1px solid var(--color-amber-light);
+    color: var(--color-amber-light);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+
+    &--pr {
+      border-color: var(--color-text-secondary);
+      color: var(--color-text-secondary);
+    }
+  }
+
   &__excerpt {
     font-size: 13px;
     color: var(--color-text-secondary);
