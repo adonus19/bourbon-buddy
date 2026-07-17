@@ -552,9 +552,9 @@ critic ratings parsed deterministically from printed strings, and per-tag
 provenance counts. All in the existing one-call-per-article budget
 (`max_tokens` 768 → 1024).
 
-- [ ] **BB-219** — Fact extraction + null-only catalog backfill (proof /
+- [x] **BB-219** — Fact extraction + null-only catalog backfill (proof /
       ageStatement / msrp / releaseType), verbatim-in-text guards,
-      `extractionVersion` + versioned re-sweep
+      `extractionVersion` + versioned re-sweep ✅
 - [ ] **BB-220** — `articleType` classification + per-bottle `verdict`;
       press-release flavor seeds dropped; provenance chip in Dispatch
 - [ ] **BB-221** — Numeric ratings: raw-string extraction, server-side

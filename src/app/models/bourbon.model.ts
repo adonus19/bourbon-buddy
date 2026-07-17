@@ -47,6 +47,9 @@ export interface Bourbon {
   proof?: number | null;
   msrp?: number | null;
   series?: string | null;
+  // Release cadence stated in a news article (BB-219). Server-written by the
+  // extraction pipeline (verbatim-guarded, null-only backfill).
+  releaseType?: 'flagship' | 'annual' | 'limited' | 'single_barrel' | null;
   upc?: string[]; // crowdsourced UPC/EAN barcodes for scan lookup (BB-175)
   flavorProfile?: FlavorProfile | null; // AI-suggested tasting notes (BB-185)
   flavorEnrichedAt?: Timestamp | null; // set once enriched; gates re-enrichment
