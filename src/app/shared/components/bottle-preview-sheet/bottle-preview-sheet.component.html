@@ -29,14 +29,22 @@
   @if (profile(); as p) {
     <section class="sheet__flavor">
       <span class="eyebrow">Flavor profile</span>
+      @if (sourceLabel(); as src) {
+        <span class="sheet__source">{{ src }}</span>
+      }
       @if (p.nose.length) {
-        <p class="sheet__stage"><strong>Nose</strong> {{ p.nose.join(' · ') }}</p>
+        <p class="sheet__stage"><strong>Nose</strong> {{ stageDisplay('nose') }}</p>
       }
       @if (p.palate.length) {
-        <p class="sheet__stage"><strong>Palate</strong> {{ p.palate.join(' · ') }}</p>
+        <p class="sheet__stage"><strong>Palate</strong> {{ stageDisplay('palate') }}</p>
       }
       @if (p.finish.length) {
-        <p class="sheet__stage"><strong>Finish</strong> {{ p.finish.join(' · ') }}</p>
+        <p class="sheet__stage"><strong>Finish</strong> {{ stageDisplay('finish') }}</p>
+      }
+      @if (claims().length) {
+        <p class="sheet__claims">
+          <strong>Distillery says</strong> {{ claims().join(' · ') }}
+        </p>
       }
     </section>
   } @else if (loaded()) {

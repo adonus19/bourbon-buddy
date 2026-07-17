@@ -688,15 +688,23 @@ bourbons/{bourbonId}
                   // articleId so re-extraction overwrites instead of double-counting; cap ~20.
                   // Averages/counts derived client-side (no numeric avg shown under 2 scores).
   flavorProfile   gains (BB-222, backward-compatible):
-    tagCounts:        map<tag, number>   // per-tag article-mention counts ("Banana ×3")
-    seededArticleIds: array<string>      // idempotency guard for count increments (cap ~30)
-    reviewCount:      number
+    tagCounts:          map<tag, number> // review/listicle mention counts ("Banana ×3")
+    marketingTagCounts: map<tag, number> // press-release claims (lowest trust tier)
+    seededArticleIds:   array<string>    // shared idempotency guard (cap ~30)
+    reviewCount:        number
+    // BB-188 (design pending) adds userTagCounts — users' confirmed tags, top tier
 ```
 
-**Seeding policy (BB-220):** flavor seeds and verdicts from `press_release`
-articles are **dropped** — marketing notes never enter the consensus profile.
-`tagCounts` counts only human-written mentions; AI-generated (BB-185 feed-b)
-tags carry no count.
+**Trust ladder (owner decision 2026-07-17):** user-confirmed (BB-188, top) >
+review/listicle mentions (load-bearing: enter the arrays, counted) > AI
+feed-b suggestions (gap-filler, uncounted) > marketing claims (bottom:
+`marketingTagCounts` only — **never** the arrays, so they can't consume the
+6-tag stage cap or feed Taste Match / Similar Bottles). Marketing acts as a
+**weak corroborator**: it adds display weight to a tag a review already
+mentions; marketing-only tags render as "Distillery says …". Verdicts from
+press releases remain dropped (a producer has no opinion of its own product).
+Every `flavorProfile` write (including feed-b regeneration) must carry the
+provenance fields through.
 
 ### Subcollection: `/users/{userId}/stores/{storeId}` *(Epic 24 — BB-223…BB-225, planned)*
 

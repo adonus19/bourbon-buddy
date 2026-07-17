@@ -10,6 +10,12 @@ import { BourbonCatalogService } from '../../../core/services/bourbon-catalog.se
 import { TasteMatchService } from '../../../core/services/taste-match.service';
 import { WishlistService } from '../../../core/services/wishlist.service';
 import { CATEGORY_DISPLAY } from '../../constants/category-display';
+import {
+  marketingOnlyTags,
+  orderTagsByWeight,
+  profileSourceLabel,
+  reviewMentions,
+} from '../../utils/flavor-provenance';
 
 /**
  * Minimal bottle identity the preview sheet needs. Both a Dispatch
@@ -67,6 +73,28 @@ export class BottlePreviewSheetComponent {
 
   /** Taste Match badge (BB-199): shared taste tags, strongest first. */
   readonly taste = computed(() => this.tasteMatch.matches(this.profile()));
+
+  /** Provenance line (BB-222): "Based on N reviews" vs "AI-suggested". */
+  readonly sourceLabel = computed(() => profileSourceLabel(this.profile()));
+
+  /** Producer claims no review corroborates — shown apart, never as consensus. */
+  readonly claims = computed(() => marketingOnlyTags(this.profile()).slice(0, 6));
+
+  /**
+   * One stage's tags as display text, consensus-weighted (BB-222): ordered by
+   * review mentions (+ half-weight corroborating claims), with an ×N marker
+   * once two or more reviews agree — e.g. "Banana ×3 · Corn · Oak".
+   */
+  stageDisplay(stage: 'nose' | 'palate' | 'finish'): string {
+    const p = this.profile();
+    const tags = p?.[stage] ?? [];
+    return orderTagsByWeight(tags, p)
+      .map((tag) => {
+        const n = reviewMentions(p, tag);
+        return n >= 2 ? `${tag} ×${n}` : tag;
+      })
+      .join(' · ');
+  }
 
   ionViewWillEnter(): void {
     void this.load();
