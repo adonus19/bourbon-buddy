@@ -36,6 +36,7 @@ import {
   RateLimitError,
   generateText,
 } from "./gemini";
+import { parseRating } from "./rating";
 import {
   applyArticleSeed,
   articleFlavorSeed,
@@ -469,12 +470,17 @@ async function processArticle(
     } catch (err) {
       logger.warn(`Flavor seed failed for ${match.id}`, err);
     }
-    // A verdict is a critic signal — cache it on the catalog doc (BB-220).
-    // Best-effort like the flavor seed; keyed by articleId so re-runs are safe.
-    if (raw.verdict) {
+    // A verdict (BB-220) or a printed score (BB-221) is a critic signal — cache
+    // it on the catalog doc. parseRating verifies the raw score verbatim against
+    // the same article text the extraction read, then normalizes it to 0-100
+    // (unrecognized scale → null). Best-effort like the flavor seed; keyed by
+    // articleId so re-runs are safe.
+    const score = raw.rating ? parseRating(raw.rating, text) : null;
+    if (raw.verdict || score != null) {
       try {
         await recordCriticSignal(db, match.id, ref.id, {
           verdict: raw.verdict,
+          score,
           sourceName: (article.sourceName as string) ?? "",
         });
       } catch (err) {
@@ -513,14 +519,16 @@ async function recordCriticSignal(
   db: FirebaseFirestore.Firestore,
   bourbonId: string,
   articleId: string,
-  signal: { verdict: string; sourceName: string }
+  signal: { verdict: string | null; score: number | null; sourceName: string }
 ): Promise<void> {
   const ref = db.collection("bourbons").doc(bourbonId);
   const snap = await ref.get();
   const existing =
     (snap.get("criticSignals") as Parameters<typeof upsertCriticSignal>[0]) ?? {};
+  // A score-less re-extraction keeps any score already on file (upsertCriticSignal
+  // handles that); a verdict-less signal (score but no opinion) is still valid.
   const next = upsertCriticSignal(existing, articleId, {
-    score: null,
+    score: signal.score,
     verdict: signal.verdict,
     sourceName: signal.sourceName,
     at: Timestamp.now(),

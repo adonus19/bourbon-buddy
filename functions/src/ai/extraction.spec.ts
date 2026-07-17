@@ -32,6 +32,7 @@ describe("parseExtractionResponse (whiskey-only filter, BB-195)", () => {
         msrp: null,
         releaseType: null,
         verdict: null,
+        rating: null,
       },
     ]);
   });
@@ -129,6 +130,7 @@ describe("parseExtractionResponse (whiskey-only filter, BB-195)", () => {
         msrp: null,
         releaseType: null,
         verdict: null,
+        rating: null,
       },
     ]);
   });
@@ -306,6 +308,45 @@ describe("parseExtractionResponse — verdict gating (BB-220)", () => {
     );
     expect(out[0].verdict).toBeNull();
     expect(out[1].verdict).toBeNull();
+  });
+});
+
+describe("parseExtractionResponse — raw rating gating (BB-221)", () => {
+  const rated = (rating: unknown) => ({
+    name: "Russell's Reserve 13",
+    spirit: "whiskey",
+    category: "bourbon",
+    rating,
+  });
+
+  it("keeps the raw rating string from a review or listicle, unparsed", () => {
+    // parseExtractionResponse only carries the printed string through; the
+    // verbatim check + scale normalization happen later in parseRating.
+    const fromReview = parseExtractionResponse(
+      envelope([rated("92/100")], "independent_review")
+    );
+    expect(fromReview[0].rating).toBe("92/100");
+    const fromListicle = parseExtractionResponse(
+      envelope([rated("4.5 stars")], "listicle")
+    );
+    expect(fromListicle[0].rating).toBe("4.5 stars");
+  });
+
+  it("drops a rating from a press release or plain news", () => {
+    const fromPr = parseExtractionResponse(
+      envelope([rated("92/100")], "press_release")
+    );
+    expect(fromPr[0].rating).toBeNull();
+    const fromNews = parseExtractionResponse(envelope([rated("92/100")]));
+    expect(fromNews[0].rating).toBeNull();
+  });
+
+  it("nulls a non-string rating (model must send a raw string, never a number)", () => {
+    const out = parseExtractionResponse(
+      envelope([rated(92), rated(null)], "independent_review")
+    );
+    expect(out[0].rating).toBeNull();
+    expect(out[1].rating).toBeNull();
   });
 });
 

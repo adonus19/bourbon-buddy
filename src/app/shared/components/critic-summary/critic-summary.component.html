@@ -1,0 +1,31 @@
+@if (hasData()) {
+  <section class="critic glass-surface">
+    <span class="eyebrow">Critic take</span>
+
+    <div class="critic__body">
+      @if (average(); as avg) {
+        <div
+          class="critic__score"
+          [attr.aria-label]="
+            'Average critic score ' + avg + ' out of 100 from ' + scoreCount() + ' scores'
+          "
+        >
+          <span class="critic__score-num">{{ avg }}</span>
+          <span class="critic__score-scale">/100</span>
+          <span class="critic__score-count">· {{ scoreCount() }} scores</span>
+        </div>
+      }
+
+      @if (verdictPhrases().length) {
+        <ul class="critic__verdicts">
+          @for (p of verdictPhrases(); track p.key) {
+            <li class="critic__verdict critic__verdict--{{ p.key }}">
+              <span class="critic__verdict-count">{{ p.count }}</span>
+              {{ p.label }}
+            </li>
+          }
+        </ul>
+      }
+    </div>
+  </section>
+}

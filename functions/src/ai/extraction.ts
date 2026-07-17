@@ -72,6 +72,10 @@ export interface ExtractedBottle {
   // The writer's opinion of this bottle (BB-220); kept only from evaluative
   // article types (independent_review / listicle) — never from marketing copy.
   verdict: string | null;
+  // The printed review score AS WRITTEN (BB-221): "92/100", "4.5 stars", "B+"
+  // — a raw string, never a bare number, so the model can't invent a scale.
+  // Evaluative-gated like verdict; normalized to 0-100 later by parseRating.
+  rating: string | null;
 }
 
 export const EXTRACTION_SYSTEM_PROMPT =
@@ -118,6 +122,11 @@ export const EXTRACTION_SYSTEM_PROMPT =
   "\"negative\"|null — the AUTHOR'S OWN opinion of this bottle from their " +
   "evaluation (rave = exceptional, glowing). Marketing claims, producer " +
   "quotes, and neutral announcements are NOT opinions: verdict is null there. " +
+  "Each bottle also carries \"rating\": string|null — the review SCORE for " +
+  "this bottle EXACTLY as printed, e.g. \"92/100\", \"4.5 stars\", \"9.2/10\", " +
+  "\"B+\", \"90 points\". Copy the whole score string verbatim; NEVER convert " +
+  "it to a bare number or invent a scale. null unless the text prints a score " +
+  "for THIS bottle. " +
   "A product is something a shopper could ask for BY NAME at a store: a brand " +
   "plus (usually) an expression. It must be named in the text as a product. " +
   "NEVER turn a description of whiskey into a product name. From \"sources " +
@@ -166,6 +175,7 @@ export const EXTRACTION_RESPONSE_SCHEMA: Record<string, unknown> = {
             nullable: true,
           },
           verdict: { type: "STRING", enum: [...VALID_VERDICTS], nullable: true },
+          rating: { type: "STRING", nullable: true },
           flavor: {
             type: "OBJECT",
             properties: {
@@ -373,6 +383,13 @@ export function parseExtractionResponse(
         typeof b["verdict"] === "string" &&
         VALID_VERDICTS.has(b["verdict"] as string)
           ? (b["verdict"] as string)
+          : null,
+      // Raw printed score, evaluative-gated like verdict — a "score" in a press
+      // release is marketing. Left as the printed string; parseRating does the
+      // verbatim check + normalization against the article text downstream.
+      rating:
+        evaluative && typeof b["rating"] === "string" && b["rating"].trim()
+          ? (b["rating"] as string)
           : null,
     }))
     .filter((b) => b.name.trim().length > 0)

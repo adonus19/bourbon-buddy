@@ -572,7 +572,7 @@ provenance counts. All in the existing one-call-per-article budget
       enrichment on `gemma-4-31b-it` (+ fence-stripper; schema required or it
       answers in prose; the 26b-a4b variant degenerates — do not use). Secret
       `GEMINI_API_KEY`; rotate the key post-merge (it transited chat).
-- [ ] **BB-221** — Numeric ratings: raw-string extraction, server-side
+- [x] **BB-221** — Numeric ratings: raw-string extraction, server-side
       `parseRating`, idempotent `criticSignals` map, `app-critic-summary` UI
 - [ ] **BB-188** — Crowdsourced flavor aggregation — **promoted from backlog
       (2026-07-17; user base is growing):** blend users' own confirmed tags

@@ -51,6 +51,8 @@
     <p class="sheet__empty">No flavor profile for this bottle yet.</p>
   }
 
+  <app-critic-summary [signals]="catalogBottle()?.criticSignals ?? null" />
+
   @if (bottle.bourbonId) {
     <app-price-history [bourbonId]="bottle.bourbonId" [compact]="true" />
     <app-similar-bottles [bourbonId]="bottle.bourbonId" />
