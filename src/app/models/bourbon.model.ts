@@ -18,6 +18,18 @@ export interface FlavorProfile {
 }
 
 /**
+ * One article's opinion of this bottle (BB-220/221), cached on the catalog in
+ * a map keyed by articleId — idempotent under re-extraction, capped server-side
+ * (~20). Aggregates (counts, averages) are always derived client-side.
+ */
+export interface CriticSignal {
+  score: number | null; // normalized 0–100 (BB-221); null until then
+  verdict: 'rave' | 'positive' | 'mixed' | 'negative' | null;
+  sourceName: string;
+  at: Timestamp;
+}
+
+/**
  * Precomputed "Similar bottles" neighbor (BB-197): cached on the catalog doc
  * by the server whenever flavor profiles change; the client only reads it.
  * `sharedTags` are the overlapping canonical flavor tags, palate-first — shown
@@ -55,6 +67,7 @@ export interface Bourbon {
   flavorEnrichedAt?: Timestamp | null; // set once enriched; gates re-enrichment
   similarBottles?: SimilarBottle[]; // precomputed neighbors (BB-197), server-written
   similarComputedAt?: Timestamp | null;
+  criticSignals?: Record<string, CriticSignal>; // per-article opinions (BB-220/221), server-written
   createdAt: Timestamp;
   createdByUserId: string;
 }

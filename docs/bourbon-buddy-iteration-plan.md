@@ -555,8 +555,8 @@ provenance counts. All in the existing one-call-per-article budget
 - [x] **BB-219** — Fact extraction + null-only catalog backfill (proof /
       ageStatement / msrp / releaseType), verbatim-in-text guards,
       `extractionVersion` + versioned re-sweep ✅
-- [ ] **BB-220** — `articleType` classification + per-bottle `verdict`;
-      press-release flavor seeds dropped; provenance chip in Dispatch
+- [x] **BB-220** — `articleType` classification + per-bottle `verdict`;
+      press-release flavor seeds dropped; provenance chip in Dispatch ✅
 - [ ] **BB-221** — Numeric ratings: raw-string extraction, server-side
       `parseRating`, idempotent `criticSignals` map, `app-critic-summary` UI
 - [ ] **BB-222** — Per-tag provenance counts on `flavorProfile`

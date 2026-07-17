@@ -182,6 +182,24 @@ export class DispatchPage implements ViewWillEnter {
     return relativeTime(a.publishedAt?.toDate() ?? null);
   }
 
+  /**
+   * Provenance label for the source classification (BB-220). Plain "news" (and
+   * pre-v3 articles without a type) show nothing — the label exists to flag
+   * marketing vs evaluation, not to decorate every row.
+   */
+  typeLabel(a: NewsArticle): string | null {
+    switch (a.articleType) {
+      case 'press_release':
+        return 'Press release';
+      case 'independent_review':
+        return 'Review';
+      case 'listicle':
+        return 'Roundup';
+      default:
+        return null;
+    }
+  }
+
   openArticle(a: NewsArticle): void {
     window.open(a.url, '_blank', 'noopener');
     // Opening an unread article files it under Read; saved articles stay saved.
