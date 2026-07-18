@@ -143,6 +143,14 @@ export const EXTRACTION_SYSTEM_PROMPT =
   "including it. Never invent details; every number must be copied from the " +
   "text. No duplicates.";
 
+// Hard array bounds in the schema (BB-227): without them a listicle occasionally
+// sent gemini-3.1-flash-lite into a repetition loop — a single giant bottle whose
+// flavor arrays never closed, blowing the entire output-token budget and
+// truncating the JSON so nothing (not even the salvage) could be recovered. These
+// caps make constrained decoding STOP, so the reply always fits and stays valid.
+const SCHEMA_MAX_BOTTLES = 15; // > MAX_BOTTLES (12); parser still trims to 12
+const MAX_FLAVOR_TAGS_PER_STAGE = 8; // canonical stage cap is 6; a little slack
+
 /**
  * Gemini responseSchema for the extraction reply (BB-226): constrained
  * decoding on gemini-3.1-flash-lite guarantees parseable JSON in the right
@@ -159,6 +167,7 @@ export const EXTRACTION_RESPONSE_SCHEMA: Record<string, unknown> = {
     },
     bottles: {
       type: "ARRAY",
+      maxItems: SCHEMA_MAX_BOTTLES,
       items: {
         type: "OBJECT",
         properties: {
@@ -179,9 +188,21 @@ export const EXTRACTION_RESPONSE_SCHEMA: Record<string, unknown> = {
           flavor: {
             type: "OBJECT",
             properties: {
-              nose: { type: "ARRAY", items: { type: "STRING" } },
-              palate: { type: "ARRAY", items: { type: "STRING" } },
-              finish: { type: "ARRAY", items: { type: "STRING" } },
+              nose: {
+                type: "ARRAY",
+                maxItems: MAX_FLAVOR_TAGS_PER_STAGE,
+                items: { type: "STRING" },
+              },
+              palate: {
+                type: "ARRAY",
+                maxItems: MAX_FLAVOR_TAGS_PER_STAGE,
+                items: { type: "STRING" },
+              },
+              finish: {
+                type: "ARRAY",
+                maxItems: MAX_FLAVOR_TAGS_PER_STAGE,
+                items: { type: "STRING" },
+              },
             },
           },
         },
