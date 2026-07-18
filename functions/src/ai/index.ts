@@ -723,7 +723,11 @@ async function extractBottleNames(
       system: EXTRACTION_SYSTEM_PROMPT,
       user: `TEXT:\n${text}`,
       maxTokens: MAX_OUTPUT_TOKENS,
-      temperature: 0,
+      // Not 0: greedy decoding occasionally looped on multi-bottle listicles,
+      // emitting a giant repeating flavor array that blew the token budget and
+      // truncated the JSON (BB-227). A small temperature breaks the loop while
+      // keeping extraction effectively deterministic under the response schema.
+      temperature: 0.15,
       responseSchema: EXTRACTION_RESPONSE_SCHEMA,
     })) || "{}";
   // The article text doubles as the verbatim-fact verifier (BB-219).
