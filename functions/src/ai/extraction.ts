@@ -105,9 +105,10 @@ export const EXTRACTION_SYSTEM_PROMPT =
   "category: exactly one of bourbon, rye, wheat_whiskey, tennessee, " +
   "american_other, scotch, irish, japanese, world_other — or null if unsure. " +
   "flavor: ONLY if the article gives tasting notes for this bottle, the flavor " +
-  "words it uses per stage (e.g. vanilla, oak, cherry, smoke). MOST articles " +
-  "are announcements with NO tasting notes — for those use empty arrays. Never " +
-  "invent flavors. " +
+  "words it uses per stage (e.g. vanilla, oak, cherry, smoke). List AT MOST 6 " +
+  "single-word or short descriptors per stage — never repeat a word and never " +
+  "restate the stage name inside the array. MOST articles are announcements " +
+  "with NO tasting notes — for those use empty arrays. Never invent flavors. " +
   "Each bottle also carries \"proof\": number|null, \"ageYears\": number|null, " +
   "\"msrp\": number|null, \"releaseType\": \"flagship\"|\"annual\"|\"limited\"|" +
   "\"single_barrel\"|null. " +
@@ -140,16 +141,18 @@ export const EXTRACTION_SYSTEM_PROMPT =
   "NOT a product. " +
   "Most articles announce news and name no bottle at all — returning an empty " +
   "array is the common, correct answer. Prefer omitting a doubtful bottle over " +
-  "including it. Never invent details; every number must be copied from the " +
-  "text. No duplicates.";
+  "including it. Extract AT MOST 12 bottles; if the text names more, keep the " +
+  "most prominent 12. Never invent details; every number must be copied from " +
+  "the text. No duplicates.";
 
-// Hard array bounds in the schema (BB-227): without them a listicle occasionally
-// sent gemini-3.1-flash-lite into a repetition loop — a single giant bottle whose
-// flavor arrays never closed, blowing the entire output-token budget and
-// truncating the JSON so nothing (not even the salvage) could be recovered. These
-// caps make constrained decoding STOP, so the reply always fits and stays valid.
-const SCHEMA_MAX_BOTTLES = 15; // > MAX_BOTTLES (12); parser still trims to 12
-const MAX_FLAVOR_TAGS_PER_STAGE = 8; // canonical stage cap is 6; a little slack
+// NB: gemini-3.1-flash-lite's responseSchema does NOT support array-size keywords
+// (`maxItems`/`minItems`) — including one makes the whole request 400 with
+// INVALID_ARGUMENT, so extraction is bounded in the PROMPT ("at most N …") and by
+// a small decoding temperature instead. See BB-227 notes: a bare listicle would
+// occasionally send the model into a repetition loop (a single giant bottle whose
+// flavor array never closed, blowing the token budget and truncating the JSON).
+// The prompt caps keep the arrays finite; the temperature breaks the greedy loop;
+// the truncation salvage in parseEnvelope stays as the last-resort safety net.
 
 /**
  * Gemini responseSchema for the extraction reply (BB-226): constrained
@@ -167,7 +170,6 @@ export const EXTRACTION_RESPONSE_SCHEMA: Record<string, unknown> = {
     },
     bottles: {
       type: "ARRAY",
-      maxItems: SCHEMA_MAX_BOTTLES,
       items: {
         type: "OBJECT",
         properties: {
@@ -188,21 +190,9 @@ export const EXTRACTION_RESPONSE_SCHEMA: Record<string, unknown> = {
           flavor: {
             type: "OBJECT",
             properties: {
-              nose: {
-                type: "ARRAY",
-                maxItems: MAX_FLAVOR_TAGS_PER_STAGE,
-                items: { type: "STRING" },
-              },
-              palate: {
-                type: "ARRAY",
-                maxItems: MAX_FLAVOR_TAGS_PER_STAGE,
-                items: { type: "STRING" },
-              },
-              finish: {
-                type: "ARRAY",
-                maxItems: MAX_FLAVOR_TAGS_PER_STAGE,
-                items: { type: "STRING" },
-              },
+              nose: { type: "ARRAY", items: { type: "STRING" } },
+              palate: { type: "ARRAY", items: { type: "STRING" } },
+              finish: { type: "ARRAY", items: { type: "STRING" } },
             },
           },
         },
