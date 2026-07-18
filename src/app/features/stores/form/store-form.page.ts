@@ -1,0 +1,163 @@
+import { Component, effect, inject } from '@angular/core';
+import { FormBuilder, Validators } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
+import { ToastController } from '@ionic/angular';
+
+import { StoreNote, StorePriceTier, StoreSpecialty } from '../../../models';
+import {
+  StoreInput,
+  StoreNotesService,
+} from '../../../core/services/store-notes.service';
+
+/**
+ * Store note create/edit (BB-223) — dual-mode Reactive Form at `/stores/new`
+ * and `/stores/:id/edit`, mirroring the Hunt List add/edit page. `priceTier` is
+ * a manual judgment (never inferred). New-mode reads query params
+ * (name/city/state/placeId) so the BB-225 sighting→store handoff can prefill it.
+ */
+@Component({
+  selector: 'app-store-form',
+  templateUrl: './store-form.page.html',
+  styleUrls: ['./store-form.page.scss'],
+  standalone: false,
+})
+export class StoreFormPage {
+  private readonly fb = inject(FormBuilder);
+  private readonly stores = inject(StoreNotesService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly toast = inject(ToastController);
+
+  readonly editId = this.route.snapshot.paramMap.get('id');
+  get isEditMode(): boolean {
+    return !!this.editId;
+  }
+
+  saving = false;
+  private patched = false;
+  private placeId: string | null = null;
+
+  readonly priceTiers: { value: StorePriceTier; label: string }[] = [
+    { value: 'underpriced', label: 'Underpriced' },
+    { value: 'fair', label: 'Fair' },
+    { value: 'overpriced', label: 'Overpriced' },
+  ];
+
+  readonly specialtyOptions: { value: StoreSpecialty; label: string }[] = [
+    { value: 'store-picks', label: 'Store Picks' },
+    { value: 'allocated', label: 'Allocated Drops' },
+    { value: 'barrel-picks', label: 'Barrel Picks' },
+    { value: 'rare-finds', label: 'Rare Finds' },
+  ];
+
+  readonly form = this.fb.group({
+    name: ['', [Validators.required, Validators.maxLength(120)]],
+    city: [''],
+    state: ['', [Validators.maxLength(40)]],
+    priceTier: [null as StorePriceTier | null],
+    specialties: [[] as StoreSpecialty[]],
+    shipmentNotes: [''],
+    notes: [''],
+  });
+
+  private readonly editStore = this.editId
+    ? this.stores.selectById(this.editId)
+    : null;
+
+  constructor() {
+    if (this.editStore) {
+      effect(() => {
+        const s = this.editStore?.();
+        if (s && !this.patched) {
+          this.patched = true;
+          this.patchFromStore(s);
+        }
+      });
+    } else {
+      // New mode: prefill from query params (BB-225 handoff).
+      const q = this.route.snapshot.queryParamMap;
+      this.placeId = q.get('placeId');
+      this.form.patchValue({
+        name: q.get('name') ?? '',
+        city: q.get('city') ?? '',
+        state: q.get('state') ?? '',
+      });
+    }
+  }
+
+  private patchFromStore(s: StoreNote): void {
+    this.placeId = s.placeId ?? null;
+    this.form.patchValue({
+      name: s.name,
+      city: s.city ?? '',
+      state: s.state ?? '',
+      priceTier: s.priceTier ?? null,
+      specialties: [...(s.specialties ?? [])],
+      shipmentNotes: s.shipmentNotes ?? '',
+      notes: s.notes ?? '',
+    });
+  }
+
+  isSpecialtySelected(value: StoreSpecialty): boolean {
+    return (this.form.controls.specialties.value ?? []).includes(value);
+  }
+
+  toggleSpecialty(value: StoreSpecialty): void {
+    const current = this.form.controls.specialties.value ?? [];
+    const next = current.includes(value)
+      ? current.filter((v) => v !== value)
+      : [...current, value];
+    this.form.controls.specialties.setValue(next);
+    this.form.controls.specialties.markAsDirty();
+  }
+
+  async save(): Promise<void> {
+    if (this.form.invalid || this.saving) {
+      this.form.markAllAsTouched();
+      return;
+    }
+    this.saving = true;
+    try {
+      const v = this.form.getRawValue();
+      const input: StoreInput = {
+        name: (v.name ?? '').trim(),
+        placeId: this.placeId,
+        city: this.strOrNull(v.city),
+        state: this.strOrNull(v.state),
+        priceTier: (v.priceTier as StorePriceTier | null) ?? null,
+        specialties: v.specialties ?? [],
+        shipmentNotes: this.strOrNull(v.shipmentNotes),
+        notes: this.strOrNull(v.notes),
+      };
+
+      if (this.editId) {
+        await this.stores.update(this.editId, input);
+        await this.presentToast('Store updated.');
+      } else {
+        await this.stores.add(input);
+        await this.presentToast('Store saved.');
+      }
+      await this.router.navigateByUrl('/stores', { replaceUrl: true });
+    } catch {
+      await this.presentToast(
+        "Couldn't save. Check your connection and try again."
+      );
+    } finally {
+      this.saving = false;
+    }
+  }
+
+  private strOrNull(v: string | null | undefined): string | null {
+    const t = (v ?? '').trim();
+    return t.length ? t : null;
+  }
+
+  private async presentToast(message: string): Promise<void> {
+    const t = await this.toast.create({
+      message,
+      duration: 2000,
+      position: 'top',
+    });
+    await t.present();
+  }
+}

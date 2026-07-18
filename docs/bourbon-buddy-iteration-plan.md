@@ -590,9 +590,12 @@ user's own `/priceHistory` (visits, last seen, avg % vs MSRP). Nav entry in the
 Hunt List toolbar next to bottle lookup. No Security Rules change (existing
 owner-only subcollection wildcard covers `/users/{uid}/stores`).
 
-- [ ] **BB-223** — `StoreNote` model + `StoreNotesService` (signal state-holder),
+- [x] **BB-223** — `StoreNote` model + `StoreNotesService` (signal state-holder),
       list page, dual-mode form (`/stores`, `/stores/new`, `/stores/:id/edit`),
-      Hunt toolbar entry
+      Hunt toolbar entry. DONE 2026-07-18: pure `store-identity` (placeId-first,
+      else name+city) + service CRUD (derives `nameNormalized`) + form validation,
+      all spec'd. Rows link to edit until BB-224 adds `/stores/:id` detail. No
+      rules change (owner-only wildcard covers `/users/{uid}/stores`).
 - [ ] **BB-224** — Store detail page: intel + evidence panel from `/priceHistory`
       (+ composite index `spotterUid ASC, storeName ASC, sightingDate DESC`)
 - [ ] **BB-225** — Sighting → store handoff: post-save "Add store intel" toast →

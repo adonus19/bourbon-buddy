@@ -15,3 +15,4 @@ export * from './article-state.model';
 export * from './notification-prefs.model';
 export * from './app-notification.model';
 export * from './access.model';
+export * from './store-note.model';

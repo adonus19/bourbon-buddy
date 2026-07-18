@@ -1,0 +1,47 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/tabs/hunt-list" text=""></ion-back-button>
+    </ion-buttons>
+    <ion-title>My Stores</ion-title>
+    <ion-buttons slot="end">
+      <ion-button routerLink="/stores/new" aria-label="Add a store">
+        <ion-icon slot="icon-only" name="add-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  @if (!loaded()) {
+    <app-list-skeleton />
+  } @else if (stores().length === 0) {
+    <div class="stores-empty">
+      <ion-icon name="storefront-outline" aria-hidden="true"></ion-icon>
+      <h2>No stores yet</h2>
+      <p>Keep notes on the shops you hunt — picks, drops, and whether they price fair.</p>
+      <ion-button class="stores-empty__cta" routerLink="/stores/new">
+        Add your first store
+      </ion-button>
+    </div>
+  } @else {
+    <ul class="stores-list">
+      @for (s of stores(); track s.id) {
+        <li class="stores-row glass-surface" [routerLink]="['/stores', s.id, 'edit']">
+          <div class="stores-row__main">
+            <span class="stores-row__name">{{ s.name }}</span>
+            @if (location(s); as loc) {
+              <span class="stores-row__loc">{{ loc }}</span>
+            }
+            @if (specialtyLabels(s).length) {
+              <span class="stores-row__tags">{{ specialtyLabels(s).join(' · ') }}</span>
+            }
+          </div>
+          @if (tierLabel(s); as tier) {
+            <span class="stores-row__tier stores-row__tier--{{ s.priceTier }}">{{ tier }}</span>
+          }
+        </li>
+      }
+    </ul>
+  }
+</ion-content>

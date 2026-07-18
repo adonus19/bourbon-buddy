@@ -110,6 +110,12 @@ const routes: Routes = [
       ),
   },
   {
+    path: 'stores',
+    canActivate: [authGuard, approvedGuard],
+    loadChildren: () =>
+      import('./features/stores/stores.module').then((m) => m.StoresModule),
+  },
+  {
     path: 'wishlist/:id/edit',
     canActivate: [authGuard, approvedGuard],
     loadChildren: () =>
