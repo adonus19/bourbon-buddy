@@ -22,6 +22,14 @@ export interface FlavorProfile {
   marketingTagCounts?: Record<string, number>;
   seededArticleIds?: string[];
   reviewCount?: number;
+  // Community tier (BB-188), the TOP of the trust ladder — users' own confirmed
+  // tags aggregated across people (server-written by the log-entry trigger).
+  // `userTags` is kept separate from the arrays above so it can be recomputed
+  // non-destructively; only counts ≥ the contributor floor (2) are stored, and
+  // nothing per-user is ever recorded.
+  userTags?: { nose: string[]; palate: string[]; finish: string[] };
+  userTagCounts?: Record<string, number>; // distinct-user count per tag
+  contributorCount?: number; // distinct users who confirmed any tag
 }
 
 /**

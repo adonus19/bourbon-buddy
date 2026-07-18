@@ -18,6 +18,7 @@ import {
 import { readFileSync } from 'fs';
 import {
   collection,
+  collectionGroup,
   deleteDoc,
   doc,
   getDoc,
@@ -160,6 +161,20 @@ describe('approved user', () => {
     await assertFails(getDoc(doc(approvedDb(), `users/${PENDING}`)));
     await assertFails(
       getDoc(doc(approvedDb(), 'accessAllowlist/friend@example.com'))
+    );
+  });
+
+  it('cannot aggregate log entries across users (BB-188 privacy)', async () => {
+    // Community flavor aggregation reads every user's confirmed tags — but only
+    // the trusted Cloud Function (admin SDK) may. A client collection-group read
+    // over logEntries must be denied, or the top trust tier would leak entries.
+    await assertFails(
+      getDocs(
+        query(
+          collectionGroup(approvedDb(), 'logEntries'),
+          where('bourbonId', '==', 'b1')
+        )
+      )
     );
   });
 });

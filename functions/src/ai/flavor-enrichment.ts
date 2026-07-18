@@ -203,6 +203,12 @@ export interface FlavorProvenance {
   marketingTagCounts: Record<string, number>; // press-release claims per tag
   seededArticleIds: string[]; // articles already counted (idempotency)
   reviewCount: number; // non-marketing articles that seeded
+  // Community tier (BB-188), the TOP of the ladder. Written by the log-entry
+  // aggregation trigger, kept SEPARATE from the arrays above (non-destructive),
+  // and carried through here so no AI regeneration can wipe it.
+  userTags: FlavorTags; // community-confirmed tags, plurality stage, floor-gated
+  userTagCounts: Record<string, number>; // distinct-user count per tag (≥ floor)
+  contributorCount: number; // distinct users who confirmed any tag
 }
 
 /** Read provenance out of a stored profile, tolerating legacy/garbage shapes. */
@@ -221,6 +227,7 @@ export function profileProvenance(profile: unknown): FlavorProvenance {
     return out;
   };
   const reviewCount = p["reviewCount"];
+  const contributorCount = p["contributorCount"];
   return {
     tagCounts: counts(p["tagCounts"]),
     marketingTagCounts: counts(p["marketingTagCounts"]),
@@ -231,6 +238,12 @@ export function profileProvenance(profile: unknown): FlavorProvenance {
       : [],
     reviewCount:
       typeof reviewCount === "number" && reviewCount > 0 ? reviewCount : 0,
+    userTags: profileToTags(p["userTags"]),
+    userTagCounts: counts(p["userTagCounts"]),
+    contributorCount:
+      typeof contributorCount === "number" && contributorCount > 0
+        ? contributorCount
+        : 0,
   };
 }
 
@@ -238,10 +251,24 @@ export function profileProvenance(profile: unknown): FlavorProvenance {
 export function hasProvenance(p: FlavorProvenance): boolean {
   return (
     p.reviewCount > 0 ||
+    p.contributorCount > 0 ||
     p.seededArticleIds.length > 0 ||
     Object.keys(p.tagCounts).length > 0 ||
-    Object.keys(p.marketingTagCounts).length > 0
+    Object.keys(p.marketingTagCounts).length > 0 ||
+    Object.keys(p.userTagCounts).length > 0
   );
+}
+
+/**
+ * Consumer-facing tags (BB-188): the review/AI arrays with the community tier
+ * (`userTags`) unioned in, community-first so it fills the per-stage cap first.
+ * Use this everywhere tags are READ for a decision — similarity, chip flavor,
+ * client prefill/display. NOT for storage merges: `profileToTags` stays raw so
+ * community tags never bake into the stored arrays (they must stay recomputable).
+ */
+export function blendedProfileTags(profile: unknown): FlavorTags {
+  const p = (profile ?? {}) as Record<string, unknown>;
+  return mergeFlavorTags(profileToTags(p["userTags"]), profileToTags(profile));
 }
 
 export interface SeedResult {
@@ -458,9 +485,13 @@ export async function applyEnrichment(
   return {
     status,
     // Return the canonical tags for immediate use; the doc carries the full
-    // profile (with the server timestamp) for listeners.
+    // profile (with the server timestamp) for listeners. Community tier (BB-188)
+    // rides along so point-of-use prefill (BB-186) can blend it in.
     flavorProfile: {
       ...chosen,
+      userTags: provenance.userTags,
+      userTagCounts: provenance.userTagCounts,
+      contributorCount: provenance.contributorCount,
       source: "ai",
       model: FLAVOR_MODEL,
       promptVersion: FLAVOR_PROMPT_VERSION,

@@ -26,19 +26,19 @@
     </div>
   }
 
-  @if (profile(); as p) {
+  @if (profile()) {
     <section class="sheet__flavor">
       <span class="eyebrow">Flavor profile</span>
       @if (sourceLabel(); as src) {
         <span class="sheet__source">{{ src }}</span>
       }
-      @if (p.nose.length) {
+      @if (blendedTags().nose.length) {
         <p class="sheet__stage"><strong>Nose</strong> {{ stageDisplay('nose') }}</p>
       }
-      @if (p.palate.length) {
+      @if (blendedTags().palate.length) {
         <p class="sheet__stage"><strong>Palate</strong> {{ stageDisplay('palate') }}</p>
       }
-      @if (p.finish.length) {
+      @if (blendedTags().finish.length) {
         <p class="sheet__stage"><strong>Finish</strong> {{ stageDisplay('finish') }}</p>
       }
       @if (claims().length) {

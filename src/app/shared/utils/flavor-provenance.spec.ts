@@ -2,11 +2,14 @@ import { Timestamp } from '@angular/fire/firestore';
 
 import { FlavorProfile } from '../../models';
 import {
+  blendedProfileTags,
+  consensusCount,
   marketingOnlyTags,
   orderTagsByWeight,
   profileSourceLabel,
   reviewMentions,
   tagWeight,
+  tasterMentions,
 } from './flavor-provenance';
 
 const profile = (over: Partial<FlavorProfile> = {}): FlavorProfile => ({
@@ -93,5 +96,72 @@ describe('profileSourceLabel', () => {
     );
     expect(profileSourceLabel(profile())).toBe('AI-suggested');
     expect(profileSourceLabel(null)).toBeNull();
+  });
+
+  it('leads with tasters when the community tier exists (BB-188)', () => {
+    expect(profileSourceLabel(profile({ contributorCount: 1 }))).toBe(
+      'AI-suggested' // below the floor → not surfaced as community
+    );
+    expect(profileSourceLabel(profile({ contributorCount: 4 }))).toBe(
+      'Based on 4 tasters'
+    );
+    expect(
+      profileSourceLabel(profile({ contributorCount: 4, reviewCount: 2 }))
+    ).toBe('Based on 4 tasters · 2 reviews');
+  });
+});
+
+describe('tasterMentions / consensusCount (BB-188)', () => {
+  it('reads the distinct-user count', () => {
+    const p = profile({ userTagCounts: { Banana: 3 } });
+    expect(tasterMentions(p, 'Banana')).toBe(3);
+    expect(tasterMentions(p, 'Oak')).toBe(0);
+    expect(tasterMentions(null, 'Oak')).toBe(0);
+  });
+
+  it('consensusCount prefers tasters over reviews for the ×N badge', () => {
+    const p = profile({ userTagCounts: { Banana: 3 }, tagCounts: { Banana: 2 } });
+    expect(consensusCount(p, 'Banana')).toBe(3); // tasters win
+    const reviewOnly = profile({ tagCounts: { Oak: 2 } });
+    expect(consensusCount(reviewOnly, 'Oak')).toBe(2);
+  });
+});
+
+describe('orderTagsByWeight — community tier tops reviews (BB-188)', () => {
+  it('ranks any community-confirmed tag above any review-only tag', () => {
+    const p = profile({
+      userTagCounts: { Oak: 2 }, // community
+      tagCounts: { Corn: 5 }, // heavily reviewed but no tasters
+    });
+    expect(orderTagsByWeight(['Corn', 'Oak', 'Banana'], p)).toEqual([
+      'Oak', // community tier wins despite Corn's 5 reviews
+      'Corn',
+      'Banana',
+    ]);
+  });
+});
+
+describe('blendedProfileTags (BB-188)', () => {
+  it('unions community userTags over the arrays, community first, capped at 6', () => {
+    const p = profile({
+      nose: ['Vanilla'],
+      palate: ['Corn'],
+      finish: [],
+      userTags: { nose: ['Oak'], palate: ['Corn'], finish: ['Char'] },
+    });
+    const blended = blendedProfileTags(p);
+    expect(blended.nose).toEqual(['Oak', 'Vanilla']);
+    expect(blended.palate).toEqual(['Corn']); // deduped
+    expect(blended.finish).toEqual(['Char']);
+  });
+
+  it('equals the raw arrays with no community tier', () => {
+    const p = profile();
+    expect(blendedProfileTags(p)).toEqual({
+      nose: p.nose,
+      palate: p.palate,
+      finish: p.finish,
+    });
+    expect(blendedProfileTags(null)).toEqual({ nose: [], palate: [], finish: [] });
   });
 });

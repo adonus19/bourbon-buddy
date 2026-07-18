@@ -1,17 +1,44 @@
 import { FlavorProfile } from '../../models';
 
 /**
- * Flavor tag provenance display logic (BB-222).
+ * Flavor tag provenance display logic (BB-222 + BB-188).
  *
- * The trust ladder: review/listicle mentions (`tagCounts`) are load-bearing;
- * producer claims (`marketingTagCounts`) are display-only and act as a WEAK
- * CORROBORATOR — they add ordering weight to a tag a review already mentions,
- * but a marketing-only tag never joins the profile arrays and never feeds
- * Taste Match / Similar Bottles. Pure functions; safe in computed().
+ * The trust ladder (top → bottom): community-confirmed tags (`userTagCounts`,
+ * BB-188) > review/listicle mentions (`tagCounts`) > AI suggestions (in the
+ * arrays, uncounted) > producer claims (`marketingTagCounts`, display-only weak
+ * CORROBORATOR). A marketing-only tag never joins the arrays; the community tier
+ * always sorts first. Pure functions; safe in computed().
+ *
+ * `blendedProfileTags` mirrors the server helper of the same name
+ * (`functions/src/ai/flavor-enrichment.ts`) — keep the two in step so client
+ * prefill/display and server similarity agree on the effective tag set.
  */
 
 /** How much a corroborating producer claim counts vs a review mention. */
 const MARKETING_CORROBORATION_WEIGHT = 0.5;
+
+/** Tags per stage; mirrors the server MAX_TAGS_PER_STAGE cap. */
+const MAX_TAGS_PER_STAGE = 6;
+
+/** Distinct users who confirmed a tag (BB-188) — the ×N badge's top signal. */
+export function tasterMentions(
+  profile: FlavorProfile | null | undefined,
+  tag: string
+): number {
+  return profile?.userTagCounts?.[tag] ?? 0;
+}
+
+/**
+ * The consensus count to badge (×N): community tasters take precedence over
+ * review mentions, so a tag that real drinkers confirmed reads as drinker
+ * consensus, not critic consensus.
+ */
+export function consensusCount(
+  profile: FlavorProfile | null | undefined,
+  tag: string
+): number {
+  return tasterMentions(profile, tag) || reviewMentions(profile, tag);
+}
 
 /** Review/listicle mentions of a tag (drives the ×N badge at N ≥ 2). */
 export function reviewMentions(
@@ -37,15 +64,44 @@ export function tagWeight(
   return reviews + claims * MARKETING_CORROBORATION_WEIGHT;
 }
 
-/** Stable weight-descending order; uncounted tags keep their stored order. */
+/**
+ * Stable order: community tier first (any confirmed tag outranks any review-only
+ * tag), then corroborated review weight, then stored order. Lexicographic so the
+ * top tier strictly dominates regardless of how many reviews a lower tag has.
+ */
 export function orderTagsByWeight(
   tags: string[],
   profile: FlavorProfile | null | undefined
 ): string[] {
   return tags
-    .map((tag, i) => ({ tag, i, w: tagWeight(profile, tag) }))
-    .sort((a, b) => b.w - a.w || a.i - b.i)
+    .map((tag, i) => ({
+      tag,
+      i,
+      u: tasterMentions(profile, tag),
+      w: tagWeight(profile, tag),
+    }))
+    .sort((a, b) => b.u - a.u || b.w - a.w || a.i - b.i)
     .map((x) => x.tag);
+}
+
+/**
+ * Effective tags for prefill/display: the review/AI arrays with the community
+ * tier unioned in, community-first so it fills the per-stage cap first. Mirror
+ * of the server `blendedProfileTags`.
+ */
+export function blendedProfileTags(
+  profile: FlavorProfile | null | undefined
+): { nose: string[]; palate: string[]; finish: string[] } {
+  const stage = (
+    arr: string[] | undefined,
+    user: string[] | undefined
+  ): string[] =>
+    [...new Set([...(user ?? []), ...(arr ?? [])])].slice(0, MAX_TAGS_PER_STAGE);
+  return {
+    nose: stage(profile?.nose, profile?.userTags?.nose),
+    palate: stage(profile?.palate, profile?.userTags?.palate),
+    finish: stage(profile?.finish, profile?.userTags?.finish),
+  };
 }
 
 /**
@@ -70,16 +126,29 @@ export function marketingOnlyTags(
     .map(([tag]) => tag);
 }
 
-/** Honest source line: earned consensus vs an AI guess. */
+/** Distinct contributors required before the community tier is surfaced (BB-188). */
+const COMMUNITY_FLOOR = 2;
+
+/**
+ * Honest source line, top tier first: community tasters (BB-188) over reviews
+ * over an AI guess. When both tasters and reviews exist, both are credited.
+ */
 export function profileSourceLabel(
   profile: FlavorProfile | null | undefined
 ): string | null {
   if (!profile) {
     return null;
   }
-  const n = profile.reviewCount ?? 0;
-  if (n > 0) {
-    return n === 1 ? 'Based on 1 review' : `Based on ${n} reviews`;
+  const tasters = profile.contributorCount ?? 0;
+  const reviews = profile.reviewCount ?? 0;
+  const reviewClause = reviews > 0
+    ? ` · ${reviews} ${reviews === 1 ? 'review' : 'reviews'}`
+    : '';
+  if (tasters >= COMMUNITY_FLOOR) {
+    return `Based on ${tasters} tasters${reviewClause}`;
+  }
+  if (reviews > 0) {
+    return reviews === 1 ? 'Based on 1 review' : `Based on ${reviews} reviews`;
   }
   return 'AI-suggested';
 }

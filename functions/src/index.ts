@@ -48,6 +48,10 @@ export {
   backfillFlavorEnrichment,
 } from "./ai";
 
+// Crowdsourced flavor aggregation (BB-188): community-confirmed tags aggregated
+// per bottle into the top provenance tier, via a log-entry write trigger.
+export { onLogEntryWrittenAggregateFlavor } from "./ai";
+
 // Taste Match (BB-199): per-user taste vector maintained on the profile doc
 // from their own high-rated tasting tags; powers badges + sighting alerts.
 export { onLogEntryWrittenUpdateTaste } from "./taste";

@@ -53,6 +53,10 @@ export {
   backfillFlavorEnrichment,
 } from "./flavor-enrichment";
 
+// Crowdsourced flavor aggregation (BB-188) — community tier on the profile,
+// maintained by a log-entry trigger. Re-exported so the barrel pulls it from "./ai".
+export { onLogEntryWrittenAggregateFlavor } from "./community-flavor";
+
 // Extraction is a judgment call — deciding that "award-winning bourbon" is
 // prose and not a bottle (BB-201) — and its output feeds JSON.parse, so it
 // runs on the Gemini model with real constrained decoding (BB-226; model +

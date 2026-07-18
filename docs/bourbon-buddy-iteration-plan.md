@@ -574,11 +574,14 @@ provenance counts. All in the existing one-call-per-article budget
       `GEMINI_API_KEY`; rotate the key post-merge (it transited chat).
 - [x] **BB-221** — Numeric ratings: raw-string extraction, server-side
       `parseRating`, idempotent `criticSignals` map, `app-critic-summary` UI
-- [ ] **BB-188** — Crowdsourced flavor aggregation — **promoted from backlog
+- [x] **BB-188** — Crowdsourced flavor aggregation — **promoted from backlog
       (2026-07-17; user base is growing):** blend users' own confirmed tags
       into the catalog as the TOP trust tier (`userTagCounts`), above reviews >
-      marketing > AI-suggested. Design pass needed (per-user dedupe, trigger vs
-      sweep) before scoping.
+      marketing > AI-suggested. DONE 2026-07-18: floor 2, full blend, log-write
+      trigger `onLogEntryWrittenAggregateFlavor`; distinct-user dedupe, separate
+      `userTags`/`userTagCounts`/`contributorCount` on `flavorProfile`,
+      `blendedProfileTags` at read (server + client mirror). New COLLECTION_GROUP
+      index on `logEntries.bourbonId` — deploy `:indexes` before `:functions`.
 
 ### Iteration R13 — My Stores (Epic 24, ~9 SP)
 **Goal:** a private retailer notebook — manual price-tier + specialties +
