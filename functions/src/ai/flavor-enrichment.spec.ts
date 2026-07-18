@@ -1,6 +1,7 @@
 import {
   applyArticleSeed,
   applyEnrichment,
+  blendedProfileTags,
   profileProvenance,
   articleFlavorSeed,
   buildFlavorPrompt,
@@ -153,6 +154,9 @@ describe("profileProvenance (BB-222)", () => {
         marketingTagCounts: {},
         seededArticleIds: [],
         reviewCount: 0,
+        userTags: { nose: [], palate: [], finish: [] },
+        userTagCounts: {},
+        contributorCount: 0,
       });
     }
   });
@@ -168,6 +172,36 @@ describe("profileProvenance (BB-222)", () => {
     expect(p.marketingTagCounts).toEqual({ Vanilla: 2 });
     expect(p.seededArticleIds).toEqual(["a1", "a2"]);
     expect(p.reviewCount).toBe(3);
+  });
+
+  it("reads the BB-188 community tier", () => {
+    const p = profileProvenance({
+      userTags: { nose: ["Oak"], palate: ["Cherry"], finish: [] },
+      userTagCounts: { Oak: 3, Cherry: 2, Junk: 0 },
+      contributorCount: 4,
+    });
+    expect(p.userTags).toEqual({ nose: ["Oak"], palate: ["Cherry"], finish: [] });
+    expect(p.userTagCounts).toEqual({ Oak: 3, Cherry: 2 });
+    expect(p.contributorCount).toBe(4);
+  });
+});
+
+describe("blendedProfileTags (BB-188)", () => {
+  it("unions community userTags over the review/AI arrays, community first", () => {
+    const blended = blendedProfileTags({
+      nose: ["Vanilla"],
+      palate: ["Corn"],
+      finish: [],
+      userTags: { nose: ["Oak"], palate: ["Corn"], finish: ["Char"] },
+    });
+    expect(blended.nose).toEqual(["Oak", "Vanilla"]); // community first
+    expect(blended.palate).toEqual(["Corn"]); // deduped
+    expect(blended.finish).toEqual(["Char"]);
+  });
+
+  it("equals the raw arrays when there is no community tier", () => {
+    const profile = { nose: ["Vanilla"], palate: [], finish: [] };
+    expect(blendedProfileTags(profile)).toEqual(profileToTags(profile));
   });
 });
 
@@ -260,6 +294,9 @@ describe("applyEnrichment — provenance carry-through (BB-222)", () => {
     marketingTagCounts: { Vanilla: 1 },
     seededArticleIds: ["a1", "pr1"],
     reviewCount: 2,
+    userTags: { nose: ["Oak"], palate: [], finish: [] },
+    userTagCounts: { Oak: 2 },
+    contributorCount: 2,
   };
 
   it("keeps provenance fields when regenerating a profile", async () => {
@@ -278,6 +315,10 @@ describe("applyEnrichment — provenance carry-through (BB-222)", () => {
     expect(written.marketingTagCounts).toEqual({ Vanilla: 1 });
     expect(written.seededArticleIds).toEqual(["a1", "pr1"]);
     expect(written.reviewCount).toBe(2);
+    // BB-188 community tier survives an AI regeneration too.
+    expect(written.userTags).toEqual({ nose: ["Oak"], palate: [], finish: [] });
+    expect(written.userTagCounts).toEqual({ Oak: 2 });
+    expect(written.contributorCount).toBe(2);
   });
 
   it("never nulls a profile that still carries provenance", async () => {

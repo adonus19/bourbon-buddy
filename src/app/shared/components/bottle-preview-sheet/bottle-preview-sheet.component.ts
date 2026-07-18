@@ -11,10 +11,11 @@ import { TasteMatchService } from '../../../core/services/taste-match.service';
 import { WishlistService } from '../../../core/services/wishlist.service';
 import { CATEGORY_DISPLAY } from '../../constants/category-display';
 import {
+  blendedProfileTags,
+  consensusCount,
   marketingOnlyTags,
   orderTagsByWeight,
   profileSourceLabel,
-  reviewMentions,
 } from '../../utils/flavor-provenance';
 
 /**
@@ -71,8 +72,12 @@ export class BottlePreviewSheetComponent {
 
   readonly profile = computed(() => this.catalogBottle()?.flavorProfile ?? null);
 
-  /** Taste Match badge (BB-199): shared taste tags, strongest first. */
-  readonly taste = computed(() => this.tasteMatch.matches(this.profile()));
+  /** Arrays with the BB-188 community tier blended in (community-first). */
+  readonly blendedTags = computed(() => blendedProfileTags(this.profile()));
+
+  /** Taste Match badge (BB-199): shared taste tags, strongest first. Matches
+   * against the community-blended tags (BB-188) so tasters' notes count too. */
+  readonly taste = computed(() => this.tasteMatch.matches(this.blendedTags()));
 
   /** Provenance line (BB-222): "Based on N reviews" vs "AI-suggested". */
   readonly sourceLabel = computed(() => profileSourceLabel(this.profile()));
@@ -87,10 +92,12 @@ export class BottlePreviewSheetComponent {
    */
   stageDisplay(stage: 'nose' | 'palate' | 'finish'): string {
     const p = this.profile();
-    const tags = p?.[stage] ?? [];
+    const tags = this.blendedTags()[stage];
     return orderTagsByWeight(tags, p)
       .map((tag) => {
-        const n = reviewMentions(p, tag);
+        // Tasters-first consensus (BB-188): a drinker-confirmed tag badges its
+        // taster count; otherwise the review count. Below 2 → no badge.
+        const n = consensusCount(p, tag);
         return n >= 2 ? `${tag} ×${n}` : tag;
       })
       .join(' · ');

@@ -20,10 +20,11 @@ import {
 
 import { Functions, httpsCallable } from '@angular/fire/functions';
 
-import { Bourbon } from '../../models';
+import { Bourbon, FlavorProfile } from '../../models';
 import { AuthService } from '../auth/auth.service';
 import { normalizeBottleName } from '../../shared/utils/normalize-name';
 import { normalizeBarcode } from '../../shared/utils/barcode';
+import { blendedProfileTags } from '../../shared/utils/flavor-provenance';
 
 /** AI-suggested tasting tags for a bottle (BB-186), canonical labels (BB-181). */
 export interface FlavorSuggestions {
@@ -73,17 +74,15 @@ export class BourbonCatalogService {
     try {
       const callable = httpsCallable<
         { bourbonId: string },
-        { flavorProfile: Partial<FlavorSuggestions> | null }
+        { flavorProfile: Partial<FlavorProfile> | null }
       >(this.functions, 'enrichBottleFlavor');
       const profile = (await callable({ bourbonId })).data?.flavorProfile;
       if (!profile) {
         return null;
       }
-      const tags: FlavorSuggestions = {
-        nose: profile.nose ?? [],
-        palate: profile.palate ?? [],
-        finish: profile.finish ?? [],
-      };
+      // Blend the community tier (BB-188) over the AI/review arrays so prefill
+      // offers what tasters confirmed first.
+      const tags: FlavorSuggestions = blendedProfileTags(profile as FlavorProfile);
       return tags.nose.length || tags.palate.length || tags.finish.length
         ? tags
         : null;

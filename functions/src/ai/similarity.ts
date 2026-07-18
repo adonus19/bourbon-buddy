@@ -10,7 +10,7 @@
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 
-import { FlavorTags, hasAnyTags, profileToTags } from "./flavor-enrichment";
+import { FlavorTags, hasAnyTags, blendedProfileTags } from "./flavor-enrichment";
 
 // Palate agreement says more about whether you'd like a pour than nose or
 // finish; same-category pairs get a mild nudge without silencing cross-
@@ -168,7 +168,10 @@ export async function recomputeNeighborsIfStale(
       if (data.canonicalId) {
         continue; // merged duplicate — never recommend it
       }
-      const tags = profileToTags(data.flavorProfile);
+      // Blend in the BB-188 community tier so neighbors reflect what tasters
+      // confirmed, not just reviews/AI. Community changes land on the next
+      // enrichment-driven recompute (this gate keys off flavorEnrichedAt).
+      const tags = blendedProfileTags(data.flavorProfile);
       if (!hasAnyTags(tags)) {
         continue;
       }
