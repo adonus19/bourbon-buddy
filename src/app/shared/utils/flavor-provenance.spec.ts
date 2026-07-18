@@ -6,6 +6,7 @@ import {
   consensusCount,
   marketingOnlyTags,
   orderTagsByWeight,
+  producerMentions,
   profileSourceLabel,
   reviewMentions,
   tagWeight,
@@ -22,18 +23,18 @@ const profile = (over: Partial<FlavorProfile> = {}): FlavorProfile => ({
   ...over,
 });
 
-describe('tagWeight (weak corroborator)', () => {
-  it('counts review mentions, plus half-weight corroborated claims', () => {
+describe('tagWeight (review + producer, BB-227)', () => {
+  it('counts review and producer mentions at full weight', () => {
     const p = profile({
       tagCounts: { Banana: 2 },
       marketingTagCounts: { Banana: 1, Vanilla: 3 },
     });
-    expect(tagWeight(p, 'Banana')).toBe(2.5);
+    expect(tagWeight(p, 'Banana')).toBe(3); // 2 reviews + 1 producer
   });
 
-  it('gives marketing-only tags zero weight — claims alone earn nothing', () => {
+  it('gives producer (distillery) tags real weight — they earn a place now', () => {
     const p = profile({ marketingTagCounts: { Vanilla: 3 } });
-    expect(tagWeight(p, 'Vanilla')).toBe(0);
+    expect(tagWeight(p, 'Vanilla')).toBe(3);
   });
 
   it('is zero on legacy profiles without provenance', () => {
@@ -48,7 +49,7 @@ describe('orderTagsByWeight', () => {
       tagCounts: { Corn: 3, Oak: 1 },
       marketingTagCounts: { Oak: 2 },
     });
-    // Corn 3, Oak 1 + 2*0.5 = 2, Banana 0.
+    // Corn 3, Oak 1 review + 2 producer = 3 (tie → stored order), Banana 0.
     expect(orderTagsByWeight(['Banana', 'Corn', 'Oak'], p)).toEqual([
       'Corn',
       'Oak',
@@ -96,6 +97,22 @@ describe('profileSourceLabel', () => {
     );
     expect(profileSourceLabel(profile())).toBe('AI-suggested');
     expect(profileSourceLabel(null)).toBeNull();
+  });
+
+  it('labels producer-only notes as "Distillery notes" (BB-227)', () => {
+    expect(profileSourceLabel(profile({ producerCount: 2 }))).toBe(
+      'Distillery notes'
+    );
+    // Reviews outrank producer for the label.
+    expect(
+      profileSourceLabel(profile({ producerCount: 2, reviewCount: 1 }))
+    ).toBe('Based on 1 review');
+  });
+
+  it('reads producer mentions for the ×N badge (BB-227)', () => {
+    const p = profile({ marketingTagCounts: { Blackberry: 2 } });
+    expect(producerMentions(p, 'Blackberry')).toBe(2);
+    expect(consensusCount(p, 'Blackberry')).toBe(2); // producer counts toward consensus
   });
 
   it('leads with tasters when the community tier exists (BB-188)', () => {

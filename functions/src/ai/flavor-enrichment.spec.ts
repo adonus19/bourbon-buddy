@@ -2,6 +2,7 @@ import {
   applyArticleSeed,
   applyEnrichment,
   blendedProfileTags,
+  hasArticleNotes,
   profileProvenance,
   articleFlavorSeed,
   buildFlavorPrompt,
@@ -154,6 +155,7 @@ describe("profileProvenance (BB-222)", () => {
         marketingTagCounts: {},
         seededArticleIds: [],
         reviewCount: 0,
+        producerCount: 0,
         userTags: { nose: [], palate: [], finish: [] },
         userTagCounts: {},
         contributorCount: 0,
@@ -225,15 +227,29 @@ describe("applyArticleSeed (BB-222 trust tiers)", () => {
     expect(res.provenance.marketingTagCounts).toEqual({});
   });
 
-  it("marketing: counts claims only — arrays and reviewCount untouched", () => {
+  it("producer: seeds arrays too, counts in marketingTagCounts + producerCount (BB-227)", () => {
+    // Human-transcribed producer notes now enter the profile arrays (beating an
+    // AI guess), while still labelled as a distillery claim via marketingTagCounts.
     const existing = { nose: ["Oak"], palate: [], finish: [] };
     const res = applyArticleSeed(existing, noProv, seed, "pr1", false);
     expect(res.changed).toBe(true);
-    expect(res.tags).toEqual(existing); // never enters the profile arrays
+    expect(res.tags.nose).toEqual(["Oak", "Banana"]); // merged into the arrays
+    expect(res.tags.palate).toEqual(["Banana", "Corn"]);
     expect(res.provenance.marketingTagCounts).toEqual({ Banana: 1, Corn: 1 });
+    expect(res.provenance.producerCount).toBe(1);
     expect(res.provenance.tagCounts).toEqual({});
     expect(res.provenance.reviewCount).toBe(0);
     expect(res.provenance.seededArticleIds).toEqual(["pr1"]);
+  });
+
+  it("replaceBase: a real seed REPLACES AI-only arrays instead of merging (BB-227)", () => {
+    const aiGuess = { nose: ["Vanilla", "Caramel"], palate: ["Oak"], finish: [] };
+    const res = applyArticleSeed(aiGuess, noProv, seed, "pr1", false, true);
+    expect(res.changed).toBe(true);
+    // The AI guess (Vanilla/Caramel/Oak) is gone; only the article notes remain.
+    expect(res.tags.nose).toEqual(["Banana"]);
+    expect(res.tags.palate).toEqual(["Banana", "Corn"]);
+    expect(res.tags.nose).not.toContain("Vanilla");
   });
 
   it("is idempotent per article (re-extraction never double-counts)", () => {
@@ -288,56 +304,67 @@ describe("applyArticleSeed (BB-222 trust tiers)", () => {
   });
 });
 
-describe("applyEnrichment — provenance carry-through (BB-222)", () => {
-  const provenance = {
-    tagCounts: { Banana: 2 },
-    marketingTagCounts: { Vanilla: 1 },
-    seededArticleIds: ["a1", "pr1"],
-    reviewCount: 2,
-    userTags: { nose: ["Oak"], palate: [], finish: [] },
-    userTagCounts: { Oak: 2 },
-    contributorCount: 2,
-  };
-
-  it("keeps provenance fields when regenerating a profile", async () => {
+describe("applyEnrichment — AI is a last resort (BB-227)", () => {
+  it("does NOT AI-enrich a bottle that already has review notes", async () => {
     const ref = { update: jest.fn().mockResolvedValue(undefined) };
-    await applyEnrichment(
+    const generate = jest.fn(async () => ({
+      nose: ["Corn"],
+      palate: ["Oak"],
+      finish: ["Char"],
+    }));
+    const res = await applyEnrichment(
       ref,
       {
         name: "Jimmy Red",
-        flavorProfile: { nose: ["Banana"], palate: [], finish: [], ...provenance },
+        flavorProfile: {
+          nose: ["Banana"],
+          palate: [],
+          finish: [],
+          tagCounts: { Banana: 2 },
+          reviewCount: 2,
+        },
       },
       false,
-      async () => ({ nose: ["Corn"], palate: ["Oak"], finish: ["Char"] })
+      generate
     );
-    const written = ref.update.mock.calls[0][0].flavorProfile;
-    expect(written.tagCounts).toEqual({ Banana: 2 });
-    expect(written.marketingTagCounts).toEqual({ Vanilla: 1 });
-    expect(written.seededArticleIds).toEqual(["a1", "pr1"]);
-    expect(written.reviewCount).toBe(2);
-    // BB-188 community tier survives an AI regeneration too.
-    expect(written.userTags).toEqual({ nose: ["Oak"], palate: [], finish: [] });
-    expect(written.userTagCounts).toEqual({ Oak: 2 });
-    expect(written.contributorCount).toBe(2);
+    expect(generate).not.toHaveBeenCalled(); // real notes win — no AI guess
+    expect(ref.update).not.toHaveBeenCalled();
+    expect(res.status).toBe("cached");
   });
 
-  it("never nulls a profile that still carries provenance", async () => {
-    // A marketing-only bottle: empty arrays but real claims. An empty
-    // generation must not wipe the claims by writing flavorProfile: null.
+  it("does NOT AI-enrich a bottle with only producer notes, even on refresh", async () => {
     const ref = { update: jest.fn().mockResolvedValue(undefined) };
+    const generate = jest.fn(async () => ({ nose: ["Vanilla"], palate: [], finish: [] }));
     await applyEnrichment(
       ref,
       {
-        name: "Obscure Bottle",
-        flavorProfile: { nose: [], palate: [], finish: [], ...provenance },
+        name: "Port Finish LE",
+        flavorProfile: {
+          nose: ["Blackberry"],
+          palate: ["Dark Chocolate"],
+          finish: ["Roasted Nuts"],
+          marketingTagCounts: { Blackberry: 1 },
+          producerCount: 1,
+        },
       },
-      false,
-      async () => ({ nose: [], palate: [], finish: [] })
+      true, // even a forced refresh must not overlay AI on real notes
+      generate
     );
+    expect(generate).not.toHaveBeenCalled();
+    expect(ref.update).not.toHaveBeenCalled();
+  });
+
+  it("DOES AI-enrich a bottle with no article notes", async () => {
+    const ref = { update: jest.fn().mockResolvedValue(undefined) };
+    const generate = jest.fn(async () => ({
+      nose: ["Vanilla"],
+      palate: ["Oak"],
+      finish: ["Char"],
+    }));
+    await applyEnrichment(ref, { name: "Unknown Bottle" }, false, generate);
+    expect(generate).toHaveBeenCalled();
     const written = ref.update.mock.calls[0][0].flavorProfile;
-    expect(written).not.toBeNull();
-    expect(written.marketingTagCounts).toEqual({ Vanilla: 1 });
-    expect(written.nose).toEqual([]);
+    expect(written.nose).toEqual(["Vanilla"]);
   });
 
   it("still writes null when there are no tags and no provenance", async () => {
@@ -348,6 +375,47 @@ describe("applyEnrichment — provenance carry-through (BB-222)", () => {
       finish: [],
     }));
     expect(ref.update.mock.calls[0][0].flavorProfile).toBeNull();
+  });
+
+  it("carries the community tier through an AI enrichment (no article notes)", async () => {
+    // A community-only bottle (userTags but no review/producer) still gets an AI
+    // guess, and the community fields must survive the regeneration.
+    const ref = { update: jest.fn().mockResolvedValue(undefined) };
+    await applyEnrichment(
+      ref,
+      {
+        name: "Community Only",
+        flavorProfile: {
+          nose: [],
+          palate: [],
+          finish: [],
+          userTags: { nose: ["Oak"], palate: [], finish: [] },
+          userTagCounts: { Oak: 2 },
+          contributorCount: 2,
+        },
+      },
+      false,
+      async () => ({ nose: ["Vanilla"], palate: ["Corn"], finish: ["Char"] })
+    );
+    const written = ref.update.mock.calls[0][0].flavorProfile;
+    expect(written.userTagCounts).toEqual({ Oak: 2 });
+    expect(written.contributorCount).toBe(2);
+  });
+});
+
+describe("hasArticleNotes (BB-227 AI gate)", () => {
+  const base = profileProvenance(null);
+  it("is true for review, producer, or any seeded article", () => {
+    expect(hasArticleNotes({ ...base, reviewCount: 1 })).toBe(true);
+    expect(hasArticleNotes({ ...base, producerCount: 1 })).toBe(true);
+    expect(hasArticleNotes({ ...base, marketingTagCounts: { Oak: 1 } })).toBe(true);
+    expect(hasArticleNotes({ ...base, seededArticleIds: ["a1"] })).toBe(true);
+  });
+  it("is false for a bare or community-only profile (AI may run)", () => {
+    expect(hasArticleNotes(base)).toBe(false);
+    expect(hasArticleNotes({ ...base, contributorCount: 5, userTagCounts: { Oak: 5 } })).toBe(
+      false
+    );
   });
 });
 

@@ -22,6 +22,10 @@ export interface FlavorProfile {
   marketingTagCounts?: Record<string, number>;
   seededArticleIds?: string[];
   reviewCount?: number;
+  // Press-release articles that seeded (BB-227). Producer notes now enter the
+  // arrays (a human transcribed them — better than an AI guess) but stay labelled
+  // "Distillery notes" via this count, distinct from independent reviews.
+  producerCount?: number;
   // Community tier (BB-188), the TOP of the trust ladder — users' own confirmed
   // tags aggregated across people (server-written by the log-entry trigger).
   // `userTags` is kept separate from the arrays above so it can be recomputed

@@ -14,11 +14,16 @@ import { FlavorProfile } from '../../models';
  * prefill/display and server similarity agree on the effective tag set.
  */
 
-/** How much a corroborating producer claim counts vs a review mention. */
-const MARKETING_CORROBORATION_WEIGHT = 0.5;
-
 /** Tags per stage; mirrors the server MAX_TAGS_PER_STAGE cap. */
 const MAX_TAGS_PER_STAGE = 6;
+
+/** Producer (press-release / distillery) mentions of a tag (BB-227). */
+export function producerMentions(
+  profile: FlavorProfile | null | undefined,
+  tag: string
+): number {
+  return profile?.marketingTagCounts?.[tag] ?? 0;
+}
 
 /** Distinct users who confirmed a tag (BB-188) — the ×N badge's top signal. */
 export function tasterMentions(
@@ -37,7 +42,11 @@ export function consensusCount(
   profile: FlavorProfile | null | undefined,
   tag: string
 ): number {
-  return tasterMentions(profile, tag) || reviewMentions(profile, tag);
+  return (
+    tasterMentions(profile, tag) ||
+    reviewMentions(profile, tag) ||
+    producerMentions(profile, tag)
+  );
 }
 
 /** Review/listicle mentions of a tag (drives the ×N badge at N ≥ 2). */
@@ -49,19 +58,16 @@ export function reviewMentions(
 }
 
 /**
- * Display weight for ordering: review mentions, plus half-weight marketing
- * corroboration — but only when at least one review already mentions the tag.
+ * Display weight for ordering (BB-227): review + producer mentions, both at full
+ * weight — producer notes are human-transcribed, so they earn a real place, no
+ * longer a half-weight corroborator. The community tier is ranked separately in
+ * `orderTagsByWeight`.
  */
 export function tagWeight(
   profile: FlavorProfile | null | undefined,
   tag: string
 ): number {
-  const reviews = reviewMentions(profile, tag);
-  if (reviews === 0) {
-    return 0;
-  }
-  const claims = profile?.marketingTagCounts?.[tag] ?? 0;
-  return reviews + claims * MARKETING_CORROBORATION_WEIGHT;
+  return reviewMentions(profile, tag) + producerMentions(profile, tag);
 }
 
 /**
@@ -141,6 +147,7 @@ export function profileSourceLabel(
   }
   const tasters = profile.contributorCount ?? 0;
   const reviews = profile.reviewCount ?? 0;
+  const producers = profile.producerCount ?? 0;
   const reviewClause = reviews > 0
     ? ` · ${reviews} ${reviews === 1 ? 'review' : 'reviews'}`
     : '';
@@ -149,6 +156,11 @@ export function profileSourceLabel(
   }
   if (reviews > 0) {
     return reviews === 1 ? 'Based on 1 review' : `Based on ${reviews} reviews`;
+  }
+  // Producer notes are real (a human wrote them), just labelled as the
+  // distillery's own — honest about the source without hiding the notes (BB-227).
+  if (producers > 0) {
+    return 'Distillery notes';
   }
   return 'AI-suggested';
 }
