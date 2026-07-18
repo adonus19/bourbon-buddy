@@ -1,0 +1,114 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button [defaultHref]="'/stores'" text=""></ion-back-button>
+    </ion-buttons>
+    <ion-title>{{ isEditMode ? 'Edit store' : 'Add a store' }}</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <form [formGroup]="form" class="sform">
+    <p class="eyebrow sform__section">The store</p>
+
+    <ion-input
+      class="sform__field"
+      fill="solid"
+      label="Name"
+      labelPlacement="stacked"
+      formControlName="name"
+    >
+      <span slot="label"
+        >Name <span class="required-mark" aria-hidden="true">*</span></span
+      >
+    </ion-input>
+    @if (form.controls.name.touched && form.controls.name.invalid) {
+      <div class="sform__error">A store name is required.</div>
+    }
+
+    <ion-input
+      class="sform__field"
+      fill="solid"
+      label="City"
+      labelPlacement="stacked"
+      formControlName="city"
+    ></ion-input>
+
+    <ion-input
+      class="sform__field"
+      fill="solid"
+      label="State"
+      labelPlacement="stacked"
+      formControlName="state"
+    ></ion-input>
+
+    <p class="eyebrow sform__section">Your read</p>
+
+    <ion-select
+      class="sform__field"
+      fill="solid"
+      label="Price tier"
+      labelPlacement="stacked"
+      interface="action-sheet"
+      placeholder="—"
+      formControlName="priceTier"
+    >
+      @for (t of priceTiers; track t.value) {
+        <ion-select-option [value]="t.value">{{ t.label }}</ion-select-option>
+      }
+    </ion-select>
+
+    <p class="sform__label">Known for</p>
+    <div class="sform__chips">
+      @for (s of specialtyOptions; track s.value) {
+        <button
+          type="button"
+          class="sform__chip"
+          [class.sform__chip--on]="isSpecialtySelected(s.value)"
+          [attr.aria-pressed]="isSpecialtySelected(s.value)"
+          (click)="toggleSpecialty(s.value)"
+        >
+          {{ s.label }}
+        </button>
+      }
+    </div>
+
+    <p class="eyebrow sform__section">Notes</p>
+
+    <ion-textarea
+      class="sform__field"
+      fill="solid"
+      label="Shipment / allocation notes"
+      labelPlacement="stacked"
+      placeholder="e.g. truck Tuesdays, allocated drop 1st Thursday"
+      [autoGrow]="true"
+      formControlName="shipmentNotes"
+    ></ion-textarea>
+
+    <ion-textarea
+      class="sform__field"
+      fill="solid"
+      label="General notes"
+      labelPlacement="stacked"
+      [autoGrow]="true"
+      formControlName="notes"
+    ></ion-textarea>
+  </form>
+</ion-content>
+
+<ion-footer class="sform-footer">
+  <ion-toolbar>
+    <ion-button
+      class="sform__save"
+      expand="block"
+      (click)="save()"
+      [disabled]="saving"
+    >
+      @if (saving) {
+        <ion-spinner name="crescent"></ion-spinner>
+      } @else {
+        <span>{{ isEditMode ? 'Save changes' : 'Save' }}</span>
+      }
+    </ion-button>
+  </ion-toolbar>
+</ion-footer>
