@@ -81,9 +81,11 @@ const MAX_BOTTLES = 12;
 // bottles (BB-227). 8192 fits ~12 fully-populated bottles with headroom; the
 // parser also salvages a truncated reply as a backstop. Output tokens are cheap.
 const MAX_OUTPUT_TOKENS = 8192;
-// Feed the model the real article body, not just the teaser (BB-130 fix). ~5k
-// chars ≈ 1.3k input tokens — enough to catch bottles named deep in a review.
-const MAX_TEXT_CHARS = 5000;
+// Feed the model the real article body, not just the teaser (BB-130 fix). ~12k
+// chars ≈ 3k input tokens — a single review needs far less, but a 7-bottle
+// listicle names its last bottles ~9k chars in, and a 5k cap silently dropped
+// them (BB-227): only the first 4 of 7 blends were ever seen by the model.
+const MAX_TEXT_CHARS = 12000;
 // Below this, the stored bodyText is just a teaser (or absent) and we fetch the
 // article URL to get the full body instead.
 const MIN_BODY_CHARS = 600;

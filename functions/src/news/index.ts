@@ -25,7 +25,9 @@ const MAX_AGE_MS = MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
 const READ_RETENTION_MS = 24 * 60 * 60 * 1000;
 // Full article body (from the feed's content:encoded) cached for AI bottle
 // extraction only (BB-130). The short `excerpt` still drives the UI card.
-const MAX_BODY_CHARS = 8000;
+// Matches the extractor's MAX_TEXT_CHARS so a long listicle's tail bottles
+// aren't pre-truncated out of the stored body before the model ever sees them.
+const MAX_BODY_CHARS = 12000;
 
 type FeedItem = Parser.Item & {
   enclosure?: { url?: string };
