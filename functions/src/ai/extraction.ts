@@ -322,13 +322,74 @@ function verifiedFact(
 }
 
 /**
+ * Rebuild a valid envelope from a reply whose `bottles` array was truncated
+ * mid-object (BB-227) — the failure mode when a multi-bottle listicle exceeds
+ * the model's output-token cap. Walks the array tracking string/nesting state,
+ * keeps every COMPLETE top-level element, and closes the array + object. Returns
+ * null when nothing is salvageable (so a genuinely broken reply still throws and
+ * stays retryable). Constrained decoding guarantees a valid *prefix*, so the
+ * recovered bottles are well-formed.
+ */
+function repairTruncatedEnvelope(content: string): string | null {
+  const bracket = content.indexOf("[", content.indexOf('"bottles"'));
+  if (bracket < 0 || !content.includes('"bottles"')) {
+    return null;
+  }
+  let depth = 0;
+  let inStr = false;
+  let esc = false;
+  let lastComplete = -1; // index just past a complete top-level element
+  for (let i = bracket + 1; i < content.length; i++) {
+    const c = content[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === "\\") esc = true;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') inStr = true;
+    else if (c === "{" || c === "[") depth++;
+    else if (c === "]" && depth === 0) break; // array already closed — genuinely broken elsewhere
+    else if (c === "}" || c === "]") {
+      depth--;
+      if (depth === 0) lastComplete = i + 1;
+    }
+  }
+  if (lastComplete < 0) {
+    return null;
+  }
+  return content.slice(0, lastComplete).replace(/,\s*$/, "") + "]}";
+}
+
+/**
+ * Parse the model's JSON envelope, recovering complete bottles from a truncated
+ * reply (BB-227). Only a genuinely unparseable, unsalvageable reply throws —
+ * preserving the retry-on-garbage semantics the sweep relies on.
+ */
+function parseEnvelope(content: string): {
+  articleType?: unknown;
+  bottles?: unknown;
+} {
+  try {
+    return JSON.parse(content) as { articleType?: unknown; bottles?: unknown };
+  } catch (err) {
+    const repaired = repairTruncatedEnvelope(content);
+    if (repaired) {
+      return JSON.parse(repaired) as { articleType?: unknown; bottles?: unknown };
+    }
+    throw err;
+  }
+}
+
+/**
  * The model's source classification for the article (BB-220), defaulting to
  * "news" when missing or off-enum — the least-trusted bucket, so a flaky
- * classification can only ever *withhold* signal, never fake it. Malformed
- * JSON throws, same retry semantics as `parseExtractionResponse`.
+ * classification can only ever *withhold* signal, never fake it. A truncated
+ * reply is repaired (BB-227); an unsalvageable one throws, same retry semantics
+ * as `parseExtractionResponse`.
  */
 export function parseArticleType(content: string): string {
-  const parsed = JSON.parse(content) as { articleType?: unknown };
+  const parsed = parseEnvelope(content);
   return typeof parsed.articleType === "string" &&
     VALID_ARTICLE_TYPES.has(parsed.articleType)
     ? parsed.articleType
@@ -353,7 +414,7 @@ export function parseExtractionResponse(
   content: string,
   sourceText = ""
 ): ExtractedBottle[] {
-  const parsed = JSON.parse(content) as { bottles?: unknown };
+  const parsed = parseEnvelope(content);
   if (!Array.isArray(parsed.bottles)) {
     return [];
   }

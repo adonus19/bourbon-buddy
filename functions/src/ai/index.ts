@@ -41,6 +41,7 @@ import {
   applyArticleSeed,
   articleFlavorSeed,
   FlavorTags,
+  hasArticleNotes,
   profileProvenance,
   profileToTags,
 } from "./flavor-enrichment";
@@ -74,8 +75,12 @@ export { onLogEntryWrittenAggregateFlavor } from "./community-flavor";
 const EXTRACTION_PROMPT_VERSION = 4;
 // Range-guide articles can list 10+ expressions, so keep this generous.
 const MAX_BOTTLES = 12;
-// v2 adds four fact fields per bottle; 768 clipped long multi-bottle replies.
-const MAX_OUTPUT_TOKENS = 1024;
+// Output cap. Each bottle now carries facts + verdict + rating + a full flavor
+// object, so a 7+ bottle listicle blew past 1024 tokens and the reply was
+// truncated mid-JSON — the parse then failed and the WHOLE article yielded zero
+// bottles (BB-227). 8192 fits ~12 fully-populated bottles with headroom; the
+// parser also salvages a truncated reply as a backstop. Output tokens are cheap.
+const MAX_OUTPUT_TOKENS = 8192;
 // Feed the model the real article body, not just the teaser (BB-130 fix). ~5k
 // chars ≈ 1.3k input tokens — enough to catch bottles named deep in a review.
 const MAX_TEXT_CHARS = 5000;
@@ -671,13 +676,13 @@ async function seedArticleFlavor(
   const snap = await ref.get();
   const profile = snap.get("flavorProfile");
   const existing = profileToTags(profile);
-  const res = applyArticleSeed(
-    existing,
-    profileProvenance(profile),
-    seed,
-    articleId,
-    evaluative
-  );
+  const prov = profileProvenance(profile);
+  // AI-only profile (an AI guess with no article notes yet) → the first real
+  // article seed REPLACES it, doesn't merge under it (BB-227). hasTags guards a
+  // null/empty profile (nothing to replace). Community-only profiles also carry
+  // no article notes, but they live in userTags (untouched by the arrays here).
+  const aiOnly = hasTags(existing) && !hasArticleNotes(prov);
+  const res = applyArticleSeed(existing, prov, seed, articleId, evaluative, aiOnly);
   if (!res.changed) {
     return hasTags(existing) ? existing : null; // nothing new — skip the write
   }

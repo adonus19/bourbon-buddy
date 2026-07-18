@@ -142,6 +142,22 @@ describe("parseExtractionResponse (whiskey-only filter, BB-195)", () => {
   it("throws on malformed JSON so the article stays retryable", () => {
     expect(() => parseExtractionResponse("not json")).toThrow();
   });
+
+  it("salvages complete bottles from a truncated (token-capped) reply", () => {
+    // A multi-bottle listicle whose JSON was cut off mid-object (BB-227): the
+    // complete bottles are recovered; the partial trailing one is dropped —
+    // instead of the whole article yielding zero.
+    const truncated =
+      '{"articleType":"listicle","bottles":[' +
+      '{"name":"Weller 12 Year","spirit":"whiskey","category":"bourbon"},' +
+      '{"name":"Blanton\'s Single Barrel","spirit":"whiskey","category":"bourbon"},' +
+      '{"name":"E.H. Taylor Small Ba';
+    const out = parseExtractionResponse(truncated);
+    expect(out.map((b) => b.name)).toEqual([
+      "Weller 12 Year",
+      "Blanton's Single Barrel",
+    ]);
+  });
 });
 
 describe("numberAppearsInText (verbatim fact guard, BB-219)", () => {
@@ -269,6 +285,12 @@ describe("parseArticleType (source classification, BB-220)", () => {
 
   it("throws on malformed JSON so the article stays retryable", () => {
     expect(() => parseArticleType("not json")).toThrow();
+  });
+
+  it("still reads articleType from a truncated reply (BB-227)", () => {
+    const truncated =
+      '{"articleType":"listicle","bottles":[{"name":"Weller 12","spirit":"whiskey"},{"name":"Blan';
+    expect(parseArticleType(truncated)).toBe("listicle");
   });
 });
 

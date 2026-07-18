@@ -199,10 +199,11 @@ export function articleFlavorSeed(rawFlavor: unknown): FlavorTags | null {
 export const SEEDED_IDS_CAP = 30;
 
 export interface FlavorProvenance {
-  tagCounts: Record<string, number>; // non-marketing article mentions per tag
+  tagCounts: Record<string, number>; // review/listicle mentions per tag
   marketingTagCounts: Record<string, number>; // press-release claims per tag
   seededArticleIds: string[]; // articles already counted (idempotency)
-  reviewCount: number; // non-marketing articles that seeded
+  reviewCount: number; // review/listicle articles that seeded
+  producerCount: number; // press-release articles that seeded (BB-227)
   // Community tier (BB-188), the TOP of the ladder. Written by the log-entry
   // aggregation trigger, kept SEPARATE from the arrays above (non-destructive),
   // and carried through here so no AI regeneration can wipe it.
@@ -227,6 +228,7 @@ export function profileProvenance(profile: unknown): FlavorProvenance {
     return out;
   };
   const reviewCount = p["reviewCount"];
+  const producerCount = p["producerCount"];
   const contributorCount = p["contributorCount"];
   return {
     tagCounts: counts(p["tagCounts"]),
@@ -238,6 +240,8 @@ export function profileProvenance(profile: unknown): FlavorProvenance {
       : [],
     reviewCount:
       typeof reviewCount === "number" && reviewCount > 0 ? reviewCount : 0,
+    producerCount:
+      typeof producerCount === "number" && producerCount > 0 ? producerCount : 0,
     userTags: profileToTags(p["userTags"]),
     userTagCounts: counts(p["userTagCounts"]),
     contributorCount:
@@ -251,11 +255,28 @@ export function profileProvenance(profile: unknown): FlavorProvenance {
 export function hasProvenance(p: FlavorProvenance): boolean {
   return (
     p.reviewCount > 0 ||
+    p.producerCount > 0 ||
     p.contributorCount > 0 ||
     p.seededArticleIds.length > 0 ||
     Object.keys(p.tagCounts).length > 0 ||
     Object.keys(p.marketingTagCounts).length > 0 ||
     Object.keys(p.userTagCounts).length > 0
+  );
+}
+
+/**
+ * Whether a bottle has any ARTICLE-sourced flavor notes — review or producer
+ * (BB-227). This is the gate for AI enrichment: the AI generic guess is a last
+ * resort, generated only when no human-transcribed notes exist. (Community
+ * user tags are handled on their own trigger and don't gate AI here.)
+ */
+export function hasArticleNotes(p: FlavorProvenance): boolean {
+  return (
+    p.reviewCount > 0 ||
+    p.producerCount > 0 ||
+    p.seededArticleIds.length > 0 ||
+    Object.keys(p.tagCounts).length > 0 ||
+    Object.keys(p.marketingTagCounts).length > 0
   );
 }
 
@@ -278,18 +299,24 @@ export interface SeedResult {
 }
 
 /**
- * Apply one article's tasting notes to a bottle's profile state (BB-222).
- * Pure. Evaluative articles merge into the arrays and count in `tagCounts`;
- * marketing (press-release) articles count ONLY in `marketingTagCounts`.
- * Idempotent per articleId; a tag counts once per article no matter how many
- * stages mention it.
+ * Apply one article's tasting notes to a bottle's profile state (BB-222/227).
+ * Pure. BOTH review/listicle and press-release notes now merge into the arrays
+ * (human-transcribed notes beat an AI guess) — the tier only changes which count
+ * map is bumped: review → `tagCounts`+`reviewCount`, producer → `marketingTagCounts`
+ * +`producerCount`, so display can still say "Based on N reviews" vs "Distillery
+ * notes". Idempotent per articleId; a tag counts once per article across stages.
+ *
+ * `replaceBase` (BB-227): when the existing arrays are an AI-only guess, the
+ * caller sets this so the seed REPLACES them rather than merging under them — a
+ * real note supersedes the guess, it never stacks below it.
  */
 export function applyArticleSeed(
   tags: FlavorTags,
   provenance: FlavorProvenance,
   seed: FlavorTags,
   articleId: string,
-  evaluative: boolean
+  evaluative: boolean,
+  replaceBase = false
 ): SeedResult {
   if (provenance.seededArticleIds.includes(articleId)) {
     return { tags, provenance, changed: false };
@@ -308,9 +335,13 @@ export function applyArticleSeed(
   const seededArticleIds = [...provenance.seededArticleIds, articleId].slice(
     -SEEDED_IDS_CAP
   );
+  const base: FlavorTags = replaceBase
+    ? { nose: [], palate: [], finish: [] }
+    : tags;
+  const mergedTags = mergeFlavorTags(base, seed);
   if (evaluative) {
     return {
-      tags: mergeFlavorTags(tags, seed),
+      tags: mergedTags,
       provenance: {
         ...provenance,
         tagCounts: bump(provenance.tagCounts),
@@ -321,10 +352,11 @@ export function applyArticleSeed(
     };
   }
   return {
-    tags,
+    tags: mergedTags,
     provenance: {
       ...provenance,
       marketingTagCounts: bump(provenance.marketingTagCounts),
+      producerCount: provenance.producerCount + 1,
       seededArticleIds,
     },
     changed: true,
@@ -408,6 +440,15 @@ export async function applyEnrichment(
   generate: (b: BottleContext) => Promise<FlavorTags>
 ): Promise<EnrichResult> {
   const existing = profileToTags(bottle.flavorProfile);
+  const provenance = profileProvenance(bottle.flavorProfile);
+
+  // AI is a last resort (BB-227): when a bottle already has human-transcribed
+  // notes (a review OR a producer/press-release), never overlay an AI guess —
+  // even a thin real profile, even on a forced refresh. The AI stereotype misled
+  // (a port-finished bourbon shown as generic vanilla/oak); real notes win.
+  if (hasArticleNotes(provenance)) {
+    return { status: "cached", flavorProfile: bottle.flavorProfile ?? null };
+  }
 
   // Already solid → no model call (cost control), unless a refresh is forced.
   if (isAdequateProfile(existing) && !refresh) {
@@ -436,8 +477,8 @@ export async function applyEnrichment(
   }
 
   // Provenance (BB-222) survives every regeneration — counts record what
-  // articles said, which no feed-b generation can un-say.
-  const provenance = profileProvenance(bottle.flavorProfile);
+  // articles said, which no feed-b generation can un-say. (Read above as the
+  // AI-last-resort gate; reused here for the write.)
 
   // Record the attempt either way (a retry-cooldown for the sweep). Store null
   // only when there's genuinely nothing — never wipe existing tags, and never
