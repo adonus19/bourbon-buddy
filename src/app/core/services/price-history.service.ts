@@ -5,6 +5,7 @@ import {
   QueryDocumentSnapshot,
   collection,
   getDocs,
+  limit,
   orderBy,
   query,
   where,
@@ -90,5 +91,67 @@ export class PriceHistoryService {
 
     const [own, friends = []] = await Promise.all(reads);
     return mergePricePoints(own, friends);
+  }
+
+  /** Max points read for one store view — bounds the detail page's read cost. */
+  static readonly STORE_POINT_CAP = 100;
+
+  /** Max recent own points scanned for the BB-225 store suggestions. */
+  static readonly RECENT_STORE_POINT_CAP = 50;
+
+  /**
+   * The user's OWN price points at one store, newest-first (BB-224 evidence).
+   * Own-only by design: the evidence panel backs *your* read on the store, so a
+   * friend's sighting there is not your receipt. Bounded one-shot read — a
+   * detail page is a pull surface.
+   *
+   * Uses the (spotterUid, storeName, sightingDate desc) composite index.
+   */
+  async priceHistoryForStore(
+    storeName: string,
+    cap: number = PriceHistoryService.STORE_POINT_CAP
+  ): Promise<PriceHistoryPoint[]> {
+    const uid = this.auth.snapshotUser?.uid;
+    const name = storeName.trim();
+    if (!uid || !name) {
+      return [];
+    }
+    const snap = await getDocs(
+      query(
+        collection(this.firestore, 'priceHistory'),
+        where('spotterUid', '==', uid),
+        where('storeName', '==', name),
+        orderBy('sightingDate', 'desc'),
+        limit(cap)
+      )
+    );
+    return snap.docs.map(
+      (d) => ({ id: d.id, ...d.data() }) as PriceHistoryPoint
+    );
+  }
+
+  /**
+   * The user's most recent own price points across all stores (BB-225) — fed to
+   * `recentStores()` so the store form can offer places they've actually been
+   * instead of making them type. Uses the (spotterUid, sightingDate desc) index.
+   */
+  async recentOwnPoints(
+    cap: number = PriceHistoryService.RECENT_STORE_POINT_CAP
+  ): Promise<PriceHistoryPoint[]> {
+    const uid = this.auth.snapshotUser?.uid;
+    if (!uid) {
+      return [];
+    }
+    const snap = await getDocs(
+      query(
+        collection(this.firestore, 'priceHistory'),
+        where('spotterUid', '==', uid),
+        orderBy('sightingDate', 'desc'),
+        limit(cap)
+      )
+    );
+    return snap.docs.map(
+      (d) => ({ id: d.id, ...d.data() }) as PriceHistoryPoint
+    );
   }
 }

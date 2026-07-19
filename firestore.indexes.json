@@ -109,6 +109,23 @@
         { "fieldPath": "spotterUid", "order": "ASCENDING" },
         { "fieldPath": "sightingDate", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "priceHistory",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "spotterUid", "order": "ASCENDING" },
+        { "fieldPath": "storeName", "order": "ASCENDING" },
+        { "fieldPath": "sightingDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "priceHistory",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "spotterUid", "order": "ASCENDING" },
+        { "fieldPath": "sightingDate", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

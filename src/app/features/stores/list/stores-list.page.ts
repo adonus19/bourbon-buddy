@@ -18,8 +18,8 @@ const SPECIALTY_LABEL: Record<StoreSpecialty, string> = {
 
 /**
  * My Stores list (BB-223): the private retailer notebook. Reads the shared
- * `stores()` signal from StoreNotesService — no listener of its own. Rows link
- * to edit for now; BB-224 repoints them at the store detail page.
+ * `stores()` signal from StoreNotesService — no listener of its own. Rows open
+ * the store detail page (BB-224), which carries the edit entry point.
  */
 @Component({
   selector: 'app-stores-list',

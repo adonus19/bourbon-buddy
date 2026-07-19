@@ -14,7 +14,10 @@ import {
   GeolocationService,
   Retailer,
 } from '../../core/services/geolocation.service';
+import { StoreNotesService } from '../../core/services/store-notes.service';
 import { sightingErrorMessage } from '../../shared/utils/sighting-error';
+import { matchStore } from '../../shared/utils/store-identity';
+import { normalizeBottleName } from '../../shared/utils/normalize-name';
 
 /**
  * "Spotted it" — log a price sighting for ANY catalog bottle, whether or not
@@ -38,6 +41,7 @@ export class SpottedItPage {
   private readonly toast = inject(ToastController);
   private readonly scanner = inject(BarcodeScannerService);
   private readonly geo = inject(GeolocationService);
+  private readonly storeNotes = inject(StoreNotesService);
 
   saving = false;
   private autoScanned = false;
@@ -284,10 +288,16 @@ export class SpottedItPage {
         this.pendingUpc = null;
       }
 
-      await this.presentToast(
+      await this.presentSavedToast(
         result === 'queued'
           ? "Saved offline — it'll sync when you're back online."
-          : 'Spotted it. Sighting logged.'
+          : 'Spotted it. Sighting logged.',
+        {
+          name: (v.storeName ?? '').trim(),
+          city: this.strOrNull(v.city),
+          state: this.strOrNull(v.state),
+          placeId: picked?.id ?? null,
+        }
       );
       await this.router.navigateByUrl(
         this.returnTo?.startsWith('/') ? this.returnTo : '/tabs/hunt-list',
@@ -303,6 +313,55 @@ export class SpottedItPage {
   private strOrNull(v: string | null | undefined): string | null {
     const t = (v ?? '').trim();
     return t.length ? t : null;
+  }
+
+  /**
+   * The post-save toast, plus the BB-225 store handoff: when the sighting was
+   * logged somewhere the user has no store note for, the toast grows an "Add
+   * store intel" action that opens a prefilled store form. The match is a pure
+   * check against the already-loaded `stores()` signal — zero extra reads — and
+   * the offer never blocks the sighting flow: the toast auto-dismisses and the
+   * navigation home happens either way.
+   */
+  private async presentSavedToast(
+    message: string,
+    store: { name: string; city: string | null; state: string | null; placeId: string | null }
+  ): Promise<void> {
+    const known =
+      !store.name ||
+      !!matchStore(this.storeNotes.stores(), {
+        placeId: store.placeId,
+        nameNormalized: normalizeBottleName(store.name),
+        city: store.city,
+      });
+
+    if (known) {
+      await this.presentToast(message);
+      return;
+    }
+
+    const t = await this.toast.create({
+      message: `${message} New store — want to note it?`,
+      duration: 6000,
+      position: 'top',
+      buttons: [
+        {
+          text: 'Add store intel',
+          handler: () => {
+            void this.router.navigate(['/stores/new'], {
+              queryParams: {
+                name: store.name,
+                city: store.city ?? undefined,
+                state: store.state ?? undefined,
+                placeId: store.placeId ?? undefined,
+              },
+            });
+          },
+        },
+        { text: 'Dismiss', role: 'cancel' },
+      ],
+    });
+    await t.present();
   }
 
   private async presentToast(message: string): Promise<void> {

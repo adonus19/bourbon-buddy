@@ -596,10 +596,21 @@ owner-only subcollection wildcard covers `/users/{uid}/stores`).
       else name+city) + service CRUD (derives `nameNormalized`) + form validation,
       all spec'd. Rows link to edit until BB-224 adds `/stores/:id` detail. No
       rules change (owner-only wildcard covers `/users/{uid}/stores`).
-- [ ] **BB-224** — Store detail page: intel + evidence panel from `/priceHistory`
-      (+ composite index `spotterUid ASC, storeName ASC, sightingDate DESC`)
-- [ ] **BB-225** — Sighting → store handoff: post-save "Add store intel" toast →
-      prefilled `/stores/new`; recent-store suggestions in the store form
+- [x] **BB-224** — Store detail page: intel + evidence panel from `/priceHistory`
+      (+ composite index `spotterUid ASC, storeName ASC, sightingDate DESC`).
+      DONE 2026-07-18: pure `store-evidence` math (visits collapse per calendar
+      day, avg % vs MSRP over catalog-known bottles only, live ≤30d window);
+      own-only bounded read (100 points, 25 catalog resolves per view); live
+      sightings derived from the points already read, so zero extra reads.
+      Evidence sits *beside* the manual `priceTier` and never sets it.
+- [x] **BB-225** — Sighting → store handoff: post-save "Add store intel" toast →
+      prefilled `/stores/new`; recent-store suggestions in the store form.
+      DONE 2026-07-18: match is a pure check against the loaded `stores()`
+      signal (zero extra reads); toast is dismissible and never blocks the
+      sighting flow. Suggestions come from own `/priceHistory` and **skip
+      stores that already have a note** (added during verification — otherwise
+      tapping one minted a duplicate location). Shipment-day inference stays
+      out of scope per the story.
 
 ---
 

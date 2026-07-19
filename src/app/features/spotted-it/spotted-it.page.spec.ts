@@ -34,6 +34,8 @@ import { SightingService } from '../../core/services/sighting.service';
 import { BarcodeScannerService } from '../../core/services/barcode-scanner.service';
 import { GeolocationService } from '../../core/services/geolocation.service';
 import { AuthService } from '../../core/auth/auth.service';
+import { StoreNotesService } from '../../core/services/store-notes.service';
+import { StoreNote } from '../../models';
 
 interface Testable {
   loadNearbyStores(coords: { lat: number; lng: number }): Promise<void>;
@@ -49,6 +51,8 @@ function configure(
     queryParams?: Record<string, string>;
     router?: Partial<Router>;
     sightings?: Partial<SightingService>;
+    stores?: StoreNote[];
+    toastCreate?: jest.Mock;
   } = {}
 ): SpottedItPage {
   TestBed.configureTestingModule({
@@ -72,7 +76,18 @@ function configure(
         },
       },
       { provide: Router, useValue: opts.router ?? {} },
-      { provide: ToastController, useValue: { create: async () => ({ present: async () => undefined }) } },
+      {
+        provide: StoreNotesService,
+        useValue: { stores: () => opts.stores ?? [] },
+      },
+      {
+        provide: ToastController,
+        useValue: {
+          create:
+            opts.toastCreate ??
+            (async () => ({ present: async () => undefined })),
+        },
+      },
     ],
   });
   return TestBed.createComponent(SpottedItPage).componentInstance;
@@ -165,5 +180,94 @@ describe('SpottedItPage — bottle-context deep link', () => {
     expect(navigateByUrl).toHaveBeenCalledWith('/tabs/hunt-list', {
       replaceUrl: true,
     });
+  });
+});
+
+describe('SpottedItPage — store handoff (BB-225)', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  const storeNote = (over: Partial<StoreNote> = {}): StoreNote =>
+    ({
+      id: 's1',
+      name: 'Total Wine',
+      nameNormalized: 'total wine',
+      placeId: null,
+      city: 'Louisville',
+      state: 'KY',
+      specialties: [],
+      ...over,
+    }) as StoreNote;
+
+  /** Saves a sighting at `store` and returns the options the toast was built with. */
+  async function saveAt(
+    store: { name: string; city?: string },
+    stores: StoreNote[]
+  ) {
+    const toastCreate = jest.fn(async (_opts: any) => ({
+      present: async () => undefined,
+    }));
+    const navigate = jest.fn(() => Promise.resolve(true));
+    const page = configure(
+      {},
+      {
+        queryParams: { bourbonName: 'Eagle Rare', bourbonId: 'er10' },
+        router: {
+          navigateByUrl: jest.fn(() => Promise.resolve(true)),
+          navigate,
+        } as unknown as Partial<Router>,
+        sightings: { add: jest.fn().mockResolvedValue('sent') },
+        stores,
+        toastCreate,
+      }
+    );
+    page.form.patchValue({
+      storeName: store.name,
+      price: 39.99,
+      city: store.city ?? '',
+    });
+    await page.save();
+    return { opts: toastCreate.mock.calls[0][0] as any, navigate };
+  }
+
+  it('offers "Add store intel" when the store has no note yet', async () => {
+    const { opts } = await saveAt({ name: 'Westport Whiskey', city: 'Louisville' }, []);
+    expect(opts.buttons.map((b: any) => b.text)).toContain('Add store intel');
+    expect(opts.message).toContain('New store');
+  });
+
+  it('stays quiet when a note for that store already exists', async () => {
+    const { opts } = await saveAt(
+      { name: 'Total Wine', city: 'Louisville' },
+      [storeNote()]
+    );
+    expect(opts.buttons).toBeUndefined();
+  });
+
+  it('treats the same chain in another city as a new store', async () => {
+    const { opts } = await saveAt(
+      { name: 'Total Wine', city: 'Lexington' },
+      [storeNote({ city: 'Louisville' })]
+    );
+    expect(opts.buttons.map((b: any) => b.text)).toContain('Add store intel');
+  });
+
+  it('sends the location to a prefilled store form when tapped', async () => {
+    const { opts, navigate } = await saveAt(
+      { name: 'Westport Whiskey', city: 'Louisville' },
+      []
+    );
+    opts.buttons.find((b: any) => b.text === 'Add store intel').handler();
+    expect(navigate).toHaveBeenCalledWith(['/stores/new'], {
+      queryParams: expect.objectContaining({
+        name: 'Westport Whiskey',
+        city: 'Louisville',
+      }),
+    });
+  });
+
+  it('is dismissible and never blocks the sighting flow', async () => {
+    const { opts } = await saveAt({ name: 'Somewhere New' }, []);
+    expect(opts.buttons.some((b: any) => b.role === 'cancel')).toBe(true);
+    expect(opts.duration).toBeGreaterThan(0);
   });
 });
