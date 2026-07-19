@@ -11,6 +11,23 @@
   <form [formGroup]="form" class="sform">
     <p class="eyebrow sform__section">The store</p>
 
+    @if (recentStores().length) {
+      <p class="sform__hint">Somewhere you've spotted a bottle?</p>
+      <ul class="sform__recents">
+        @for (s of recentStores(); track s.name + '|' + s.city) {
+          <li>
+            <button
+              type="button"
+              class="sform__recent"
+              (click)="useRecentStore(s)"
+            >
+              {{ s.name }}@if (s.city) {<span class="sform__recent-city">{{ s.city }}</span>}
+            </button>
+          </li>
+        }
+      </ul>
+    }
+
     <ion-input
       class="sform__field"
       fill="solid"

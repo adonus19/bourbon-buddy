@@ -1,4 +1,4 @@
-import { Component, effect, inject } from '@angular/core';
+import { Component, effect, inject, signal } from '@angular/core';
 import { FormBuilder, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ToastController } from '@ionic/angular';
@@ -8,6 +8,16 @@ import {
   StoreInput,
   StoreNotesService,
 } from '../../../core/services/store-notes.service';
+import { PriceHistoryService } from '../../../core/services/price-history.service';
+import {
+  RecentStore,
+  recentStores as pickRecentStores,
+} from '../../../shared/utils/store-evidence';
+import { matchStore } from '../../../shared/utils/store-identity';
+import { normalizeBottleName } from '../../../shared/utils/normalize-name';
+
+/** How many recent stores to offer as tap-to-fill suggestions. */
+const RECENT_STORE_SUGGESTIONS = 6;
 
 /**
  * Store note create/edit (BB-223) — dual-mode Reactive Form at `/stores/new`
@@ -27,6 +37,7 @@ export class StoreFormPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastController);
+  private readonly priceHistory = inject(PriceHistoryService);
 
   readonly editId = this.route.snapshot.paramMap.get('id');
   get isEditMode(): boolean {
@@ -77,12 +88,57 @@ export class StoreFormPage {
       // New mode: prefill from query params (BB-225 handoff).
       const q = this.route.snapshot.queryParamMap;
       this.placeId = q.get('placeId');
+      const name = q.get('name') ?? '';
       this.form.patchValue({
-        name: q.get('name') ?? '',
+        name,
         city: q.get('city') ?? '',
         state: q.get('state') ?? '',
       });
+      // Arriving without a name means the user is starting from scratch —
+      // offer the places they've actually been instead of making them type.
+      if (!name) {
+        void this.loadRecentStores();
+      }
     }
+  }
+
+  /**
+   * Stores the user has logged a sighting at, newest-first (BB-225). One
+   * bounded one-shot read on open, in an explicit method — never in a
+   * `computed`/`effect` (Firebase call discipline).
+   */
+  readonly recentStores = signal<RecentStore[]>([]);
+
+  private async loadRecentStores(): Promise<void> {
+    try {
+      const points = await this.priceHistory.recentOwnPoints();
+      // Only places the user has no note for yet — suggesting one they've
+      // already written up would just mint a duplicate location.
+      const noted = this.stores.stores();
+      const fresh = pickRecentStores(points, RECENT_STORE_SUGGESTIONS).filter(
+        (s) =>
+          !matchStore(noted, {
+            placeId: null,
+            nameNormalized: normalizeBottleName(s.name),
+            city: s.city,
+          })
+      );
+      this.recentStores.set(fresh);
+    } catch {
+      // Suggestions are a convenience — never block the form for them.
+      this.recentStores.set([]);
+    }
+  }
+
+  /** Tap a suggestion to fill the location fields. */
+  useRecentStore(s: RecentStore): void {
+    this.form.patchValue({
+      name: s.name,
+      city: s.city ?? '',
+      state: s.state ?? '',
+    });
+    this.form.markAsDirty();
+    this.recentStores.set([]); // picked — the list has done its job
   }
 
   private patchFromStore(s: StoreNote): void {
