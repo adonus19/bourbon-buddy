@@ -7,11 +7,12 @@ import { IonicModule } from '@ionic/angular';
 import { SharedModule } from '../../shared/shared.module';
 import { StoresListPage } from './list/stores-list.page';
 import { StoreFormPage } from './form/store-form.page';
+import { StoreDetailPage } from './detail/store-detail.page';
 
 /**
- * My Stores (Epic 24, BB-223) — lazy feature module. Owns the list and the
- * dual-mode create/edit form; the store detail page (`:id`) arrives with BB-224.
- * `new` precedes `:id/edit` so the static path wins.
+ * My Stores (Epic 24, BB-223/224) — lazy feature module. Owns the list, the
+ * dual-mode create/edit form, and the detail page with its evidence panel.
+ * `new` precedes the `:id` routes so the static path wins.
  */
 @NgModule({
   imports: [
@@ -23,8 +24,9 @@ import { StoreFormPage } from './form/store-form.page';
       { path: '', component: StoresListPage },
       { path: 'new', component: StoreFormPage },
       { path: ':id/edit', component: StoreFormPage },
+      { path: ':id', component: StoreDetailPage },
     ]),
   ],
-  declarations: [StoresListPage, StoreFormPage],
+  declarations: [StoresListPage, StoreFormPage, StoreDetailPage],
 })
 export class StoresModule {}

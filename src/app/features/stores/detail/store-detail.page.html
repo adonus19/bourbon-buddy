@@ -1,0 +1,129 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/stores" text=""></ion-back-button>
+    </ion-buttons>
+    <ion-title>{{ store()?.name ?? 'Store' }}</ion-title>
+    @if (store(); as s) {
+      <ion-buttons slot="end">
+        <ion-button [routerLink]="['/stores', storeId, 'edit']" aria-label="Edit this store">
+          <ion-icon slot="icon-only" name="create-outline"></ion-icon>
+        </ion-button>
+      </ion-buttons>
+    }
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  @if (!storesLoaded()) {
+    <app-list-skeleton />
+  } @else if (!store()) {
+    <div class="sdetail-missing">
+      <ion-icon name="storefront-outline" aria-hidden="true"></ion-icon>
+      <h2>Store not found</h2>
+      <p>This store note may have been deleted.</p>
+      <ion-button routerLink="/stores">Back to My Stores</ion-button>
+    </div>
+  } @else if (store(); as s) {
+    <section class="sdetail-intel glass-surface">
+      <header class="sdetail-intel__head">
+        <div>
+          <h1 class="sdetail-intel__name">{{ s.name }}</h1>
+          @if (location(s); as loc) {
+            <p class="sdetail-intel__loc">{{ loc }}</p>
+          }
+        </div>
+        @if (tierLabel(s); as tier) {
+          <span class="sdetail-tier sdetail-tier--{{ s.priceTier }}">{{ tier }}</span>
+        }
+      </header>
+
+      @if (specialtyLabels(s).length) {
+        <ul class="sdetail-chips">
+          @for (label of specialtyLabels(s); track label) {
+            <li class="sdetail-chip">{{ label }}</li>
+          }
+        </ul>
+      }
+
+      @if (s.shipmentNotes) {
+        <p class="eyebrow sdetail-label">Shipments &amp; drops</p>
+        <p class="sdetail-text">{{ s.shipmentNotes }}</p>
+      }
+
+      @if (s.notes) {
+        <p class="eyebrow sdetail-label">Notes</p>
+        <p class="sdetail-text">{{ s.notes }}</p>
+      }
+    </section>
+
+    <section class="sdetail-evidence">
+      <p class="eyebrow sdetail-label">Evidence from your sightings</p>
+
+      @if (evidenceLoading()) {
+        <app-list-skeleton />
+      } @else if (!hasEvidence()) {
+        <p class="sdetail-empty">
+          No sightings logged here yet. Log one and your visit history shows up
+          beside your price read.
+        </p>
+      } @else {
+        <ul class="sdetail-stats">
+          <li class="sdetail-stat glass-surface">
+            <span class="sdetail-stat__value">{{ evidence().visitCount }}</span>
+            <span class="sdetail-stat__label">
+              {{ evidence().visitCount === 1 ? 'visit' : 'visits' }}
+            </span>
+          </li>
+          <li class="sdetail-stat glass-surface">
+            <span class="sdetail-stat__value">{{ evidence().bottlesSpotted }}</span>
+            <span class="sdetail-stat__label">
+              {{ evidence().bottlesSpotted === 1 ? 'bottle' : 'bottles' }} spotted
+            </span>
+          </li>
+          @if (lastSeenPhrase(); as seen) {
+            <li class="sdetail-stat glass-surface">
+              <span class="sdetail-stat__value sdetail-stat__value--text">{{ seen }}</span>
+              <span class="sdetail-stat__label">last seen</span>
+            </li>
+          }
+          @if (msrpPhrase(evidence().avgPctVsMsrp); as phrase) {
+            <li class="sdetail-stat glass-surface">
+              <span class="sdetail-stat__value sdetail-stat__value--text">{{ phrase }}</span>
+              <span class="sdetail-stat__label">
+                avg over {{ evidence().msrpSampleSize }}
+                {{ evidence().msrpSampleSize === 1 ? 'bottle' : 'bottles' }}
+              </span>
+            </li>
+          }
+        </ul>
+        <p class="sdetail-note">
+          Your own sightings only. Your price tier stays your call — this is just
+          the receipts.
+        </p>
+      }
+    </section>
+
+    @if (liveSightings().length) {
+      <section class="sdetail-live">
+        <p class="eyebrow sdetail-label">Still live here (last 30 days)</p>
+        <ul class="sdetail-live__list">
+          @for (row of liveSightings(); track row.id) {
+            <li class="sdetail-live__row glass-surface">
+              <div class="sdetail-live__main">
+                <span class="sdetail-live__bottle">{{ row.bottleName }}</span>
+                <span class="sdetail-live__when">{{ row.when }}</span>
+              </div>
+              <div class="sdetail-live__price">
+                <span class="sdetail-live__amount">{{ row.price | currency: 'USD' : 'symbol' : '1.0-2' }}</span>
+                @if (msrpPhrase(row.pctVsMsrp); as phrase) {
+                  <span class="sdetail-live__msrp">{{ phrase }}</span>
+                }
+              </div>
+            </li>
+          }
+        </ul>
+      </section>
+    }
+  }
+</ion-content>

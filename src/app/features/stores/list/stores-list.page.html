@@ -27,7 +27,7 @@
   } @else {
     <ul class="stores-list">
       @for (s of stores(); track s.id) {
-        <li class="stores-row glass-surface" [routerLink]="['/stores', s.id, 'edit']">
+        <li class="stores-row glass-surface" [routerLink]="['/stores', s.id]">
           <div class="stores-row__main">
             <span class="stores-row__name">{{ s.name }}</span>
             @if (location(s); as loc) {
