@@ -98,6 +98,43 @@ describe('BottlePreviewSheetComponent (BB-198)', () => {
     expect(component.loaded()).toBe(true);
   });
 
+  // BB-228b: before this, the sheet rendered a blank gap while its catalog read
+  // was in flight — the user's "is it broken?" complaint on the Radar tab.
+  it('renders a skeleton while the catalog read is in flight', async () => {
+    let release!: (v: unknown) => void;
+    catalog.getById.mockReturnValue(
+      new Promise((resolve) => {
+        release = resolve;
+      })
+    );
+    component.bottle = chip();
+    component.ionViewWillEnter();
+    fixture.detectChanges();
+
+    expect(component.loaded()).toBe(false);
+    expect(
+      fixture.nativeElement.querySelector('.sheet__skeleton')
+    ).toBeTruthy();
+
+    release(null);
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(component.loaded()).toBe(true);
+    expect(fixture.nativeElement.querySelector('.sheet__skeleton')).toBeNull();
+  });
+
+  it('skips the skeleton entirely for a bottle with no catalog id', async () => {
+    // Nothing to fetch, so a skeleton would flash for no reason.
+    component.bottle = chip({ bourbonId: null });
+    component.ionViewWillEnter();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(catalog.getById).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.querySelector('.sheet__skeleton')).toBeNull();
+  });
+
   it('adds via the existing catalog match without creating a duplicate', async () => {
     wishlist.add.mockResolvedValue('id');
     component.bottle = chip();

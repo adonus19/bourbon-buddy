@@ -68,16 +68,16 @@ export class PriceHistoryComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     this.myUid.set(this.auth.snapshotUser?.uid ?? null);
     try {
-      // BB-228a: these two are chained today — friendsOnce must resolve before
-      // the points query starts. The spans' start offsets make that visible.
-      const friends = await this.perf.measure('price.friendsOnce', () =>
-        this.friends.friendsOnce()
+      // BB-228c: uids only — this component never renders a friend's name, it
+      // just needs them for the `spotterUid in [...]` filter, so hydrating each
+      // friend's public profile here would be N wasted reads. And the list is
+      // handed over PENDING so the own-points query starts before it resolves,
+      // instead of chaining behind it (BB-228a measured the chain).
+      const friendUids = this.perf.measure('price.friendUids', () =>
+        this.friends.friendUidsOnce()
       );
       const points = await this.perf.measure('price.pointsForBottle', () =>
-        this.priceHistory.priceHistoryForBottle(
-          this.bourbonId(),
-          friends.map((f) => f.uid)
-        )
+        this.priceHistory.priceHistoryForBottle(this.bourbonId(), friendUids)
       );
       this.points.set(points);
     } catch {

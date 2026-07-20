@@ -7,6 +7,7 @@ jest.mock('@angular/fire/firestore', () => ({
   collection: jest.fn(() => 'col'),
   doc: jest.fn((_fs: unknown, col: string, id: string) => ({ col, id })),
   endAt: jest.fn(() => 'endAt'),
+  getDoc: jest.fn(),
   getDocs: jest.fn(),
   limit: jest.fn(() => 'limit'),
   orderBy: jest.fn(() => 'orderBy'),
@@ -27,6 +28,7 @@ jest.mock('@angular/fire/functions', () => ({
 
 import {
   Firestore,
+  getDoc,
   getDocs,
   updateDoc,
   where,
@@ -53,6 +55,82 @@ describe('BourbonCatalogService — UPC index (BB-175)', () => {
   });
 
   afterEach(() => jest.clearAllMocks());
+
+  // BB-228c: opening the bottle preview sheet fired getById for the SAME doc
+  // twice — once from the sheet, once from its similar-bottles child, ~5ms
+  // apart (measured in BB-228a). These collapse that to one read.
+  describe('getById caching (BB-228c)', () => {
+    const snapshot = (id: string, data: Record<string, unknown> = {}) => ({
+      exists: () => true,
+      id,
+      data: () => data,
+    });
+
+    it('collapses concurrent reads of the same doc into one fetch', async () => {
+      let release!: (v: unknown) => void;
+      asMock(getDoc).mockReturnValue(
+        new Promise((resolve) => {
+          release = resolve;
+        })
+      );
+
+      const a = service.getById('b1');
+      const b = service.getById('b1');
+      release(snapshot('b1', { name: 'Weller 12' }));
+      const [first, second] = await Promise.all([a, b]);
+
+      expect(asMock(getDoc)).toHaveBeenCalledTimes(1);
+      expect(first?.name).toBe('Weller 12');
+      expect(second).toEqual(first);
+    });
+
+    it('serves a repeat read from cache without refetching', async () => {
+      asMock(getDoc).mockResolvedValue(snapshot('b1', { name: 'Weller 12' }));
+
+      await service.getById('b1');
+      const again = await service.getById('b1');
+
+      expect(asMock(getDoc)).toHaveBeenCalledTimes(1);
+      expect(again?.name).toBe('Weller 12');
+    });
+
+    it('caches a miss so a bottle with no catalog doc is not refetched', async () => {
+      asMock(getDoc).mockResolvedValue({ exists: () => false });
+
+      expect(await service.getById('nope')).toBeNull();
+      expect(await service.getById('nope')).toBeNull();
+      expect(asMock(getDoc)).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps separate ids separate', async () => {
+      asMock(getDoc)
+        .mockResolvedValueOnce(snapshot('b1', { name: 'One' }))
+        .mockResolvedValueOnce(snapshot('b2', { name: 'Two' }));
+
+      expect((await service.getById('b1'))?.name).toBe('One');
+      expect((await service.getById('b2'))?.name).toBe('Two');
+      expect(asMock(getDoc)).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not cache a failed read', async () => {
+      asMock(getDoc).mockRejectedValueOnce(new Error('offline'));
+      await expect(service.getById('b1')).rejects.toThrow('offline');
+
+      asMock(getDoc).mockResolvedValue(snapshot('b1', { name: 'Weller 12' }));
+      expect((await service.getById('b1'))?.name).toBe('Weller 12');
+      expect(asMock(getDoc)).toHaveBeenCalledTimes(2);
+    });
+
+    it('invalidates the cached doc after addUpc writes to it', async () => {
+      asMock(getDoc).mockResolvedValue(snapshot('b1', { name: 'Weller 12' }));
+      await service.getById('b1');
+      await service.addUpc('b1', '012345678905');
+      await service.getById('b1');
+
+      // The write changed the doc, so the next read must hit the server.
+      expect(asMock(getDoc)).toHaveBeenCalledTimes(2);
+    });
+  });
 
   describe('getFlavorSuggestions (BB-186)', () => {
     const callWith = (data: unknown) => {
