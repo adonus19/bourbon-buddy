@@ -19,18 +19,23 @@ describe('spendPrivacyOf', () => {
     const p = spendPrivacyOf({ spendPrivacy: { hidden: true } });
     expect(p.hidden).toBe(true);
     expect(p.mode).toBe(DEFAULT_SPEND_PRIVACY.mode);
-    expect(p.tier).toBe(DEFAULT_SPEND_PRIVACY.tier);
+    expect(p.gauntletRuns).toBe(DEFAULT_SPEND_PRIVACY.gauntletRuns);
     expect(p.configured).toBe(false);
   });
 
   it('preserves a fully specified setting', () => {
     const p = spendPrivacyOf({
-      spendPrivacy: { hidden: true, mode: 'self', tier: 3, configured: true },
+      spendPrivacy: {
+        hidden: true,
+        mode: 'self',
+        gauntletRuns: 3,
+        configured: true,
+      },
     });
     expect(p).toMatchObject({
       hidden: true,
       mode: 'self',
-      tier: 3,
+      gauntletRuns: 3,
       configured: true,
     });
   });
@@ -42,9 +47,12 @@ describe('spendPrivacyOf', () => {
     expect(p.mode).toBe(DEFAULT_SPEND_PRIVACY.mode);
   });
 
-  it('clamps a tier outside the ladder', () => {
-    expect(spendPrivacyOf({ spendPrivacy: { tier: -4 } }).tier).toBe(0);
-    expect(spendPrivacyOf({ spendPrivacy: { tier: 99 } }).tier).toBe(7);
+  it('floors a negative or fractional run count', () => {
+    // The counter only ever grows; a nonsense value must not break the ladder.
+    expect(spendPrivacyOf({ spendPrivacy: { gauntletRuns: -4 } }).gauntletRuns)
+      .toBe(0);
+    expect(spendPrivacyOf({ spendPrivacy: { gauntletRuns: 2.7 } }).gauntletRuns)
+      .toBe(2);
   });
 });
 

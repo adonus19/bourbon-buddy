@@ -8,7 +8,8 @@ import {
 } from '@ionic/angular';
 import { Auth, updateProfile } from '@angular/fire/auth';
 
-import { SightingVisibility } from '../../models';
+import { SightingVisibility, SpendPrivacyMode } from '../../models';
+import { spendPrivacyOf } from '../../shared/utils/spend-privacy';
 import { AuthService } from '../../core/auth/auth.service';
 import { USERNAME_TAKEN, UserService } from '../../core/services/user.service';
 import { ExportKind, ExportService } from '../../core/services/export.service';
@@ -78,6 +79,9 @@ export class ProfilePage {
   });
 
   readonly currentUsername = computed(() => this.profile()?.username ?? null);
+  /** Effective Discreet Total Spent setting (BB-229), defaults filled in. */
+  readonly spendPrivacy = computed(() => spendPrivacyOf(this.profile()));
+
   readonly isDiscoverable = computed(
     () => this.profile()?.isDiscoverable ?? false
   );
@@ -246,6 +250,40 @@ export class ProfilePage {
       await this.userService.setAlertRadiusMiles(uid, miles);
     } catch {
       await this.presentToast("Couldn't update alert radius. Try again.");
+    }
+  }
+
+  /**
+   * Discreet Total Spent (BB-229d) — the kill-switch.
+   *
+   * Unconditional in every mode, including `self`. The gauntlet is a commitment
+   * device, not security; being locked out of your own spend by a joke you
+   * opted into is the one outcome this feature must never produce. Clears only
+   * `hidden`, so mode and run count survive and re-hiding later doesn't
+   * re-interrogate the user about who they're hiding from.
+   */
+  async setSpendHidden(value: boolean): Promise<void> {
+    const uid = this.user()?.uid;
+    if (!uid || value === this.spendPrivacy().hidden) {
+      return;
+    }
+    try {
+      await this.userService.setSpendPrivacy(uid, { hidden: value });
+    } catch {
+      await this.presentToast("Couldn't update that. Try again.");
+    }
+  }
+
+  /** Changes how hiding behaves without touching whether it's on. */
+  async setSpendMode(mode: SpendPrivacyMode): Promise<void> {
+    const uid = this.user()?.uid;
+    if (!uid || mode === this.spendPrivacy().mode) {
+      return;
+    }
+    try {
+      await this.userService.setSpendPrivacy(uid, { mode, configured: true });
+    } catch {
+      await this.presentToast("Couldn't update that. Try again.");
     }
   }
 

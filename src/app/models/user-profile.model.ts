@@ -24,11 +24,15 @@ export type SpendPrivacyMode = 'partner' | 'self' | 'plain';
 export interface SpendPrivacy {
   hidden: boolean;
   mode: SpendPrivacyMode;
-  /** Gauntlet rung, 0–7 (BB-229c). Escalates per reveal, resets weekly. */
-  tier: number;
+  /**
+   * Completed gauntlet runs (BB-229c). NOT a position in the ladder — a reveal
+   * runs all seven stages every time, so there is nothing to resume. Kept as a
+   * counter so escalating flavor text can key off it later without a migration.
+   */
+  gauntletRuns: number;
   /** True once the first-run "who are we hiding from?" modal was answered. */
   configured: boolean;
-  /** Last successful reveal — drives the weekly tier reset (BB-229c). */
+  /** Last successful reveal. */
   lastRevealAt?: Timestamp | null;
 }
 

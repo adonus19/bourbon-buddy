@@ -146,6 +146,55 @@
       </ion-toggle>
     </ion-item>
 
+    <p class="eyebrow profile__section">Total spent</p>
+    <ion-item class="profile__toggle" lines="none">
+      <ion-toggle
+        [checked]="spendPrivacy().hidden"
+        (ionChange)="setSpendHidden($event.detail.checked)"
+      >
+        <ion-label>
+          Hide it on The Numbers
+          <p class="profile__toggle-hint">
+            @if (spendPrivacy().hidden) {
+              Currently hidden. Turn this off any time — no hoops.
+            } @else {
+              Replaces the number with a dash until you ask for it.
+            }
+          </p>
+        </ion-label>
+      </ion-toggle>
+    </ion-item>
+
+    @if (spendPrivacy().hidden) {
+      <ion-item lines="none">
+        <ion-select
+          label="Who are we hiding it from?"
+          labelPlacement="stacked"
+          interface="action-sheet"
+          [value]="spendPrivacy().mode"
+          (ionChange)="setSpendMode($any($event.detail.value))"
+        >
+          <ion-select-option value="partner">
+            Someone I live with
+          </ion-select-option>
+          <ion-select-option value="self">
+            Me. I don't want to know.
+          </ion-select-option>
+          <ion-select-option value="plain">Nobody in particular</ion-select-option>
+        </ion-select>
+      </ion-item>
+      <p class="profile__hint">
+        @switch (spendPrivacy().mode) {
+          @case ('partner') { One tap brings it back. No questions asked. }
+          @case ('self') {
+            Seven stages between you and that number, every time. This switch
+            is always here if you've had enough.
+          }
+          @default { Just hidden. No theatrics. }
+        }
+      </p>
+    }
+
     <p class="eyebrow profile__section">Sightings</p>
     <p class="profile__hint">
       Default visibility for sightings you log. You can still change it on each

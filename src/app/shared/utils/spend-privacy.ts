@@ -18,8 +18,8 @@ export const SPEND_PRIVACY_MODES: SpendPrivacyMode[] = [
   'plain',
 ];
 
-/** Highest gauntlet rung (BB-229c). */
-export const MAX_GAUNTLET_TIER = 7;
+/** Number of stages in one gauntlet run (BB-229c) — ALL of them, every time. */
+export const GAUNTLET_STAGES = 7;
 
 /**
  * What a masked amount renders as. A plain em dash on purpose: a "🔒 HIDDEN"
@@ -32,7 +32,7 @@ export const MASKED_SPEND = '—';
 export const DEFAULT_SPEND_PRIVACY: SpendPrivacy = {
   hidden: false,
   mode: 'plain',
-  tier: 0,
+  gauntletRuns: 0,
   configured: false,
 };
 
@@ -53,17 +53,19 @@ export function spendPrivacyOf(
     mode: SPEND_PRIVACY_MODES.includes(stored.mode as SpendPrivacyMode)
       ? (stored.mode as SpendPrivacyMode)
       : DEFAULT_SPEND_PRIVACY.mode,
-    tier: clampTier(stored.tier ?? DEFAULT_SPEND_PRIVACY.tier),
+    gauntletRuns: clampRuns(
+      stored.gauntletRuns ?? DEFAULT_SPEND_PRIVACY.gauntletRuns
+    ),
     configured: stored.configured ?? DEFAULT_SPEND_PRIVACY.configured,
   };
 }
 
-/** Keeps a stored tier inside the ladder, whatever the document says. */
-export function clampTier(tier: number): number {
-  if (!Number.isFinite(tier)) {
+/** Keeps a stored run count sane, whatever the document says. */
+export function clampRuns(runs: number): number {
+  if (!Number.isFinite(runs) || runs < 0) {
     return 0;
   }
-  return Math.min(MAX_GAUNTLET_TIER, Math.max(0, Math.trunc(tier)));
+  return Math.trunc(runs);
 }
 
 /**
