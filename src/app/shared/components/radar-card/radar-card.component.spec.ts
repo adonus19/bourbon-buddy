@@ -34,6 +34,7 @@ import { ModalController, ToastController } from '@ionic/angular';
 import { MentionedBottle, WishlistEntry } from '../../../models';
 import { BourbonCatalogService } from '../../../core/services/bourbon-catalog.service';
 import { LogEntryService } from '../../../core/services/log-entry.service';
+import { PerfTraceService } from '../../../core/services/perf-trace.service';
 import { TasteMatchService } from '../../../core/services/taste-match.service';
 import { WishlistService } from '../../../core/services/wishlist.service';
 import { RadarBottle } from '../../utils/release-radar';
@@ -79,6 +80,13 @@ describe('RadarCardComponent (BB-208)', () => {
   let modalCtrl: { create: jest.Mock };
   let present: jest.Mock;
 
+  /** A real PerfTraceService with output silenced. */
+  function quietPerf(): PerfTraceService {
+    const perf = new PerfTraceService();
+    perf.configure({ enabled: false });
+    return perf;
+  }
+
   function make(bottle: Partial<MentionedBottle> = {}): RadarCardComponent {
     const fixture = TestBed.createComponent(RadarCardComponent);
     fixture.componentRef.setInput('radar', radarBottle(bottle));
@@ -108,6 +116,10 @@ describe('RadarCardComponent (BB-208)', () => {
         { provide: BourbonCatalogService, useValue: catalog },
         { provide: TasteMatchService, useValue: taste },
         { provide: ModalController, useValue: modalCtrl },
+        // PerfTraceService self-enables on localhost and jsdom's hostname IS
+        // "localhost", so the real one would dump timing blocks into the test
+        // output. Tracing behaviour is covered by its own spec.
+        { provide: PerfTraceService, useValue: quietPerf() },
         {
           provide: ToastController,
           useValue: { create: jest.fn().mockResolvedValue({ present: jest.fn() }) },
@@ -154,6 +166,44 @@ describe('RadarCardComponent (BB-208)', () => {
         discoverySource: 'Release Radar',
       })
     );
+  });
+
+  // BB-228b: the tap must register instantly even when opening is slow.
+  it('marks itself opening while the sheet is being presented, then clears', async () => {
+    let releasePresent!: () => void;
+    present.mockReturnValue(
+      new Promise<void>((resolve) => {
+        releasePresent = resolve;
+      })
+    );
+
+    const card = make();
+    expect(card.opening()).toBe(false);
+    const opened = card.view();
+    await Promise.resolve(); // let create() settle, present() still pending
+    await Promise.resolve();
+    expect(card.opening()).toBe(true);
+
+    releasePresent();
+    await opened;
+    expect(card.opening()).toBe(false);
+  });
+
+  it('ignores a second tap while the sheet is already opening', async () => {
+    let releasePresent!: () => void;
+    present.mockReturnValue(
+      new Promise<void>((resolve) => {
+        releasePresent = resolve;
+      })
+    );
+    const card = make();
+    const first = card.view();
+    await Promise.resolve();
+    await card.view(); // double-tap must not open a second modal
+    expect(modalCtrl.create).toHaveBeenCalledTimes(1);
+
+    releasePresent();
+    await first;
   });
 
   it('creates the catalog entry first when the bottle has no bourbonId', async () => {

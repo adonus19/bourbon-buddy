@@ -137,6 +137,30 @@ ion-content {
     margin-top: 4px;
   }
 
+  // BB-228b: placeholder for the flavor block while the catalog read is in
+  // flight. Sized to roughly match the real block so the sheet doesn't jump
+  // when the content lands.
+  &__skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  &__skeleton-line {
+    height: 14px;
+    border-radius: 4px;
+    margin: 0;
+
+    &--eyebrow {
+      width: 40%;
+      height: 10px;
+    }
+
+    &--short {
+      width: 65%;
+    }
+  }
+
   &__listed {
     display: flex;
     align-items: center;

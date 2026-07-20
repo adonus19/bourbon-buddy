@@ -72,7 +72,7 @@ describe('PriceHistoryComponent (BB-204)', () => {
   let fixture: ComponentFixture<PriceHistoryComponent>;
   let component: PriceHistoryComponent;
   let priceHistory: { priceHistoryForBottle: jest.Mock };
-  let friends: { friendsOnce: jest.Mock };
+  let friends: { friendsOnce: jest.Mock; friendUidsOnce: jest.Mock };
   let log: { entries: WritableSignal<LogEntry[]> };
 
   /**
@@ -118,7 +118,11 @@ describe('PriceHistoryComponent (BB-204)', () => {
 
   beforeEach(() => {
     priceHistory = { priceHistoryForBottle: jest.fn().mockResolvedValue([]) };
-    friends = { friendsOnce: jest.fn().mockResolvedValue([]) };
+    friends = {
+      friendsOnce: jest.fn().mockResolvedValue([]),
+      // BB-228c: this component needs uids only, never display names.
+      friendUidsOnce: jest.fn().mockResolvedValue([]),
+    };
     log = { entries: signal<LogEntry[]>([]) };
 
     TestBed.configureTestingModule({
@@ -134,12 +138,17 @@ describe('PriceHistoryComponent (BB-204)', () => {
   });
 
   it('passes the viewer’s friend UIDs to the read service and clears loading', async () => {
-    friends.friendsOnce.mockResolvedValue([{ uid: 'f1' }, { uid: 'f2' }]);
+    friends.friendUidsOnce.mockResolvedValue(['f1', 'f2']);
     const c = await load([]);
-    expect(priceHistory.priceHistoryForBottle).toHaveBeenCalledWith('b1', [
-      'f1',
-      'f2',
-    ]);
+
+    // BB-228c: the uids are handed over as a PENDING promise so the service can
+    // start the own-points query before the friend lookup resolves. The
+    // contract is still "the viewer's friend uids reach the service".
+    const [bourbonId, uids] = (
+      priceHistory.priceHistoryForBottle as jest.Mock
+    ).mock.calls[0];
+    expect(bourbonId).toBe('b1');
+    await expect(Promise.resolve(uids)).resolves.toEqual(['f1', 'f2']);
     expect(c.loading()).toBe(false);
   });
 

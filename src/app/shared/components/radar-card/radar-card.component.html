@@ -41,9 +41,19 @@
   </div>
 
   <div class="radar-card__actions">
-    <ion-button fill="clear" size="small" (click)="view()">
-      <ion-icon slot="start" name="eye-outline" aria-hidden="true"></ion-icon>
-      View
+    <ion-button
+      fill="clear"
+      size="small"
+      [disabled]="opening()"
+      (click)="view()"
+    >
+      @if (opening()) {
+        <ion-spinner slot="start" name="dots" aria-hidden="true"></ion-spinner>
+        Opening
+      } @else {
+        <ion-icon slot="start" name="eye-outline" aria-hidden="true"></ion-icon>
+        View
+      }
     </ion-button>
     @if (!onHuntList()) {
       <ion-button

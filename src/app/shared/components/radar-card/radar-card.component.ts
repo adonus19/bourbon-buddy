@@ -36,6 +36,8 @@ export class RadarCardComponent {
 
   readonly radar = input.required<RadarBottle>();
   readonly adding = signal(false);
+  /** BB-228b: the sheet is being created/presented — gives the tap feedback. */
+  readonly opening = signal(false);
 
   readonly bottle = computed(() => this.radar().bottle);
   private readonly bourbonId = computed(() => this.radar().bottle.bourbonId ?? null);
@@ -135,20 +137,28 @@ export class RadarCardComponent {
 
   /** Opens the shared preview sheet (flavor profile, price, similar bottles). */
   async view(): Promise<void> {
+    if (this.opening()) {
+      return; // double-tap guard: one sheet per tap
+    }
+    this.opening.set(true);
     // BB-228a: one trace spans the whole open, closed on dismiss so the child
     // components' reads (similar-bottles, price-history) land in it too.
     this.perf.start('radar → preview sheet');
     const endPresent = this.perf.span('modal.create+present');
-    const modal = await this.modalCtrl.create({
-      component: BottlePreviewSheetComponent,
-      componentProps: { bottle: this.bottle() },
-      breakpoints: [0, 0.65, 0.95],
-      initialBreakpoint: 0.65,
-      cssClass: 'glass-modal',
-    });
-    await modal.present();
-    endPresent();
-    void modal.onDidDismiss().then(() => this.perf.end());
+    try {
+      const modal = await this.modalCtrl.create({
+        component: BottlePreviewSheetComponent,
+        componentProps: { bottle: this.bottle() },
+        breakpoints: [0, 0.65, 0.95],
+        initialBreakpoint: 0.65,
+        cssClass: 'glass-modal',
+      });
+      await modal.present();
+      void modal.onDidDismiss().then(() => this.perf.end());
+    } finally {
+      endPresent();
+      this.opening.set(false);
+    }
   }
 
   private async presentToast(message: string): Promise<void> {

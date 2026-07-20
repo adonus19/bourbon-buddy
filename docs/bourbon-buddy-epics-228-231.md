@@ -12,10 +12,11 @@
 
 | Epic | Theme | Stories | Status |
 |---|---|---|---|
-| A — BB-228 | Radar / preview-sheet load time | 4 | In progress |
+| A — BB-228 | Radar / preview-sheet load time | 4 | **Complete** |
 | B — BB-229 | Discreet Total Spent | 4 | Not started |
 | C — BB-230 | Sharing (friends-only) | 6 | Not started |
 | D — BB-231 | Angular 20.3 → latest migration | 1 | Deferred — last |
+| E — BB-232 | Turn the service worker on | 1 | Deferred — owner decision |
 
 **Working agreement for every story:** TDD (test first), `ng build` clean before
 done, then drive it through the `verify` skill against the emulators. Branch
@@ -49,8 +50,8 @@ infrastructure, so BB-228a measures before BB-228d changes anything.
 
 ### Stories
 
-- [~] **BB-228a — Instrument the sheet-open path.** *(instrumentation landed &
-  validated; cause not yet named — needs one live-project measurement)*
+- [x] **BB-228a — Instrument the sheet-open path.** *(DONE — cause found and
+  fixed; see ROOT CAUSE below. Also covers BB-228d, which is no longer needed.)*
   Timestamp every read from Radar tap → content painted; log per-read durations
   and the gaps between them. Identify which suspect owns the 20s:
   1. ~~Firestore WebChannel → long-polling fallback, fixed with
@@ -113,43 +114,115 @@ infrastructure, so BB-228a measures before BB-228d changes anything.
   noise is almost certainly downstream of it, and it plausibly explains the whole
   20s: every listener retries with backoff instead of failing fast.
 
-  **Leading hypothesis — unregistered App Check debug token.** On localhost
-  [app.module.ts:82](../src/app/app.module.ts#L82) sets
-  `FIREBASE_APPCHECK_DEBUG_TOKEN = true`, minting a debug token that **must be
-  registered** in Firebase Console → App Check → Apps → Manage debug tokens.
-  [docs/app-check-setup.md](app-check-setup.md) §2.2 is explicit: *"Without this,
-  local dev against the live project gets rejected once enforcement is on."*
-  A rejected App Check request can surface as a CORS error rather than a clean
-  403, because the rejection response omits the CORS headers. This also matches
-  the "2026-07 outage" the code comment warns about.
+  **App Check was investigated and RULED OUT.** The hypothesis was an
+  unregistered local debug token (app-check-setup.md §2.2 warns about it, and the
+  code comment references a prior outage). Test: `recaptchaSiteKey: ''`, which
+  disables App Check init entirely. The identical CORS error persisted and no
+  debug token was minted. Not the cause.
 
-  **Decisive test (one line, ~60s):** set `recaptchaSiteKey: ''` in
-  `src/environments/environment.ts`. That disables App Check initialization
-  entirely (documented rollback, app-check-setup.md §Rollback). Errors gone →
-  App Check is the cause; errors persist → it's the Safari/WebChannel transport.
+  **ROOT CAUSE — Safari refuses the WebChannel stream over the Fetch API.**
+  Three facts line up:
+  1. The browser build streams the WebChannel over fetch by default —
+     `registerFirestore(variant, useFetchStreams = true)`.
+  2. Safari blocks that cross-origin fetch stream, hence the error's exact
+     wording: "**Fetch API** cannot load … due to access control checks".
+  3. `experimentalAutoDetectLongPolling` (already `true`) does not rescue it:
+     it detects a *buffering proxy*, not a stream refused outright, so the
+     fallback never triggers. Listeners retry with backoff instead.
 
-  **Not yet answered — and the emulators cannot answer it.** Local Firestore has
-  no WebChannel fallback and App Check is disabled against emulators, so the two
-  leading suspects are unreproducible here by construction. Naming the cause needs
-  **one trace captured against `bourbonbuddy-dev` on the network where it's slow**
-  (`useEmulators: false`, DevTools console, tap a Radar bottle). Finding (3) makes
-  the infrastructure hypotheses *more* likely, not less: ~240ms of work cannot
-  become 20s without something outside the code path stalling.
+  Downstream symptoms all follow: no realtime listener connects, so the app
+  renders only what IndexedDB already had (owner saw just "Sorted by date added"
+  / "12 pours" — that was the **cache**, not a half-loaded page), and the
+  Ionicons / `InvalidCharacterError: '[object Object]'` tab-bar errors were
+  secondary. Sign-in still worked because Auth uses plain requests, not a stream.
 
-- [ ] **BB-228b — Loading state.**
+  **Confirmed by browser comparison:** Firefox — no error. Safari — error.
+  Headless WebKit and Chromium both render the login shell cleanly (the failure
+  is post-auth only), so the login page is not a useful reproduction surface.
+
+  **FIX (landed): `experimentalForceLongPolling: true`** in
+  [app.module.ts](../src/app/app.module.ts). `useFetchStreams: false` would be
+  narrower but is not on the public `FirestoreSettings` type (internal to
+  `registerFirestore`), so it fails to compile; forcing long polling routes off
+  fetch streams as a side effect. Costs extra requests vs. a live stream —
+  Firestore bills per *document read*, so read cost is unchanged. Kept global
+  rather than UA-gated: this is an iOS-first PWA and every iOS browser is WebKit.
+
+  **Owner verified in Safari 2026-07-20:** app loads, Radar bottles open, the
+  Ionicons errors are gone.
+
+- [x] **BB-228b — Loading state.** *(DONE)*
   Skeleton inside `BottlePreviewSheetComponent`; pressed/disabled state on
   `RadarCardComponent.view()` so the tap registers instantly.
   **AC:** no surface can show an empty sheet with no affordance; loader appears
   within one frame of the tap.
 
-- [ ] **BB-228c — Remove redundant work.**
+  **Built:** a skeleton block in the sheet replaces the blank gap while the
+  catalog read is in flight — scoped to the *flavor* block only, because
+  `price-history` and `similar-bottles` render immediately and manage their own
+  loading; gating them on `loaded()` would have re-serialized the reads the rest
+  of this epic removes. `RadarCardComponent` gained an `opening` signal that
+  disables the View button and swaps in a spinner, plus a double-tap guard so one
+  tap opens exactly one sheet. No skeleton flashes for a bottle with no
+  `bourbonId` (nothing to fetch).
+
+- [x] **BB-228c — Remove redundant work.** *(DONE)*
   Bounded in-memory doc cache in `BourbonCatalogService` (kills the duplicate
   `getById`); `Promise.all` the price-history reads; memoize `friendsOnce()`.
   **AC:** one sheet open performs at most one `getById` per bourbonId; friends +
   price-history reads run concurrently.
 
-- [ ] **BB-228d — Apply the infrastructure fix identified by BB-228a.**
-  **AC:** the measured p95 open time drops below 2s on a normal connection.
+  **Built:**
+  - `BourbonCatalogService.getById` — in-flight request sharing + a bounded
+    (50-entry) 30s TTL cache. TTL is deliberately short: catalog docs are
+    enriched server-side, so a long TTL would serve stale flavor/critic data.
+    Failed reads are never cached; `addUpc` invalidates the doc it wrote.
+  - `FriendService.friendsOnce` — memoized per uid. This was never one read: it
+    is a collection read PLUS one `publicProfiles` getDoc per friend, on the
+    critical path of every price-history load. Cleared by `removeFriend`,
+    `blockUser`, and `respondToRequest` (accepting adds an edge); failures are
+    not memoized.
+  - `FriendService.friendUidsOnce` — **new.** Friend uids are needed as *query
+    input* for `where('spotterUid','in',[...])`, which is why the preview sheet
+    touches the friend graph at all: its crowd-price line reads `/priceHistory`,
+    and friends' points are only visible if the query names them. The uid
+    already **is** the friends edge doc ID, so hydrating each friend's public
+    profile for that was N document reads thrown away. This is one collection
+    read, and it derives from the hydrated cache when that is already loaded.
+    Only `price-history.component` uses it — `sightings-map` and `friends-feed`
+    genuinely render names. **Note:** `sightings-map.build()` calls
+    `loadSightings()` and `friendNames()` in one `Promise.all`, so switching
+    only the first would make it pay for *two* caches; it stays on `friendsOnce`
+    deliberately.
+  - `PriceHistoryService.priceHistoryForBottle` now accepts
+    `string[] | Promise<string[]>` for friend uids. The own-points query does not
+    depend on them, so it is issued first and runs while the friend lookup
+    resolves — breaking the chain at its source rather than at the call site.
+
+  **Measured after (same seeded scenario and driver as the BB-228a baseline):**
+
+  ```
+  [perf] radar → preview sheet
+    @0ms   modal.create+present            336ms
+    @30ms  price.friendsOnce                69ms
+    @31ms  price.pointsForBottle           119ms   ← was @97ms
+    @32ms  similar-bottles.catalog.getById 134ms
+    @37ms  sheet.catalog.getById           130ms
+  ```
+
+  **Result: all reads complete by ~167ms, down from ~241ms (≈31% faster).**
+  The chain is gone — `price.pointsForBottle` now starts at @31ms alongside
+  `price.friendsOnce` instead of waiting for it to finish at @97ms.
+
+  **On the duplicate `getById`:** both spans still appear, because both callers
+  still *ask*. They now share one request — visible in the trace as the two spans
+  ending at the same instant (166ms / 167ms). The reduction to a single network
+  read is asserted directly by unit test ("collapses concurrent reads of the same
+  doc into one fetch" — `getDoc` called once); the trace alone does not prove it.
+
+- [x] **BB-228d — Apply the infrastructure fix identified by BB-228a.**
+  *(DONE — landed together with BB-228a: `experimentalForceLongPolling: true`.
+  Owner confirmed in Safari that the app loads and Radar bottles open normally.)*
 
 ---
 
@@ -296,3 +369,47 @@ compile. Migrating resolves the contradiction in the right direction.
   - Decide per-surface whether to adopt Signal Forms; **no big-bang forms
     rewrite** — Reactive Forms keep working
   - CLAUDE.md updated: version, forms guidance, and the `@Service()` note
+
+---
+
+# Epic E — BB-232: Turn the service worker on
+
+**Deferred by owner decision 2026-07-20** — deliberately staying off while
+feature iteration is fast, because a service worker's stale-cache behavior
+fights frequent rollouts. Revisit once feature velocity slows.
+
+**Discovered 2026-07-20** while tracing which environment file the deployed app
+uses. The service worker is off in the live app for **two independent reasons**:
+
+1. [app.module.ts:60](../src/app/app.module.ts#L60) —
+   `ServiceWorkerModule.register('ngsw-worker.js', { enabled: environment.production })`,
+   and the live site is built by `.github/workflows/deploy.yml` with
+   `npm run build:staging`, whose configuration has no `fileReplacements`, so it
+   runs `environment.ts` with `production: false`.
+2. The `serviceWorker` **build option** exists only on the `production`
+   configuration in `angular.json`, so `build:staging` never generates
+   `ngsw.json` or emits `ngsw-worker.js` at all.
+
+**Current consequences (accepted for now):**
+- No app-shell precaching — every launch is a network fetch
+- No offline shell; the installed home-screen app needs a connection to boot
+  (Firestore offline still works — that's `persistentLocalCache`, unrelated)
+- `AppUpdateService` never fires, since it is driven by SW update events
+
+**Note:** the owner runs the app installed on an iPhone home screen today and it
+works fine — so this is a latent capability gap, not a live defect.
+
+### Story
+
+- [ ] **BB-232 — Enable the service worker in the deployed app.**
+  **AC:**
+  - Decide the gate: either give `staging` its own `fileReplacements` +
+    `serviceWorker: true`, or switch the register flag off a dedicated
+    `enableServiceWorker` environment field rather than `production`
+    (`production` is not a reliable "is deployed" signal in this repo)
+  - `ngsw.json` + `ngsw-worker.js` are emitted by whichever build CI deploys
+  - `ngsw-config.json` reviewed: app shell + assets precached, Firestore/API
+    calls NOT cached
+  - `AppUpdateService` verified end-to-end — a new deploy prompts an update
+    rather than silently serving a stale shell
+  - Verified on an installed iOS home-screen PWA, including the update path

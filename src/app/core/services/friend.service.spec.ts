@@ -16,7 +16,7 @@ jest.mock('@angular/fire/functions', () => ({
   httpsCallable: jest.fn(),
 }));
 
-import { Firestore, doc, getDoc } from '@angular/fire/firestore';
+import { Firestore, doc, getDoc, getDocs } from '@angular/fire/firestore';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../auth/auth.service';
 import { FriendService } from './friend.service';
@@ -47,6 +47,104 @@ describe('FriendService', () => {
   }
 
   afterEach(() => jest.clearAllMocks());
+
+  // BB-228c: friendsOnce sits on the critical path of every price-history load
+  // and costs a collection read PLUS one publicProfiles getDoc per friend.
+  describe('friendsOnce memoization (BB-228c)', () => {
+    const edges = (ids: string[]) => ({
+      empty: ids.length === 0,
+      docs: ids.map((id) => ({ id })),
+    });
+
+    beforeEach(() => {
+      setup('u1');
+      asMock(getDocs).mockResolvedValue(edges(['f1']));
+      asMock(getDoc).mockResolvedValue(
+        snap(true, { displayName: 'Friend One' }, 'f1')
+      );
+    });
+
+    it('reads the edges once across repeated calls', async () => {
+      await service.friendsOnce();
+      await service.friendsOnce();
+      expect(asMock(getDocs)).toHaveBeenCalledTimes(1);
+    });
+
+    it('shares one request between concurrent callers', async () => {
+      const [a, b] = await Promise.all([
+        service.friendsOnce(),
+        service.friendsOnce(),
+      ]);
+      expect(asMock(getDocs)).toHaveBeenCalledTimes(1);
+      expect(b).toEqual(a);
+    });
+
+    it('refetches after the graph changes', async () => {
+      await service.friendsOnce();
+      asMock(httpsCallable).mockReturnValue(jest.fn().mockResolvedValue({}));
+      await service.removeFriend('f1');
+      await service.friendsOnce();
+      expect(asMock(getDocs)).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not memoize a failed read', async () => {
+      asMock(getDocs).mockRejectedValueOnce(new Error('offline'));
+      await expect(service.friendsOnce()).rejects.toThrow('offline');
+      await service.friendsOnce();
+      expect(asMock(getDocs)).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  // BB-228c: the preview sheet's crowd-price line only needs UIDs to build the
+  // `where('spotterUid','in',...)` query — hydrating each friend's public
+  // profile there is N document reads thrown away.
+  describe('friendUidsOnce (BB-228c)', () => {
+    beforeEach(() => {
+      setup('u1');
+      asMock(getDocs).mockResolvedValue({
+        empty: false,
+        docs: [{ id: 'f1' }, { id: 'f2' }],
+      });
+    });
+
+    it('returns the edge ids without reading any public profile', async () => {
+      // The edge doc ID *is* the friend's uid, so hydration buys nothing here.
+      expect(await service.friendUidsOnce()).toEqual(['f1', 'f2']);
+      expect(asMock(getDoc)).not.toHaveBeenCalled();
+    });
+
+    it('reads once across repeated calls', async () => {
+      await service.friendUidsOnce();
+      await service.friendUidsOnce();
+      expect(asMock(getDocs)).toHaveBeenCalledTimes(1);
+    });
+
+    it('reuses an already-loaded full friends list instead of re-reading', async () => {
+      asMock(getDoc).mockResolvedValue(
+        snap(true, { displayName: 'Friend One' }, 'f1')
+      );
+      await service.friendsOnce(); // full hydrate, 1 getDocs
+      asMock(getDocs).mockClear();
+
+      expect(await service.friendUidsOnce()).toEqual(['f1', 'f2']);
+      expect(asMock(getDocs)).not.toHaveBeenCalled();
+    });
+
+    it('refetches after the graph changes', async () => {
+      await service.friendUidsOnce();
+      asMock(httpsCallable).mockReturnValue(jest.fn().mockResolvedValue({}));
+      await service.removeFriend('f1');
+      await service.friendUidsOnce();
+      expect(asMock(getDocs)).toHaveBeenCalledTimes(2);
+    });
+
+    it('returns empty when signed out', async () => {
+      TestBed.resetTestingModule(); // beforeEach already built a signed-in one
+      setup(null);
+      expect(await service.friendUidsOnce()).toEqual([]);
+      expect(asMock(getDocs)).not.toHaveBeenCalled();
+    });
+  });
 
   describe('searchByUsername', () => {
     /** Route each getDoc by the doc path it was called with. */

@@ -49,6 +49,16 @@
     </section>
   } @else if (loaded()) {
     <p class="sheet__empty">No flavor profile for this bottle yet.</p>
+  } @else {
+    <!-- BB-228b: the catalog read is still in flight. Only this block waits —
+         price-history and similar-bottles below render immediately and manage
+         their own loading, so gating them here would serialize the reads. -->
+    <section class="sheet__skeleton" aria-label="Loading flavor profile">
+      <ion-skeleton-text [animated]="true" class="sheet__skeleton-line sheet__skeleton-line--eyebrow"></ion-skeleton-text>
+      <ion-skeleton-text [animated]="true" class="sheet__skeleton-line"></ion-skeleton-text>
+      <ion-skeleton-text [animated]="true" class="sheet__skeleton-line"></ion-skeleton-text>
+      <ion-skeleton-text [animated]="true" class="sheet__skeleton-line sheet__skeleton-line--short"></ion-skeleton-text>
+    </section>
   }
 
   <app-critic-summary [signals]="catalogBottle()?.criticSignals ?? null" />

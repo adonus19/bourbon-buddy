@@ -43,7 +43,11 @@ export class PriceHistoryService {
    */
   async priceHistoryForBottle(
     bourbonId: string,
-    friendUids: string[] = []
+    // BB-228c: accepts a PENDING friend list. The own-points query does not
+    // depend on friend uids, so it is issued first and runs while the friend
+    // lookup resolves. Callers used to await friendsOnce() and only then call
+    // this, which serialized two round trips (measured in BB-228a).
+    friendUids: string[] | Promise<string[]> = []
   ): Promise<PriceHistoryPoint[]> {
     const uid = this.auth.snapshotUser?.uid;
     if (!uid) {
@@ -70,8 +74,10 @@ export class PriceHistoryService {
 
     // Friends' shared points. Uses the
     // (bourbonId, visibility, spotterUid, sightingDate) index.
+    // The own-points read above is already in flight at this point, so awaiting
+    // the friend list here costs nothing extra.
     const uids = friendUidsForQuery(
-      friendUids,
+      await friendUids,
       uid,
       PriceHistoryService.FRIEND_UID_CAP
     );

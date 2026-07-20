@@ -59,6 +59,21 @@ export class BourbonCatalogService {
   private readonly auth = inject(AuthService);
 
   /**
+   * Short-lived catalog-doc cache (BB-228c). Deliberately brief: catalog docs
+   * are enriched server-side (flavor profiles, critic signals, similar bottles),
+   * so a long TTL would show stale data. This exists to collapse duplicate reads
+   * within a single screen open, not to be a durable store — Firestore's own
+   * IndexedDB cache already covers that.
+   */
+  private static readonly DOC_TTL_MS = 30_000;
+  private static readonly DOC_CACHE_MAX = 50;
+  private readonly docCache = new Map<
+    string,
+    { at: number; value: Bourbon | null }
+  >();
+  private readonly inFlight = new Map<string, Promise<Bourbon | null>>();
+
+  /**
    * AI flavor suggestions for a bottle (BB-186), via the `enrichBottleFlavor`
    * callable (BB-185). The server returns a cached profile or generates one on
    * the spot (enrich-at-point-of-use), so this is a single round-trip.
@@ -161,8 +176,52 @@ export class BourbonCatalogService {
     if (!bourbonId) {
       return null;
     }
-    const snap = await getDoc(doc(this.firestore, 'bourbons', bourbonId));
-    return snap.exists() ? ({ id: snap.id, ...snap.data() } as Bourbon) : null;
+
+    const cached = this.docCache.get(bourbonId);
+    if (cached && Date.now() - cached.at < BourbonCatalogService.DOC_TTL_MS) {
+      return cached.value;
+    }
+
+    // Share one request between simultaneous callers. The preview sheet and its
+    // similar-bottles child both ask for the same doc within a few ms (BB-228a),
+    // and without this each opened its own round trip.
+    const pending = this.inFlight.get(bourbonId);
+    if (pending) {
+      return pending;
+    }
+
+    const request = (async () => {
+      const snap = await getDoc(doc(this.firestore, 'bourbons', bourbonId));
+      return snap.exists()
+        ? ({ id: snap.id, ...snap.data() } as Bourbon)
+        : null;
+    })();
+    this.inFlight.set(bourbonId, request);
+
+    try {
+      const value = await request;
+      this.cacheDoc(bourbonId, value); // only on success — a failed read must
+      return value; // not poison the cache
+    } finally {
+      this.inFlight.delete(bourbonId);
+    }
+  }
+
+  /** Drops a cached doc — call after any write that changes it. */
+  invalidate(bourbonId: string): void {
+    this.docCache.delete(bourbonId);
+  }
+
+  private cacheDoc(bourbonId: string, value: Bourbon | null): void {
+    // Bounded: evict oldest-inserted once over the cap so a long session can't
+    // grow this without limit.
+    if (this.docCache.size >= BourbonCatalogService.DOC_CACHE_MAX) {
+      const oldest = this.docCache.keys().next().value;
+      if (oldest !== undefined) {
+        this.docCache.delete(oldest);
+      }
+    }
+    this.docCache.set(bourbonId, { at: Date.now(), value });
   }
 
   /**
@@ -199,6 +258,7 @@ export class BourbonCatalogService {
     await updateDoc(doc(this.firestore, 'bourbons', bourbonId), {
       upc: arrayUnion(normalized),
     });
+    this.invalidate(bourbonId); // the doc just changed (BB-228c)
   }
 
   /** Returns the id of the first catalog doc matching the constraint, or null. */
