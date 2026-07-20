@@ -8,6 +8,30 @@ import { SightingVisibility } from './sighting.model';
  */
 export type AccessStatus = 'pending' | 'approved' | 'denied';
 
+/**
+ * Discreet Total Spent (BB-229). How the user wants hiding to behave:
+ *  - `partner` — hide fast, reveal in one tap. Someone may be looking over your
+ *    shoulder, so a puzzle is worse than useless and a loud badge is worse still.
+ *  - `self`    — the escalating gauntlet; you asked to be stopped.
+ *  - `plain`   — just hide it, no bit.
+ */
+export type SpendPrivacyMode = 'partner' | 'self' | 'plain';
+
+/**
+ * Stored on the user doc so the setting follows the account across devices.
+ * Read from the profile listener AuthService already holds — zero extra reads.
+ */
+export interface SpendPrivacy {
+  hidden: boolean;
+  mode: SpendPrivacyMode;
+  /** Gauntlet rung, 0–7 (BB-229c). Escalates per reveal, resets weekly. */
+  tier: number;
+  /** True once the first-run "who are we hiding from?" modal was answered. */
+  configured: boolean;
+  /** Last successful reveal — drives the weekly tier reset (BB-229c). */
+  lastRevealAt?: Timestamp | null;
+}
+
 // Collection: /users/{userId}  (document ID = Firebase Auth UID)
 export interface UserProfile {
   id?: string;
@@ -29,6 +53,9 @@ export interface UserProfile {
   baseLng?: number | null;
   baseLocationLabel?: string | null; // e.g. "Louisville, KY"
   alertRadiusMiles?: number | null;
+  // Discreet Total Spent (BB-229). Absent on every pre-feature profile, which
+  // correctly reads as "not hidden".
+  spendPrivacy?: Partial<SpendPrivacy>;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

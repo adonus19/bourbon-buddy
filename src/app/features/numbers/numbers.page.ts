@@ -10,9 +10,16 @@ import { ViewDidEnter } from '@ionic/angular';
 import { ChartConfiguration } from 'chart.js';
 
 import { StatsService } from '../../core/services/stats.service';
+import { AuthService } from '../../core/auth/auth.service';
+import { UserService } from '../../core/services/user.service';
 import { OnboardingService } from '../../core/onboarding/onboarding.service';
 import { TIPS } from '../../core/onboarding/tips.config';
 import { cssVarValue } from '../../shared/utils/css-var';
+import {
+  displaySpend,
+  isSpendHidden,
+  spendPrivacyOf,
+} from '../../shared/utils/spend-privacy';
 import {
   ActivityRange,
   MonthActivity,
@@ -32,6 +39,19 @@ export class NumbersPage implements ViewDidEnter {
   private readonly router = inject(Router);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly onboarding = inject(OnboardingService);
+  private readonly auth = inject(AuthService);
+  private readonly users = inject(UserService);
+
+  /**
+   * Discreet Total Spent (BB-229). Derived from the profile listener
+   * AuthService already holds — no extra read, no listener of our own.
+   */
+  readonly spendPrivacy = computed(() => spendPrivacyOf(this.auth.profile()));
+  /** Transient: a reveal lasts for this visit only, never flipping `hidden`. */
+  readonly revealedThisSession = signal(false);
+  readonly spendHidden = computed(() =>
+    isSpendHidden(this.spendPrivacy(), this.revealedThisSession())
+  );
 
   readonly hasData = this.stats.hasData;
   readonly summary = this.stats.summary;
@@ -251,8 +271,56 @@ export class NumbersPage implements ViewDidEnter {
     }
   }
 
-  spent(): string {
+  /** The real figure, before any masking. */
+  private rawSpent(): string {
     return `$${Math.round(this.summary().totalSpent).toLocaleString()}`;
+  }
+
+  /** What the Total Spent tile renders — masked when hidden (BB-229). */
+  spent(): string {
+    return displaySpend(
+      this.rawSpent(),
+      this.spendPrivacy(),
+      this.revealedThisSession()
+    );
+  }
+
+  /** Eye icon reflects what tapping will do. */
+  spendActionIcon(): string {
+    return this.spendHidden() ? 'eye-outline' : 'eye-off-outline';
+  }
+
+  spendActionLabel(): string {
+    return this.spendHidden() ? 'Show total spent' : 'Hide total spent';
+  }
+
+  /**
+   * Corner-action tap. Hiding is immediate and persistent; revealing is
+   * session-only so the amount re-hides on the next visit rather than quietly
+   * undoing the user's setting.
+   */
+  async toggleSpendPrivacy(): Promise<void> {
+    const uid = this.auth.snapshotUser?.uid;
+    if (!uid) {
+      return;
+    }
+
+    // Branch on what is CURRENTLY DISPLAYED, not on the stored flag — while a
+    // session reveal is active the amount is visible even though `hidden` is
+    // still true, and tapping then must re-hide rather than re-reveal.
+    if (!this.spendHidden()) {
+      this.revealedThisSession.set(false);
+      if (!this.spendPrivacy().hidden) {
+        await this.users.setSpendPrivacy(uid, { hidden: true });
+      }
+      return;
+    }
+
+    // Masked → reveal for this visit only. Turning the setting back OFF for
+    // good lives in Settings (BB-229d), deliberately: the tile's own control
+    // shouldn't be able to undo the choice as easily as it was made.
+    // BB-229c will gate this reveal behind the gauntlet for `self` mode.
+    this.revealedThisSession.set(true);
   }
 
   avg(): string {
