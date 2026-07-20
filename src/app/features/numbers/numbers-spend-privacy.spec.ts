@@ -31,6 +31,10 @@ jest.mock('@ionic/angular', () => ({
   AlertController: class {},
 }));
 
+import { ModalController } from '@ionic/angular';
+import { LogEntryService } from '../../core/services/log-entry.service';
+import { NewsService } from '../../core/services/news.service';
+
 import { UserProfile } from '../../models';
 import { AuthService } from '../../core/auth/auth.service';
 import { OnboardingService } from '../../core/onboarding/onboarding.service';
@@ -46,7 +50,15 @@ import { NumbersPage } from './numbers.page';
 describe('NumbersPage — Discreet Total Spent (BB-229a)', () => {
   let page: NumbersPage;
   let users: { setSpendPrivacy: jest.Mock };
+  let modalCtrl: { create: jest.Mock };
+  let gauntletRole: 'revealed' | 'cancel' = 'revealed';
   let profile: ReturnType<typeof signal<Partial<UserProfile> | undefined>>;
+
+  // Reset between tests — a leaked 'cancel' would silently change what a later
+  // test is actually asserting.
+  beforeEach(() => {
+    gauntletRole = 'revealed';
+  });
 
   function setup(
     spendPrivacy?: Partial<UserProfile>['spendPrivacy'],
@@ -56,6 +68,12 @@ describe('NumbersPage — Discreet Total Spent (BB-229a)', () => {
       spendPrivacy ? { spendPrivacy } : {}
     );
     users = { setSpendPrivacy: jest.fn().mockResolvedValue(undefined) };
+    modalCtrl = {
+      create: jest.fn().mockResolvedValue({
+        present: jest.fn().mockResolvedValue(undefined),
+        onDidDismiss: jest.fn().mockResolvedValue({ role: gauntletRole }),
+      }),
+    };
 
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
@@ -81,6 +99,9 @@ describe('NumbersPage — Discreet Total Spent (BB-229a)', () => {
           useValue: { showTipOnce: jest.fn(), registerAnchor: jest.fn() },
         },
         { provide: ChangeDetectorRef, useValue: { markForCheck: jest.fn() } },
+        { provide: ModalController, useValue: modalCtrl },
+        { provide: LogEntryService, useValue: { entries: signal([]) } },
+        { provide: NewsService, useValue: { articles: signal([]) } },
         { provide: Router, useValue: { navigate: jest.fn() } },
       ],
     });
@@ -127,6 +148,64 @@ describe('NumbersPage — Discreet Total Spent (BB-229a)', () => {
     // Already stored as hidden, so this is a no-op write plus a reveal reset.
     expect(page.spendHidden()).toBe(true);
     expect(page.spent()).toBe('—');
+  });
+
+  it('runs the gauntlet before revealing in self mode', async () => {
+    gauntletRole = 'revealed';
+    setup({ hidden: true, mode: 'self', configured: true });
+    await page.toggleSpendPrivacy();
+
+    expect(modalCtrl.create).toHaveBeenCalledTimes(1);
+    expect(page.spendHidden()).toBe(false);
+  });
+
+  it('leaves the amount masked when the gauntlet is abandoned', async () => {
+    // Closing mid-run discards progress — the next attempt starts at stage 1.
+    gauntletRole = 'cancel';
+    setup({ hidden: true, mode: 'self', configured: true });
+    await page.toggleSpendPrivacy();
+
+    expect(page.spendHidden()).toBe(true);
+    expect(page.spent()).toBe('—');
+  });
+
+  it('records the completed run without blocking the reveal', async () => {
+    gauntletRole = 'revealed';
+    setup({ hidden: true, mode: 'self', gauntletRuns: 2 });
+    await page.toggleSpendPrivacy();
+
+    expect(users.setSpendPrivacy).toHaveBeenCalledWith('u1', {
+      gauntletRuns: 3,
+    });
+  });
+
+  it('still reveals when recording the run fails', async () => {
+    gauntletRole = 'revealed';
+    setup({ hidden: true, mode: 'self' });
+    users.setSpendPrivacy.mockRejectedValue(new Error('offline'));
+    await page.toggleSpendPrivacy();
+
+    // The user earned it; a bookkeeping write must never take it away.
+    expect(page.spendHidden()).toBe(false);
+  });
+
+  it('skips the gauntlet entirely in partner mode', async () => {
+    // Someone may be waiting — puzzles here would be worse than not hiding.
+    gauntletRole = 'revealed';
+    setup({ hidden: true, mode: 'partner', configured: true });
+    await page.toggleSpendPrivacy();
+
+    expect(modalCtrl.create).not.toHaveBeenCalled();
+    expect(page.spendHidden()).toBe(false);
+  });
+
+  it('skips the gauntlet in plain mode', async () => {
+    gauntletRole = 'revealed';
+    setup({ hidden: true, mode: 'plain', configured: true });
+    await page.toggleSpendPrivacy();
+
+    expect(modalCtrl.create).not.toHaveBeenCalled();
+    expect(page.spendHidden()).toBe(false);
   });
 
   it('does nothing when signed out rather than throwing', async () => {

@@ -1,0 +1,112 @@
+<ion-content>
+  <div class="gaunt" [class.gaunt--shake]="shake()">
+    <header class="gaunt__head">
+      <span class="eyebrow">Stage {{ stepLabel() }}</span>
+      <button class="gaunt__close" type="button" (click)="giveUp()" aria-label="Give up">
+        <ion-icon name="close" aria-hidden="true"></ion-icon>
+      </button>
+    </header>
+
+    @if (bailedOut()) {
+      <!-- BB-229d escape hatch: the bit stops here, permanently for this run. -->
+      <section class="gaunt__body">
+        <h2 class="gaunt__title">Alright, you've suffered enough.</h2>
+        <p class="gaunt__prompt">
+          You couldn't hack it, so we're bailing you out. Try not to look
+          directly at the number.
+        </p>
+        <ion-button expand="block" (click)="bail()">Fine, show me</ion-button>
+      </section>
+    } @else if (stage(); as s) {
+      <section class="gaunt__body">
+        <p class="gaunt__prompt">{{ s.prompt }}</p>
+
+        @switch (s.kind) {
+          @case ('tap') {
+            <ion-button expand="block" (click)="next()">{{ s.cta }}</ion-button>
+          }
+
+          @case ('confirm') {
+            <ion-button expand="block" (click)="next()">{{ s.yes }}</ion-button>
+            <ion-button expand="block" fill="clear" (click)="giveUp()">
+              {{ s.no }}
+            </ion-button>
+          }
+
+          @case ('phrase') {
+            <p class="gaunt__question">Type: <strong>{{ s.phrase }}</strong></p>
+            <ion-input
+              class="gaunt__input"
+              fill="outline"
+              autocapitalize="off"
+              autocomplete="off"
+              [value]="typed()"
+              (ionInput)="typed.set($any($event.detail.value) ?? '')"
+              (keyup.enter)="submitPhrase()"
+            ></ion-input>
+            <ion-button expand="block" (click)="submitPhrase()">I typed it</ion-button>
+          }
+
+          @case ('math') {
+            <p class="gaunt__question">{{ s.question }}</p>
+            <ion-input
+              class="gaunt__input"
+              fill="outline"
+              type="number"
+              inputmode="numeric"
+              [value]="answer()"
+              (ionInput)="answer.set($any($event.detail.value) ?? '')"
+              (keyup.enter)="submitMath()"
+            ></ion-input>
+            <ion-button expand="block" (click)="submitMath()">That's it</ion-button>
+          }
+
+          @case ('hold') {
+            <p class="gaunt__question">Press and hold for {{ s.seconds }} seconds.</p>
+            <button
+              class="gaunt__hold"
+              type="button"
+              (pointerdown)="startHold()"
+              (pointerup)="endHold()"
+              (pointerleave)="endHold()"
+              (pointercancel)="endHold()"
+            >
+              <span
+                class="gaunt__hold-fill"
+                [style.width.%]="holdProgress() * 100"
+              ></span>
+              <span class="gaunt__hold-label">
+                {{ holdCaption() || 'Hold' }}
+              </span>
+            </button>
+          }
+
+          @case ('pick') {
+            <p class="gaunt__question">{{ s.question }}</p>
+            @for (o of s.options; track o.id) {
+              <ion-button expand="block" fill="outline" (click)="choose(o.id)">
+                {{ o.label }}
+              </ion-button>
+            }
+          }
+
+          @case ('cooldown') {
+            @if (cooldownLeft() > 0) {
+              <p class="gaunt__count">{{ cooldownLeft() }}</p>
+            } @else {
+              <button class="gaunt__tiny" type="button" (click)="finish()">
+                {{ s.cta }}
+              </button>
+            }
+          }
+        }
+
+        @if (failures() > 0) {
+          <p class="gaunt__misses">
+            {{ failures() }} of 3 misses. Three and we give up on you.
+          </p>
+        }
+      </section>
+    }
+  </div>
+</ion-content>

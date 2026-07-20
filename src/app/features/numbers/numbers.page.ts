@@ -9,7 +9,11 @@ import { Router } from '@angular/router';
 import { ViewDidEnter } from '@ionic/angular';
 import { ChartConfiguration } from 'chart.js';
 
+import { ModalController } from '@ionic/angular';
+
 import { StatsService } from '../../core/services/stats.service';
+import { LogEntryService } from '../../core/services/log-entry.service';
+import { NewsService } from '../../core/services/news.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { UserService } from '../../core/services/user.service';
 import { OnboardingService } from '../../core/onboarding/onboarding.service';
@@ -20,6 +24,9 @@ import {
   isSpendHidden,
   spendPrivacyOf,
 } from '../../shared/utils/spend-privacy';
+import { GauntletSources } from '../../shared/utils/gauntlet';
+import { releaseRadar } from '../../shared/utils/release-radar';
+import { SpendGauntletComponent } from '../../shared/components/spend-gauntlet/spend-gauntlet.component';
 import {
   ActivityRange,
   MonthActivity,
@@ -41,6 +48,9 @@ export class NumbersPage implements ViewDidEnter {
   private readonly onboarding = inject(OnboardingService);
   private readonly auth = inject(AuthService);
   private readonly users = inject(UserService);
+  private readonly log = inject(LogEntryService);
+  private readonly news = inject(NewsService);
+  private readonly modalCtrl = inject(ModalController);
 
   /**
    * Discreet Total Spent (BB-229). Derived from the profile listener
@@ -319,8 +329,59 @@ export class NumbersPage implements ViewDidEnter {
     // Masked → reveal for this visit only. Turning the setting back OFF for
     // good lives in Settings (BB-229d), deliberately: the tile's own control
     // shouldn't be able to undo the choice as easily as it was made.
-    // BB-229c will gate this reveal behind the gauntlet for `self` mode.
+    if (this.spendPrivacy().mode === 'self') {
+      await this.runGauntlet(uid);
+      return;
+    }
+    // partner + plain reveal instantly — a partner mode that made you solve
+    // puzzles while someone waits would be worse than not hiding at all.
     this.revealedThisSession.set(true);
+  }
+
+  /**
+   * Self mode (BB-229c): all seven stages, every time. A cancel leaves the
+   * amount masked and discards progress, so the next attempt starts over.
+   */
+  private async runGauntlet(uid: string): Promise<void> {
+    const modal = await this.modalCtrl.create({
+      component: SpendGauntletComponent,
+      componentProps: { sources: this.gauntletSources() },
+      cssClass: 'glass-modal',
+      backdropDismiss: false,
+    });
+    await modal.present();
+    const { role } = await modal.onDidDismiss();
+    if (role !== 'revealed') {
+      return;
+    }
+    this.revealedThisSession.set(true);
+    // Best-effort counter; failing to record a run must never block the reveal
+    // the user just earned.
+    void this.users
+      .setSpendPrivacy(uid, {
+        gauntletRuns: this.spendPrivacy().gauntletRuns + 1,
+      })
+      .catch(() => undefined);
+  }
+
+  /**
+   * Puzzle material, richest source first — all from already-loaded signals,
+   * so building a run costs zero reads.
+   */
+  private gauntletSources(): GauntletSources {
+    const entries = this.log.entries();
+    return {
+      rated: entries
+        .filter((e) => e.rating != null)
+        .map((e) => ({ name: e.bourbonName, rating: e.rating as number })),
+      priced: entries
+        .filter((e) => e.purchasePrice != null)
+        .map((e) => ({
+          name: e.bourbonName,
+          price: e.purchasePrice as number,
+        })),
+      radar: releaseRadar(this.news.articles()).map((r) => r.bottle.name),
+    };
   }
 
   avg(): string {

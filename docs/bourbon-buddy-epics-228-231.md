@@ -13,7 +13,7 @@
 | Epic | Theme | Stories | Status |
 |---|---|---|---|
 | A — BB-228 | Radar / preview-sheet load time | 4 | **Complete** |
-| B — BB-229 | Discreet Total Spent | 4 | In progress (a, d done) |
+| B — BB-229 | Discreet Total Spent | 4 | In progress (a, c, d done) |
 | C — BB-230 | Sharing (friends-only) | 6 | Not started |
 | D — BB-231 | Angular 20.3 → latest migration | 1 | Deferred — last |
 | E — BB-232 | Turn the service worker on | 1 | Deferred — owner decision |
@@ -273,7 +273,7 @@ Every rung must be solvable.
   persisted on the user doc via the existing profile listener.
 - [ ] **BB-229b — First-run "Who are we hiding this from?" modal.**
   Three modes above; copy pass.
-- [ ] **BB-229c — The gauntlet.** *(self mode only; partner and plain skip it)*
+- [x] **BB-229c — The gauntlet.** *(DONE — self mode only; partner and plain skip it)*
 
   **Shape (owner-corrected 2026-07-20):** ONE reveal runs **all seven stages,
   every time**, easy → absurd. There is no per-attempt tier counter and nothing

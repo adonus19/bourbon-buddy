@@ -15,6 +15,7 @@ import { WishlistCardComponent } from './components/wishlist-card/wishlist-card.
 import { PourFormComponent } from './components/pour-form/pour-form.component';
 import { ChipInputComponent } from './components/chip-input/chip-input.component';
 import { MetricCardComponent } from './components/metric-card/metric-card.component';
+import { SpendGauntletComponent } from './components/spend-gauntlet/spend-gauntlet.component';
 import { ListSkeletonComponent } from './components/list-skeleton/list-skeleton.component';
 import { OfflineSyncBadgeComponent } from './components/offline-sync-badge/offline-sync-badge.component';
 import { SimilarBottlesComponent } from './components/similar-bottles/similar-bottles.component';
@@ -44,6 +45,7 @@ const COMPONENTS = [
   PourFormComponent,
   ChipInputComponent,
   MetricCardComponent,
+  SpendGauntletComponent,
   ListSkeletonComponent,
   OfflineSyncBadgeComponent,
   SimilarBottlesComponent,
