@@ -61,12 +61,22 @@ import { ProfilePage } from './profile.page';
 describe('ProfilePage — Discreet Total Spent settings (BB-229d)', () => {
   let page: ProfilePage;
   let users: { setSpendPrivacy: jest.Mock };
+  let alertCtrl: { create: jest.Mock };
+
+  /** Makes the next confirm dialog resolve with the given button role. */
+  function answerConfirm(role: 'confirm' | 'cancel') {
+    alertCtrl.create.mockResolvedValue({
+      present: jest.fn().mockResolvedValue(undefined),
+      onDidDismiss: jest.fn().mockResolvedValue({ role }),
+    });
+  }
 
   function setup(
     spendPrivacy?: Partial<SpendPrivacy>,
     uid: string | null = 'u1'
   ) {
     users = { setSpendPrivacy: jest.fn().mockResolvedValue(undefined) };
+    alertCtrl = { create: jest.fn() };
     const profile = signal<Partial<UserProfile>>({ spendPrivacy });
 
     TestBed.resetTestingModule();
@@ -89,7 +99,7 @@ describe('ProfilePage — Discreet Total Spent settings (BB-229d)', () => {
               .mockResolvedValue({ present: jest.fn().mockResolvedValue(null) }),
           },
         },
-        { provide: AlertController, useValue: { create: jest.fn() } },
+        { provide: AlertController, useValue: alertCtrl },
         { provide: ActionSheetController, useValue: { create: jest.fn() } },
         { provide: ExportService, useValue: {} },
         { provide: NotificationService, useValue: { permission: signal('default') } },
@@ -111,6 +121,7 @@ describe('ProfilePage — Discreet Total Spent settings (BB-229d)', () => {
 
   it('turns hiding off, clearing only `hidden`', async () => {
     setup({ hidden: true, mode: 'self', configured: true, gauntletRuns: 4 });
+    answerConfirm('confirm');
     await page.setSpendHidden(false);
 
     // Mode and run count must survive: re-hiding later shouldn't re-ask who
@@ -122,6 +133,7 @@ describe('ProfilePage — Discreet Total Spent settings (BB-229d)', () => {
     // Regression guard for the tempting "make self mode harder to escape"
     // idea — an unconditional exit is the point of this story.
     setup({ hidden: true, mode: 'self', configured: true });
+    answerConfirm('confirm');
     await page.setSpendHidden(false);
     expect(users.setSpendPrivacy).toHaveBeenCalledWith('u1', { hidden: false });
   });
@@ -149,8 +161,40 @@ describe('ProfilePage — Discreet Total Spent settings (BB-229d)', () => {
 
   it('surfaces a toast instead of throwing when the write fails', async () => {
     setup({ hidden: true });
+    answerConfirm('confirm');
     users.setSpendPrivacy.mockRejectedValue(new Error('offline'));
     await expect(page.setSpendHidden(false)).resolves.toBeUndefined();
+  });
+
+  it('asks for confirmation before turning hiding off', async () => {
+    setup({ hidden: true, mode: 'self' });
+    answerConfirm('confirm');
+    await page.setSpendHidden(false);
+
+    expect(alertCtrl.create).toHaveBeenCalledTimes(1);
+    const opts = alertCtrl.create.mock.calls[0][0];
+    // Owns the loophole rather than pretending it isn't one.
+    expect(opts.header).toMatch(/turn it off/i);
+    expect(users.setSpendPrivacy).toHaveBeenCalledWith('u1', { hidden: false });
+  });
+
+  it('writes nothing and snaps the toggle back when the confirm is declined', async () => {
+    setup({ hidden: true, mode: 'self' });
+    answerConfirm('cancel');
+    await page.setSpendHidden(false);
+
+    expect(users.setSpendPrivacy).not.toHaveBeenCalled();
+    // The switch must return to "hidden" — the DOM already moved on tap.
+    expect(page.spendHiddenUi()).toBe(true);
+  });
+
+  it('does not ask for confirmation when turning hiding ON', async () => {
+    // The joke is about escaping, not entering.
+    setup({ hidden: false });
+    await page.setSpendHidden(true);
+
+    expect(alertCtrl.create).not.toHaveBeenCalled();
+    expect(users.setSpendPrivacy).toHaveBeenCalledWith('u1', { hidden: true });
   });
 
   it('does nothing when signed out', async () => {

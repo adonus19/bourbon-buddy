@@ -1,4 +1,11 @@
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  effect,
+  inject,
+  linkedSignal,
+  signal,
+} from '@angular/core';
 import { FormBuilder, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import {
@@ -81,6 +88,11 @@ export class ProfilePage {
   readonly currentUsername = computed(() => this.profile()?.username ?? null);
   /** Effective Discreet Total Spent setting (BB-229), defaults filled in. */
   readonly spendPrivacy = computed(() => spendPrivacyOf(this.profile()));
+  /**
+   * What the toggle renders. `linkedSignal` so it follows the stored setting,
+   * but stays writable — cancelling the confirm has to move the switch back.
+   */
+  readonly spendHiddenUi = linkedSignal(() => this.spendPrivacy().hidden);
 
   readonly isDiscoverable = computed(
     () => this.profile()?.isDiscoverable ?? false
@@ -267,11 +279,38 @@ export class ProfilePage {
     if (!uid || value === this.spendPrivacy().hidden) {
       return;
     }
+    // Turning it OFF gets one confirmation that owns the loophole rather than
+    // pretending it isn't one. Friction and a joke — never a barrier, so the
+    // "yes" path is always available in every mode.
+    // Track the DOM's optimistic position so a cancel can snap it back. Setting
+    // it to `value` first matters: without that, reverting would assign the
+    // value Angular already believes is bound and the toggle would stay moved.
+    this.spendHiddenUi.set(value);
+    if (!value && !(await this.confirmSpendReveal())) {
+      this.spendHiddenUi.set(true);
+      return;
+    }
     try {
       await this.userService.setSpendPrivacy(uid, { hidden: value });
     } catch {
       await this.presentToast("Couldn't update that. Try again.");
     }
+  }
+
+  private async confirmSpendReveal(): Promise<boolean> {
+    const alert = await this.alertCtrl.create({
+      header: 'Thought you could just turn it off?',
+      message:
+        "You're right. You can. Want to go back to seeing the damage every " +
+        'time you open The Numbers?',
+      buttons: [
+        { text: 'Leave it hidden', role: 'cancel' },
+        { text: 'Show me the damage', role: 'confirm' },
+      ],
+    });
+    await alert.present();
+    const { role } = await alert.onDidDismiss();
+    return role === 'confirm';
   }
 
   /** Changes how hiding behaves without touching whether it's on. */

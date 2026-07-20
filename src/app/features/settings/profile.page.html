@@ -149,7 +149,7 @@
     <p class="eyebrow profile__section">Total spent</p>
     <ion-item class="profile__toggle" lines="none">
       <ion-toggle
-        [checked]="spendPrivacy().hidden"
+        [checked]="spendHiddenUi()"
         (ionChange)="setSpendHidden($event.detail.checked)"
       >
         <ion-label>
