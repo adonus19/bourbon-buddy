@@ -13,6 +13,7 @@ import {
 } from '../../../models';
 import { BourbonCatalogService } from '../../../core/services/bourbon-catalog.service';
 import { LogEntryService } from '../../../core/services/log-entry.service';
+import { PerfTraceService } from '../../../core/services/perf-trace.service';
 import { WishlistService } from '../../../core/services/wishlist.service';
 import { CATEGORY_DISPLAY } from '../../constants/category-display';
 
@@ -34,6 +35,7 @@ export class SimilarBottlesComponent {
   private readonly wishlist = inject(WishlistService);
   private readonly log = inject(LogEntryService);
   private readonly toastCtrl = inject(ToastController);
+  private readonly perf = inject(PerfTraceService);
 
   readonly neighbors = signal<SimilarBottle[]>([]);
   private adding = false;
@@ -100,7 +102,11 @@ export class SimilarBottlesComponent {
 
   private async load(id: string): Promise<void> {
     try {
-      const bottle = await this.catalog.getById(id);
+      // BB-228a: duplicate of the sheet's own getById for the same doc.
+      const bottle = await this.perf.measure(
+        'similar-bottles.catalog.getById',
+        () => this.catalog.getById(id)
+      );
       this.neighbors.set(bottle?.similarBottles ?? []);
     } catch {
       this.neighbors.set([]); // best-effort section; missing is just hidden

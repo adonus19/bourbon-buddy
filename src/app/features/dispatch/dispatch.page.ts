@@ -23,6 +23,7 @@ import { NewsService } from '../../core/services/news.service';
 import { LogEntryService } from '../../core/services/log-entry.service';
 import { WishlistService } from '../../core/services/wishlist.service';
 import { TasteMatchService } from '../../core/services/taste-match.service';
+import { PerfTraceService } from '../../core/services/perf-trace.service';
 import { OnboardingService } from '../../core/onboarding/onboarding.service';
 import { TIPS } from '../../core/onboarding/tips.config';
 import { BottlePreviewSheetComponent } from '../../shared/components/bottle-preview-sheet/bottle-preview-sheet.component';
@@ -53,6 +54,7 @@ export class DispatchPage implements ViewWillEnter {
   private readonly wishlist = inject(WishlistService);
   private readonly tasteMatch = inject(TasteMatchService);
   private readonly modalCtrl = inject(ModalController);
+  private readonly perf = inject(PerfTraceService);
   private readonly toast = inject(ToastController);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly onboarding = inject(OnboardingService);
@@ -224,6 +226,9 @@ export class DispatchPage implements ViewWillEnter {
    */
   async openBottle(b: MentionedBottle, ev: Event): Promise<void> {
     ev.stopPropagation();
+    // BB-228a: same sheet as Radar, so trace this path too.
+    this.perf.start('feed chip → preview sheet');
+    const endPresent = this.perf.span('modal.create+present');
     const modal = await this.modalCtrl.create({
       component: BottlePreviewSheetComponent,
       componentProps: { bottle: b },
@@ -232,6 +237,8 @@ export class DispatchPage implements ViewWillEnter {
       cssClass: 'glass-modal',
     });
     await modal.present();
+    endPresent();
+    void modal.onDidDismiss().then(() => this.perf.end());
   }
 
   async doRefresh(event: RefresherCustomEvent): Promise<void> {

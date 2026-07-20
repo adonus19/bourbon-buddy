@@ -4,6 +4,7 @@ import { PriceHistoryPoint } from '../../../models';
 import { AuthService } from '../../../core/auth/auth.service';
 import { FriendService } from '../../../core/services/friend.service';
 import { LogEntryService } from '../../../core/services/log-entry.service';
+import { PerfTraceService } from '../../../core/services/perf-trace.service';
 import { PriceHistoryService } from '../../../core/services/price-history.service';
 import { PricePoint, bottleHistory } from '../../utils/bottle-history';
 import { pointsWithinDays, priceStats } from '../../utils/price-history';
@@ -43,6 +44,7 @@ export class PriceHistoryComponent implements OnInit {
   private readonly friends = inject(FriendService);
   private readonly auth = inject(AuthService);
   private readonly log = inject(LogEntryService);
+  private readonly perf = inject(PerfTraceService);
 
   readonly bourbonId = input.required<string>();
   readonly msrp = input<number | null>(null);
@@ -66,10 +68,16 @@ export class PriceHistoryComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     this.myUid.set(this.auth.snapshotUser?.uid ?? null);
     try {
-      const friends = await this.friends.friendsOnce();
-      const points = await this.priceHistory.priceHistoryForBottle(
-        this.bourbonId(),
-        friends.map((f) => f.uid)
+      // BB-228a: these two are chained today — friendsOnce must resolve before
+      // the points query starts. The spans' start offsets make that visible.
+      const friends = await this.perf.measure('price.friendsOnce', () =>
+        this.friends.friendsOnce()
+      );
+      const points = await this.perf.measure('price.pointsForBottle', () =>
+        this.priceHistory.priceHistoryForBottle(
+          this.bourbonId(),
+          friends.map((f) => f.uid)
+        )
       );
       this.points.set(points);
     } catch {

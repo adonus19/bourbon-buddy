@@ -91,7 +91,14 @@ describe('RadarCardComponent (BB-208)', () => {
     catalog = { findOrCreate: jest.fn().mockResolvedValue('newid') };
     taste = { matches: jest.fn().mockReturnValue({ matched: false, tags: [] }) };
     present = jest.fn().mockResolvedValue(undefined);
-    modalCtrl = { create: jest.fn().mockResolvedValue({ present }) };
+    // onDidDismiss mirrors the real HTMLIonModalElement: BB-228a closes the
+    // perf trace on dismiss, so the stub has to resolve like the real one.
+    modalCtrl = {
+      create: jest.fn().mockResolvedValue({
+        present,
+        onDidDismiss: jest.fn().mockResolvedValue({}),
+      }),
+    };
 
     TestBed.configureTestingModule({
       declarations: [RadarCardComponent],

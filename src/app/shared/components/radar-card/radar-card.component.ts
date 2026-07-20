@@ -4,6 +4,7 @@ import { ModalController, ToastController } from '@ionic/angular';
 import { ACTIVE_WISHLIST_STATUSES } from '../../../models';
 import { BourbonCatalogService } from '../../../core/services/bourbon-catalog.service';
 import { LogEntryService } from '../../../core/services/log-entry.service';
+import { PerfTraceService } from '../../../core/services/perf-trace.service';
 import { TasteMatchService } from '../../../core/services/taste-match.service';
 import { WishlistService } from '../../../core/services/wishlist.service';
 import { CATEGORY_DISPLAY } from '../../constants/category-display';
@@ -31,6 +32,7 @@ export class RadarCardComponent {
   private readonly tasteMatch = inject(TasteMatchService);
   private readonly modalCtrl = inject(ModalController);
   private readonly toastCtrl = inject(ToastController);
+  private readonly perf = inject(PerfTraceService);
 
   readonly radar = input.required<RadarBottle>();
   readonly adding = signal(false);
@@ -133,6 +135,10 @@ export class RadarCardComponent {
 
   /** Opens the shared preview sheet (flavor profile, price, similar bottles). */
   async view(): Promise<void> {
+    // BB-228a: one trace spans the whole open, closed on dismiss so the child
+    // components' reads (similar-bottles, price-history) land in it too.
+    this.perf.start('radar → preview sheet');
+    const endPresent = this.perf.span('modal.create+present');
     const modal = await this.modalCtrl.create({
       component: BottlePreviewSheetComponent,
       componentProps: { bottle: this.bottle() },
@@ -141,6 +147,8 @@ export class RadarCardComponent {
       cssClass: 'glass-modal',
     });
     await modal.present();
+    endPresent();
+    void modal.onDidDismiss().then(() => this.perf.end());
   }
 
   private async presentToast(message: string): Promise<void> {

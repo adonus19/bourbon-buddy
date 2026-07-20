@@ -7,6 +7,7 @@ import {
   BourbonCategory,
 } from '../../../models';
 import { BourbonCatalogService } from '../../../core/services/bourbon-catalog.service';
+import { PerfTraceService } from '../../../core/services/perf-trace.service';
 import { TasteMatchService } from '../../../core/services/taste-match.service';
 import { WishlistService } from '../../../core/services/wishlist.service';
 import { CATEGORY_DISPLAY } from '../../constants/category-display';
@@ -48,6 +49,7 @@ export class BottlePreviewSheetComponent {
   private readonly tasteMatch = inject(TasteMatchService);
   private readonly modalCtrl = inject(ModalController);
   private readonly toastCtrl = inject(ToastController);
+  private readonly perf = inject(PerfTraceService);
 
   @Input({ required: true }) bottle!: BottlePreviewInput;
 
@@ -157,7 +159,12 @@ export class BottlePreviewSheetComponent {
   private async load(): Promise<void> {
     try {
       if (this.bottle?.bourbonId) {
-        this.catalogBottle.set(await this.catalog.getById(this.bottle.bourbonId));
+        // BB-228a: note that similar-bottles fetches this SAME doc again.
+        this.catalogBottle.set(
+          await this.perf.measure('sheet.catalog.getById', () =>
+            this.catalog.getById(this.bottle.bourbonId!)
+          )
+        );
       }
     } catch {
       this.catalogBottle.set(null); // sheet still shows the basic chip info
