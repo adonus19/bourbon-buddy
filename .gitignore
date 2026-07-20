@@ -90,3 +90,6 @@ pubsub-debug.log
 # Jest coverage output (functions)
 functions/coverage/
 functions/out-tsc/
+
+# graphify knowledge-graph output (regenerable; large)
+/graphify-out

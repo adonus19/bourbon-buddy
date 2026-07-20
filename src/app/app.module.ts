@@ -109,6 +109,24 @@ import { OnboardingModule } from './shared/onboarding.module';
         localCache: persistentLocalCache({
           tabManager: persistentMultipleTabManager(),
         }),
+        // BB-228: Safari blocks the WebChannel backchannel when it rides the
+        // Fetch API — "Fetch API cannot load .../Listen/channel ... due to
+        // access control checks" — so no realtime listener ever connects and
+        // the app renders only what IndexedDB already had.
+        //
+        // `useFetchStreams` defaults to TRUE in the browser build
+        // (`registerFirestore(variant, useFetchStreams = true)`), and
+        // `experimentalAutoDetectLongPolling` — already true by default — does
+        // NOT rescue this: it detects a *buffering proxy*, not a stream that is
+        // refused outright, so it never triggers the fallback. Requests just
+        // retry with backoff, which is where the multi-second stalls come from.
+        //
+        // `useFetchStreams: false` would be the narrower fix but it is not on
+        // the public `FirestoreSettings` type (internal to registerFirestore),
+        // so the supported escape hatch is forcing long polling — which routes
+        // off fetch streams onto XHR as a side effect. Costs some extra
+        // requests versus a live stream; correctness beats chattiness here.
+        experimentalForceLongPolling: true,
       });
       if (environment.useEmulators) {
         const { host, port } = environment.emulators.firestore;

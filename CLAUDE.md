@@ -10,6 +10,9 @@ Full specs live in [docs/](docs/). Read these before non-trivial work:
 - [docs/bourbon-buddy-data-model.md](docs/bourbon-buddy-data-model.md) — Firestore schemas + queries
 - [docs/bourbon-buddy-user-stories.md](docs/bourbon-buddy-user-stories.md) — stories + acceptance criteria
 - [docs/bourbon-buddy-iteration-plan.md](docs/bourbon-buddy-iteration-plan.md) — sprint plan / DoD
+- [docs/bourbon-buddy-epics-228-231.md](docs/bourbon-buddy-epics-228-231.md) — **active plan**
+  (BB-228 perf, BB-229 discreet spend, BB-230 sharing, BB-231 Angular upgrade);
+  source of truth for what's done vs. next — mark stories complete there
 
 ## Architecture
 - **NgModules with lazy-loaded feature modules** (not standalone) — deliberate choice.
@@ -90,3 +93,13 @@ Full specs live in [docs/](docs/). Read these before non-trivial work:
 - Firebase project aliases (`.firebaserc`): `dev` = bourbonbuddy-dev (default),
   `prod` = bourbon-buddy-prod (not created yet).
 - Test Security Rules / Functions against the emulator before deploying.
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
