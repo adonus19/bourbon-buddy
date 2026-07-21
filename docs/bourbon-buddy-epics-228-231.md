@@ -268,9 +268,12 @@ Every rung must be solvable.
 
 ### Stories
 
-- [ ] **BB-229a — Toggle + masked tile + persistence.**
+- [x] **BB-229a — Toggle + masked tile + persistence.** *(DONE — shipped with
+  the rest of Epic B; `cd761e9`)*
   Eye toggle top-right of the Total Spent card; masked `—` value; `spendPrivacy`
   persisted on the user doc via the existing profile listener.
+  Masking is `displaySpend()` in [spend-privacy.ts](../src/app/shared/utils/spend-privacy.ts),
+  a `masked(field)`-style check per the locked decision, not a one-off on the tile.
 - [x] **BB-229b — First-run "Who are we hiding this from?" modal.** *(DONE)*
   Three modes; the joke lives in the hints, not the labels (labels must work for
   whoever holds the phone). Shown only on the FIRST hide (`configured` gates it);
