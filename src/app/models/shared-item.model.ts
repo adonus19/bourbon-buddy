@@ -1,5 +1,7 @@
 import { Timestamp } from '@angular/fire/firestore';
 
+import { BourbonCategory } from './enums';
+
 /**
  * Friends-only in-app sharing (BB-230). What is shared is always the *catalog
  * bottle* — never the sharer's log entry (which carries their price paid, notes,
@@ -36,7 +38,7 @@ export interface SharedItem {
   bourbonId: string;
   bottleName: string;
   distillery: string | null;
-  category: string | null;
+  category: BourbonCategory | null;
 
   // Optional short message from the sharer.
   note?: string | null;

@@ -100,12 +100,16 @@ describe("shareBottleLogic (BB-230a)", () => {
     expect(sendNotificationToUser).toHaveBeenCalledTimes(1);
     const [uid, payload, type] = sendNotificationToUser.mock.calls[0] as [
       string,
-      { body: string; data: Record<string, string> },
+      { body: string; link: string; data: Record<string, string> },
       string,
     ];
     expect(uid).toBe(TO);
     expect(type).toBe("bottleShare");
     expect(payload.data).toMatchObject({ type: "bottleShare", bourbonId: "b1" });
+    // BB-230c: deep-links to the durable shared item so the recipient can act on
+    // it (the receive chooser), not to a generic list.
+    expect(payload.data.shareId).toBe("gen-1");
+    expect(payload.link).toBe("/shared/gen-1");
   });
 
   it("rejects sharing with someone who isn't a friend", async () => {

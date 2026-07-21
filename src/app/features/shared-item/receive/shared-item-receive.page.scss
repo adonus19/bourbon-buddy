@@ -1,0 +1,81 @@
+.receive__center,
+.receive__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 3rem 1rem;
+  text-align: center;
+
+  ion-icon {
+    font-size: 2.5rem;
+    color: var(--ion-color-medium);
+  }
+
+  p {
+    margin: 0;
+    color: var(--ion-color-medium);
+  }
+}
+
+.receive__bottle {
+  font-family: var(--font-display, inherit);
+  font-size: 1.6rem;
+  font-weight: 600;
+  margin: 0.25rem 0 0.5rem;
+}
+
+.receive__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.receive__chip {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border: 1px solid var(--color-cat-other, currentColor);
+  color: var(--color-cat-other, currentColor);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.receive__distillery {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary, var(--ion-color-medium));
+}
+
+.receive__rating {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+
+.receive__note {
+  margin: 0 0 1rem;
+  padding-left: 0.85rem;
+  border-left: 3px solid var(--color-accent, #c8873a);
+  color: var(--color-text-secondary, var(--ion-color-medium));
+  font-style: italic;
+}
+
+.receive__already {
+  font-size: 0.85rem;
+  color: var(--ion-color-medium);
+  margin: 0 0 1rem;
+}
+
+.receive__group {
+  margin-top: 1.5rem;
+
+  .eyebrow {
+    margin-bottom: 0.5rem;
+  }
+}
+
+.receive__skip {
+  margin-top: 1.5rem;
+}

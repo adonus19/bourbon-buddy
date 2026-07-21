@@ -432,9 +432,30 @@ Every rung must be solvable.
     by unit tests (functions emulator skipped).
   - **Deploy pending** (owner) — the `shareBottle` rating change redeploys the
     callable.
-- [ ] **BB-230c — Receive chooser.**
-  Cellar (Shelf / Journal / Graveyard as form presets) or Hunt List (Hunting /
-  Got Away).
+- [x] **BB-230c — Receive chooser.** *(DONE — functions + frontend; not yet deployed)*
+  **Built (per-share, via the notification deep-link — the browsable list is BB-230e):**
+  - Notification `bottleShare` link changed `/tabs/hunt-list?shared=1` → `/shared/{id}`
+    (the inbox tap and push both navigate by this link). **Redeploy needed.**
+  - `SharedItemsService` (`core/services/shared-items.service.ts`) — one-shot read
+    of `users/{me}/sharedItems/{id}` + `markStatus(imported|dismissed)`.
+  - `SharedItemReceivePage` at lazy route `/shared/:id` (authGuard+approvedGuard):
+    shows sharer, bottle, note, and their rating (if opted in), with the chooser —
+    **Cellar** (On my shelf / In my journal / In the graveyard → preset the log
+    form) and **Hunt List** (I'm hunting it → `actively_looking` / It got away →
+    `got_away`, added directly). Acting marks the share `imported`; "No thanks"
+    marks it `dismissed`.
+  - `cellarIntentPreset` util (`shared/utils/shared-receive.ts`) — the pure
+    intent→form mapping (Shelf/Journal/Graveyard are DERIVED from entryType +
+    bottleRemainingPct, not stored): shelf→purchased+100, graveyard→purchased+0,
+    journal→drink.
+  - add-entry gained a `?fromShared={id}&intent=` prefill path mirroring
+    `?fromWishlist=`; presets identity + entryType + remaining, then
+    auto-populates flavors.
+  - Tests: `shared-items.service.spec` (4), `shared-receive.spec` (4),
+    `shared-item-receive.page.spec` (4), notification-link assertion in
+    `sharing.spec`. Functions 298 green; `ng build` clean; add-entry specs fixed
+    for the new dependency (21 green).
+  - **Deploy pending** (owner) — the notification-link change redeploys `shareBottle`.
 - [ ] **BB-230d — Share the full Hunt List** as a frozen snapshot.
 - [ ] **BB-230e — "Shared with me" segment** in the Hunt List page: grouped by
   sharer with metadata, collapsible, all but the top group collapsed by default;

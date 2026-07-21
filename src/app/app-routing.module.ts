@@ -70,6 +70,15 @@ const routes: Routes = [
       ),
   },
   {
+    // Receive a shared bottle (BB-230c) — the bottleShare notification deep-links here.
+    path: 'shared/:id',
+    canActivate: [authGuard, approvedGuard],
+    loadChildren: () =>
+      import('./features/shared-item/shared-item.module').then(
+        (m) => m.SharedItemPageModule
+      ),
+  },
+  {
     path: 'entry/:id/edit',
     canActivate: [authGuard, approvedGuard],
     loadChildren: () =>
