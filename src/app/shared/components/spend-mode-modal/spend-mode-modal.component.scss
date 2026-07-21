@@ -1,0 +1,78 @@
+.mode {
+  padding: 20px 18px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  &__close {
+    background: transparent;
+    border: 0;
+    padding: 6px;
+    line-height: 0;
+    color: var(--color-text-secondary);
+
+    ion-icon {
+      font-size: 22px;
+    }
+  }
+
+  &__title {
+    font-family: var(--font-display);
+    font-size: 24px;
+    margin: 0;
+    color: var(--color-text-primary);
+  }
+
+  &__body {
+    margin: 0;
+    font-size: 15px;
+    color: var(--color-text-secondary);
+  }
+
+  &__choices {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 4px;
+  }
+
+  // Full-width tap targets: the hint is the joke, so it has to be readable
+  // rather than squeezed onto a button label.
+  &__choice {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    text-align: left;
+    padding: 14px;
+    border-radius: var(--radius-card);
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-surface);
+
+    &:active {
+      border-color: var(--color-amber);
+    }
+  }
+
+  &__choice-label {
+    font-size: 16px;
+    color: var(--color-text-primary);
+  }
+
+  &__choice-hint {
+    font-size: 13px;
+    line-height: 1.35;
+    color: var(--color-text-secondary);
+  }
+
+  &__foot {
+    margin: 6px 0 0;
+    font-size: 12px;
+    color: var(--color-text-secondary);
+  }
+}

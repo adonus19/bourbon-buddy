@@ -25,8 +25,10 @@ import {
   spendPrivacyOf,
 } from '../../shared/utils/spend-privacy';
 import { GauntletSources } from '../../shared/utils/gauntlet';
+import { SpendPrivacyMode } from '../../models';
 import { releaseRadar } from '../../shared/utils/release-radar';
 import { SpendGauntletComponent } from '../../shared/components/spend-gauntlet/spend-gauntlet.component';
+import { SpendModeModalComponent } from '../../shared/components/spend-mode-modal/spend-mode-modal.component';
 import {
   ActivityRange,
   MonthActivity,
@@ -320,9 +322,26 @@ export class NumbersPage implements ViewDidEnter {
     // still true, and tapping then must re-hide rather than re-reveal.
     if (!this.spendHidden()) {
       this.revealedThisSession.set(false);
-      if (!this.spendPrivacy().hidden) {
-        await this.users.setSpendPrivacy(uid, { hidden: true });
+      const privacy = this.spendPrivacy();
+      if (privacy.hidden) {
+        return; // was only visible via a session reveal; nothing to store
       }
+
+      // First time hiding: ask who we're hiding from before committing, since
+      // the answer decides whether every future reveal costs a tap or a minute.
+      if (!privacy.configured) {
+        const mode = await this.askSpendMode();
+        if (!mode) {
+          return; // dismissed — never silently assign a mode
+        }
+        await this.users.setSpendPrivacy(uid, {
+          hidden: true,
+          mode,
+          configured: true,
+        });
+        return;
+      }
+      await this.users.setSpendPrivacy(uid, { hidden: true });
       return;
     }
 
@@ -336,6 +355,19 @@ export class NumbersPage implements ViewDidEnter {
     // partner + plain reveal instantly — a partner mode that made you solve
     // puzzles while someone waits would be worse than not hiding at all.
     this.revealedThisSession.set(true);
+  }
+
+  /** First-run mode picker (BB-229b). Null when dismissed without choosing. */
+  private async askSpendMode(): Promise<SpendPrivacyMode | null> {
+    const modal = await this.modalCtrl.create({
+      component: SpendModeModalComponent,
+      breakpoints: [0, 0.6],
+      initialBreakpoint: 0.6,
+      cssClass: 'glass-modal',
+    });
+    await modal.present();
+    const { data, role } = await modal.onDidDismiss<SpendPrivacyMode>();
+    return role === 'chosen' && data ? data : null;
   }
 
   /**

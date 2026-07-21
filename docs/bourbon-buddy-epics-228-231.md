@@ -13,7 +13,7 @@
 | Epic | Theme | Stories | Status |
 |---|---|---|---|
 | A — BB-228 | Radar / preview-sheet load time | 4 | **Complete** |
-| B — BB-229 | Discreet Total Spent | 4 | In progress (a, c, d done) |
+| B — BB-229 | Discreet Total Spent | 4 | **Complete** |
 | C — BB-230 | Sharing (friends-only) | 6 | Not started |
 | D — BB-231 | Angular 20.3 → latest migration | 1 | Deferred — last |
 | E — BB-232 | Turn the service worker on | 1 | Deferred — owner decision |
@@ -271,8 +271,18 @@ Every rung must be solvable.
 - [ ] **BB-229a — Toggle + masked tile + persistence.**
   Eye toggle top-right of the Total Spent card; masked `—` value; `spendPrivacy`
   persisted on the user doc via the existing profile listener.
-- [ ] **BB-229b — First-run "Who are we hiding this from?" modal.**
-  Three modes above; copy pass.
+- [x] **BB-229b — First-run "Who are we hiding this from?" modal.** *(DONE)*
+  Three modes; the joke lives in the hints, not the labels (labels must work for
+  whoever holds the phone). Shown only on the FIRST hide (`configured` gates it);
+  dismissing cancels the hide rather than defaulting a mode — `self` costs a
+  minute per reveal and nobody should land in it by closing a sheet. Self-mode
+  hint states the real cost up front: "All seven stages, every time."
+
+  **Verified end-to-end 2026-07-20** (emulators, seeded user, $145 total):
+  $145 → mode modal → "Me. I don't want to know." → masked `—` → tap reveal →
+  gauntlet opens → 3 wrong phrases → escape hatch ("Alright, you've suffered
+  enough.") → $145 revealed. Partner/plain reveal instantly; confirmed the
+  self path runs the gauntlet and the others don't.
 - [x] **BB-229c — The gauntlet.** *(DONE — self mode only; partner and plain skip it)*
 
   **Shape (owner-corrected 2026-07-20):** ONE reveal runs **all seven stages,

@@ -43,21 +43,25 @@ import { UserService } from '../../core/services/user.service';
 import { NumbersPage } from './numbers.page';
 
 /**
- * BB-229a — the Total Spent tile's hide/reveal behaviour. The formatting and
- * masking rules live in `spend-privacy.spec.ts`; this covers the wiring that
- * pure functions can't: what persists, what doesn't, and what the tile shows.
+ * BB-229a/b/c — the Total Spent tile: hide, first-run mode picker, and the
+ * self-mode gauntlet gate. Masking and formatting rules live in
+ * `spend-privacy.spec.ts` and puzzle generation in `gauntlet.spec.ts`; this
+ * covers the wiring pure functions can't — what persists, what doesn't, and
+ * which modal a given mode opens.
  */
-describe('NumbersPage — Discreet Total Spent (BB-229a)', () => {
+describe('NumbersPage — Discreet Total Spent (BB-229)', () => {
   let page: NumbersPage;
   let users: { setSpendPrivacy: jest.Mock };
   let modalCtrl: { create: jest.Mock };
   let gauntletRole: 'revealed' | 'cancel' = 'revealed';
+  let modeChoice: 'partner' | 'self' | 'plain' | null = 'plain';
   let profile: ReturnType<typeof signal<Partial<UserProfile> | undefined>>;
 
   // Reset between tests — a leaked 'cancel' would silently change what a later
   // test is actually asserting.
   beforeEach(() => {
     gauntletRole = 'revealed';
+    modeChoice = 'plain';
   });
 
   function setup(
@@ -69,9 +73,16 @@ describe('NumbersPage — Discreet Total Spent (BB-229a)', () => {
     );
     users = { setSpendPrivacy: jest.fn().mockResolvedValue(undefined) };
     modalCtrl = {
-      create: jest.fn().mockResolvedValue({
-        present: jest.fn().mockResolvedValue(undefined),
-        onDidDismiss: jest.fn().mockResolvedValue({ role: gauntletRole }),
+      create: jest.fn().mockImplementation(({ component }) => {
+        const isModePicker = component?.name?.includes('SpendModeModal');
+        return Promise.resolve({
+          present: jest.fn().mockResolvedValue(undefined),
+          onDidDismiss: jest.fn().mockResolvedValue(
+            isModePicker
+              ? { data: modeChoice, role: modeChoice ? 'chosen' : 'cancel' }
+              : { role: gauntletRole }
+          ),
+        });
       }),
     };
 
@@ -122,9 +133,35 @@ describe('NumbersPage — Discreet Total Spent (BB-229a)', () => {
     expect(page.spendActionLabel()).toBe('Show total spent');
   });
 
-  it('persists hiding so it survives a reload', async () => {
+  it('asks who we are hiding from the first time, then persists both', async () => {
+    modeChoice = 'self';
+    setup(); // never configured
+    await page.toggleSpendPrivacy();
+
+    expect(modalCtrl.create).toHaveBeenCalledTimes(1);
+    expect(users.setSpendPrivacy).toHaveBeenCalledWith('u1', {
+      hidden: true,
+      mode: 'self',
+      configured: true,
+    });
+  });
+
+  it('cancels the hide outright when the mode picker is dismissed', async () => {
+    // Never silently assign a mode — `self` costs a minute per reveal, and
+    // nobody should land in it by closing a sheet.
+    modeChoice = null;
     setup();
     await page.toggleSpendPrivacy();
+
+    expect(users.setSpendPrivacy).not.toHaveBeenCalled();
+    expect(page.spendHidden()).toBe(false);
+  });
+
+  it('does not re-ask once a mode has been chosen', async () => {
+    setup({ hidden: false, mode: 'partner', configured: true });
+    await page.toggleSpendPrivacy();
+
+    expect(modalCtrl.create).not.toHaveBeenCalled();
     expect(users.setSpendPrivacy).toHaveBeenCalledWith('u1', { hidden: true });
   });
 
