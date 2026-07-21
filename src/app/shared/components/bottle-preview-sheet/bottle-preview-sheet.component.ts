@@ -11,6 +11,7 @@ import { PerfTraceService } from '../../../core/services/perf-trace.service';
 import { TasteMatchService } from '../../../core/services/taste-match.service';
 import { WishlistService } from '../../../core/services/wishlist.service';
 import { CATEGORY_DISPLAY } from '../../constants/category-display';
+import { ShareBottleModalComponent } from '../share-bottle-modal/share-bottle-modal.component';
 import {
   blendedProfileTags,
   consensusCount,
@@ -157,6 +158,24 @@ export class BottlePreviewSheetComponent {
     } finally {
       this.adding.set(false);
     }
+  }
+
+  /** Share this bottle with a friend (BB-230b). Opens over the preview sheet. */
+  async share(): Promise<void> {
+    const modal = await this.modalCtrl.create({
+      component: ShareBottleModalComponent,
+      componentProps: {
+        bottle: {
+          name: this.bottle.name,
+          bourbonId: this.bottle.bourbonId ?? this.catalogBottle()?.id ?? null,
+          distillery: this.bottle.distillery ?? null,
+          category: this.bottle.category ?? null,
+        },
+      },
+      breakpoints: [0, 0.9],
+      initialBreakpoint: 0.9,
+    });
+    await modal.present();
   }
 
   async close(): Promise<void> {

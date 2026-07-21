@@ -29,6 +29,7 @@ import {
   timeToKillDays,
 } from '../../../shared/utils/bottle-lifecycle';
 import { PourFormComponent } from '../../../shared/components/pour-form/pour-form.component';
+import { ShareBottleModalComponent } from '../../../shared/components/share-bottle-modal/share-bottle-modal.component';
 import { OnboardingService } from '../../../core/onboarding/onboarding.service';
 import { TIPS } from '../../../core/onboarding/tips.config';
 
@@ -237,6 +238,29 @@ export class LogEntryDetailPage {
 
   togglePours(): void {
     this.poursOpen.update((open) => !open);
+  }
+
+  /** Share this bottle with a friend (BB-230b) — with the rating opt-in. */
+  async share(): Promise<void> {
+    const e = this.entry();
+    if (!e) {
+      return;
+    }
+    const modal = await this.modalCtrl.create({
+      component: ShareBottleModalComponent,
+      componentProps: {
+        bottle: {
+          name: e.bourbonName,
+          bourbonId: e.bourbonId,
+          distillery: e.distillery ?? null,
+          category: e.category,
+        },
+        myRating: e.rating ?? null,
+      },
+      breakpoints: [0, 0.9],
+      initialBreakpoint: 0.9,
+    });
+    await modal.present();
   }
 
   async openPourForm(): Promise<void> {

@@ -38,6 +38,12 @@ export interface ShareBottleData {
     category?: string | null;
   };
   note?: string | null;
+  /**
+   * The sharer's own rating (0–5), included ONLY when they opt in (BB-230b).
+   * It's the sharer's own low-stakes opinion of a catalog bottle, so it's taken
+   * from the client (which already holds it) and merely range-validated here.
+   */
+  sharerRating?: number | null;
 }
 
 /**
@@ -94,6 +100,13 @@ export async function shareBottleLogic(
   const fromPub = (await db.doc(`publicProfiles/${fromUid}`).get()).data() ?? {};
   const note =
     typeof data.note === "string" ? data.note.trim().slice(0, NOTE_MAX) || null : null;
+  const sharerRating =
+    typeof data.sharerRating === "number" &&
+    Number.isFinite(data.sharerRating) &&
+    data.sharerRating >= 0 &&
+    data.sharerRating <= 5
+      ? data.sharerRating
+      : null;
 
   const shareRef = db.collection(`users/${toUid}/sharedItems`).doc();
   const limitRef = db.doc(`users/${fromUid}/rateLimits/shares`);
@@ -127,6 +140,7 @@ export async function shareBottleLogic(
       distillery: bottle.distillery,
       category: bottle.category,
       note,
+      sharerRating,
       status: "pending",
       createdAt: FieldValue.serverTimestamp(),
     });

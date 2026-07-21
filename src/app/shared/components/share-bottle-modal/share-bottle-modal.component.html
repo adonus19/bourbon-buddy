@@ -1,0 +1,90 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Share bottle</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="close()" aria-label="Close">
+        <ion-icon slot="icon-only" name="close"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <p class="share__bottle">{{ bottle.name }}</p>
+
+  @if (loading()) {
+    <div class="share__center">
+      <ion-spinner></ion-spinner>
+    </div>
+  } @else if (!friends().length) {
+    <div class="share__empty">
+      <ion-icon name="people-outline" aria-hidden="true"></ion-icon>
+      <p>Sharing is friends-only. Add a friend to send them a bottle.</p>
+      <ion-button fill="outline" (click)="goToFriends()">Find friends</ion-button>
+    </div>
+  } @else {
+    <p class="eyebrow">Share with</p>
+    <ion-list lines="full">
+      <ion-radio-group
+        [value]="selectedUid()"
+        (ionChange)="selectedUid.set($event.detail.value)"
+      >
+        @for (f of friends(); track f.uid) {
+          <ion-item>
+            <ion-avatar slot="start">
+              @if (f.avatarUrl) {
+                <img [src]="f.avatarUrl" [alt]="f.displayName" />
+              } @else {
+                <div class="share__avatar-fallback" aria-hidden="true">
+                  <ion-icon name="person"></ion-icon>
+                </div>
+              }
+            </ion-avatar>
+            <ion-label>
+              <h3>{{ f.displayName }}</h3>
+              @if (f.username) {
+                <p>&#64;{{ f.username }}</p>
+              }
+            </ion-label>
+            <ion-radio slot="end" [value]="f.uid"></ion-radio>
+          </ion-item>
+        }
+      </ion-radio-group>
+    </ion-list>
+
+    <ion-item lines="none">
+      <ion-textarea
+        label="Add a note (optional)"
+        labelPlacement="stacked"
+        [formControl]="note"
+        maxlength="280"
+        autoGrow="true"
+        placeholder="Thought you'd like this…"
+      ></ion-textarea>
+    </ion-item>
+
+    @if (myRating != null) {
+      <ion-item lines="none">
+        <ion-toggle
+          [checked]="includeRating()"
+          (ionChange)="includeRating.set($event.detail.checked)"
+        >
+          Include my rating ({{ myRating }}&#9733;)
+        </ion-toggle>
+      </ion-item>
+    }
+
+    <ion-button
+      class="share__submit"
+      expand="block"
+      [disabled]="!selectedUid() || busy()"
+      (click)="share()"
+    >
+      @if (busy()) {
+        <ion-spinner name="dots"></ion-spinner>
+      } @else {
+        Share
+      }
+    </ion-button>
+  }
+</ion-content>

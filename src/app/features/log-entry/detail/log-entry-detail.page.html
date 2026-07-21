@@ -5,6 +5,9 @@
     </ion-buttons>
     @if (entry()) {
       <ion-buttons slot="end">
+        <ion-button (click)="share()" aria-label="Share">
+          <ion-icon slot="icon-only" name="share-social-outline"></ion-icon>
+        </ion-button>
         <ion-button (click)="goToEdit()" aria-label="Edit">
           <ion-icon slot="icon-only" name="create-outline"></ion-icon>
         </ion-button>
