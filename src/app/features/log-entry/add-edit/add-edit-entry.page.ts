@@ -33,6 +33,11 @@ import {
   fieldRulesFor,
 } from './entry-field-rules';
 import { foundItPrefill } from './found-it-prefill';
+import { SharedItemsService } from '../../../core/services/shared-items.service';
+import {
+  cellarIntentPreset,
+  isCellarIntent,
+} from '../../../shared/utils/shared-receive';
 
 @Component({
   selector: 'app-add-edit-entry',
@@ -47,6 +52,7 @@ export class AddEditEntryPage {
   private readonly scanner = inject(BarcodeScannerService);
   private readonly storage = inject(StorageService);
   private readonly wishlist = inject(WishlistService);
+  private readonly sharedItems = inject(SharedItemsService);
   private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -71,6 +77,12 @@ export class AddEditEntryPage {
   // identity + spec into a fresh purchase instance, linked via repurchaseOfEntryId.
   readonly buyAgainFromId = this.route.snapshot.queryParamMap.get('buyAgainFrom');
   private repurchaseOfEntryId: string | null = null;
+
+  // Receive a shared bottle (BB-230c): /entry/new?fromShared={id}&intent={shelf|
+  // journal|graveyard} presets the form from the shared catalog bottle, with the
+  // intent choosing entryType + bottleRemainingPct (the derived cellar view).
+  readonly fromSharedId = this.route.snapshot.queryParamMap.get('fromShared');
+  private readonly sharedIntent = this.route.snapshot.queryParamMap.get('intent');
 
   saving = false;
 
@@ -247,7 +259,40 @@ export class AddEditEntryPage {
           void this.prefillFromRebuy(e);
         }
       });
+    } else if (!this.editId && this.fromSharedId) {
+      // One-shot read (not a signal), so no effect needed — fetch and preset once.
+      this.patched = true;
+      void this.prefillFromShared(this.fromSharedId);
     }
+  }
+
+  /**
+   * Receive a shared bottle (BB-230c): preset the form from the shared catalog
+   * bottle, with the chosen intent driving entryType + bottleRemainingPct (the
+   * derived cellar view). Best-effort — a missing/removed share leaves a blank
+   * form rather than erroring.
+   */
+  private async prefillFromShared(shareId: string): Promise<void> {
+    const item = await this.sharedItems.get(shareId).catch(() => null);
+    if (!item) {
+      return;
+    }
+    const intent = isCellarIntent(this.sharedIntent) ? this.sharedIntent : 'shelf';
+    const preset = cellarIntentPreset(intent);
+    const catalogDoc = await this.catalog.getById(item.bourbonId).catch(() => null);
+    this.form.patchValue({
+      bourbonId: item.bourbonId,
+      bourbonName: item.bottleName,
+      distillery: item.distillery ?? catalogDoc?.distillery ?? '',
+      ...(item.category || catalogDoc?.category
+        ? { category: item.category ?? catalogDoc?.category }
+        : {}),
+      entryType: preset.entryType,
+      ...(preset.bottleRemainingPct != null
+        ? { bottleRemainingPct: preset.bottleRemainingPct }
+        : {}),
+    });
+    void this.autoPopulateFlavors(item.bourbonId);
   }
 
   /**

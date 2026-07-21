@@ -1,0 +1,69 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/tabs/dispatch"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Shared with you</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  @if (loading()) {
+    <div class="receive__center"><ion-spinner></ion-spinner></div>
+  } @else if (!item(); as _) {
+    <div class="receive__empty">
+      <ion-icon name="wine-outline" aria-hidden="true"></ion-icon>
+      <p>This share isn't available anymore.</p>
+      <ion-button fill="outline" routerLink="/tabs/dispatch">Back to the app</ion-button>
+    </div>
+  } @else {
+    <p class="eyebrow">{{ sharerLabel() }} shared</p>
+    <h1 class="receive__bottle">{{ item()!.bottleName }}</h1>
+    <div class="receive__meta">
+      @if (categoryLabel(); as label) {
+        <span class="receive__chip">{{ label }}</span>
+      }
+      @if (item()!.distillery) {
+        <span class="receive__distillery">{{ item()!.distillery }}</span>
+      }
+    </div>
+
+    @if (item()!.sharerRating != null) {
+      <p class="receive__rating">Their rating: {{ item()!.sharerRating }}&#9733;</p>
+    }
+    @if (item()!.note) {
+      <blockquote class="receive__note">"{{ item()!.note }}"</blockquote>
+    }
+
+    @if (item()!.status !== 'pending') {
+      <p class="receive__already">You've already handled this one — pick again to redo it.</p>
+    }
+
+    <section class="receive__group">
+      <p class="eyebrow">Add to your cellar</p>
+      <ion-button expand="block" fill="outline" [disabled]="busy()" (click)="receiveToCellar('shelf')">
+        On my shelf
+      </ion-button>
+      <ion-button expand="block" fill="outline" [disabled]="busy()" (click)="receiveToCellar('journal')">
+        In my journal
+      </ion-button>
+      <ion-button expand="block" fill="outline" [disabled]="busy()" (click)="receiveToCellar('graveyard')">
+        In the graveyard
+      </ion-button>
+    </section>
+
+    <section class="receive__group">
+      <p class="eyebrow">Add to your hunt list</p>
+      <ion-button expand="block" fill="outline" [disabled]="busy()" (click)="receiveToHuntList('actively_looking')">
+        I'm hunting it
+      </ion-button>
+      <ion-button expand="block" fill="outline" [disabled]="busy()" (click)="receiveToHuntList('got_away')">
+        It got away
+      </ion-button>
+    </section>
+
+    <ion-button class="receive__skip" expand="block" fill="clear" color="medium" [disabled]="busy()" (click)="dismiss()">
+      No thanks
+    </ion-button>
+  }
+</ion-content>

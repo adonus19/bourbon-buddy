@@ -38,6 +38,7 @@ import { BourbonCatalogService } from '../../../core/services/bourbon-catalog.se
 import { BarcodeScannerService } from '../../../core/services/barcode-scanner.service';
 import { StorageService } from '../../../core/services/storage.service';
 import { WishlistService } from '../../../core/services/wishlist.service';
+import { SharedItemsService } from '../../../core/services/shared-items.service';
 import { AuthService } from '../../../core/auth/auth.service';
 
 function configure(opts: {
@@ -61,6 +62,10 @@ function configure(opts: {
       { provide: BarcodeScannerService, useValue: {} },
       { provide: StorageService, useValue: {} },
       { provide: WishlistService, useValue: { selectById: () => signal(null) } },
+      {
+        provide: SharedItemsService,
+        useValue: { get: jest.fn().mockResolvedValue(null), markStatus: jest.fn() },
+      },
       { provide: AuthService, useValue: { snapshotUser: { uid: 'u1' } } },
       { provide: ActivatedRoute, useValue: route },
       { provide: Router, useValue: {} },

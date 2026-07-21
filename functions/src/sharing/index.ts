@@ -154,7 +154,9 @@ export async function shareBottleLogic(
     {
       title: "A bottle came your way",
       body: `${who} shared ${bottle.name} with you.`,
-      link: "/tabs/hunt-list?shared=1",
+      // Deep-links to the durable shared item so the recipient lands on the
+      // receive chooser (BB-230c), not a generic list.
+      link: `/shared/${shareRef.id}`,
       data: {
         type: "bottleShare",
         shareId: shareRef.id,
