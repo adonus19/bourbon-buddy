@@ -302,6 +302,55 @@ describe("applyArticleSeed (BB-222 trust tiers)", () => {
     expect(prov.seededArticleIds[0]).toBe("a2");
     expect(prov.seededArticleIds[29]).toBe("a31");
   });
+
+  // BB-233 backfill: a force re-extraction re-seeds an article that was already
+  // counted, now carrying the finish the old schema dropped. remerge unions the
+  // new tags into the arrays WITHOUT re-bumping counts or seededArticleIds — so
+  // finish is recovered while the "never double-count" invariant holds.
+  it("remerge: recovers newly-captured finish without double-counting", () => {
+    const first = applyArticleSeed(
+      empty,
+      noProv,
+      { nose: ["Banana"], palate: ["Corn"], finish: [] },
+      "a1",
+      true
+    );
+    expect(first.tags.finish).toEqual([]); // old schema dropped finish
+
+    const withFinish = { nose: ["Banana"], palate: ["Corn"], finish: ["Oak"] };
+    const backfilled = applyArticleSeed(
+      first.tags,
+      first.provenance,
+      withFinish,
+      "a1",
+      true,
+      false,
+      true // remerge
+    );
+    expect(backfilled.changed).toBe(true);
+    expect(backfilled.tags.finish).toEqual(["Oak"]); // finish recovered
+    // Counts and idempotency ledger are untouched — the review was already counted.
+    expect(backfilled.provenance.tagCounts).toEqual({ Banana: 1, Corn: 1 });
+    expect(backfilled.provenance.reviewCount).toBe(1);
+    expect(backfilled.provenance.seededArticleIds).toEqual(["a1"]);
+  });
+
+  it("remerge: no-op (changed=false) when the re-seed adds no new tags", () => {
+    const seed3 = { nose: ["Banana"], palate: ["Corn"], finish: ["Oak"] };
+    const first = applyArticleSeed(empty, noProv, seed3, "a1", true);
+    const again = applyArticleSeed(
+      first.tags,
+      first.provenance,
+      seed3,
+      "a1",
+      true,
+      false,
+      true // remerge, identical tags
+    );
+    expect(again.changed).toBe(false);
+    expect(again.tags).toEqual(first.tags);
+    expect(again.provenance.reviewCount).toBe(1);
+  });
 });
 
 describe("applyEnrichment — AI is a last resort (BB-227)", () => {

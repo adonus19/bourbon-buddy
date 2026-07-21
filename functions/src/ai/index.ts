@@ -383,7 +383,11 @@ async function sweepUnprocessed(
       skipped++;
       continue; // already extracted (force re-extracts anyway)
     }
-    const n = await processArticle(db, doc.ref, data, apiKey);
+    const n = await processArticle(db, doc.ref, data, apiKey, {
+      // Force re-extraction re-merges recovered tags (BB-233 finish backfill)
+      // and logs the raw envelope; the ordinary sweep does neither.
+      remerge: opts.force,
+    });
     if (n === RATE_LIMITED) {
       rateLimited = true;
       break; // stop hammering a limited quota; unprocessed docs stay for later
@@ -407,7 +411,11 @@ async function processArticle(
   db: FirebaseFirestore.Firestore,
   ref: FirebaseFirestore.DocumentReference,
   article: FirebaseFirestore.DocumentData | undefined,
-  apiKey: string
+  apiKey: string,
+  // BB-233: a force/backfill re-extraction re-seeds already-counted articles so
+  // their profiles gain the finish the old schema dropped, and logs the raw
+  // model envelope. Off for the steady-state onCreate + sweep paths.
+  opts: { remerge?: boolean } = {}
 ): Promise<number> {
   if (!article) {
     return -1;
@@ -440,7 +448,11 @@ async function processArticle(
   let extracted: ExtractedBottle[];
   let articleType: string;
   try {
-    ({ articleType, bottles: extracted } = await extractBottleNames(text, apiKey));
+    ({ articleType, bottles: extracted } = await extractBottleNames(
+      text,
+      apiKey,
+      opts.remerge
+    ));
   } catch (err) {
     if (err instanceof RateLimitError) {
       return RATE_LIMITED; // caller decides whether to stop / retry later
@@ -476,7 +488,8 @@ async function processArticle(
         match.id,
         raw.flavor,
         ref.id,
-        articleType !== "press_release"
+        articleType !== "press_release",
+        opts.remerge
       );
     } catch (err) {
       logger.warn(`Flavor seed failed for ${match.id}`, err);
@@ -668,7 +681,10 @@ async function seedArticleFlavor(
   bourbonId: string,
   rawFlavor: unknown,
   articleId: string,
-  evaluative: boolean
+  evaluative: boolean,
+  // BB-233: a force re-extraction re-merges an already-counted article's tags so
+  // the profile picks up the finish the old schema dropped, without double-counting.
+  remerge = false
 ): Promise<FlavorTags | null> {
   const seed = articleFlavorSeed(rawFlavor);
   if (!seed) {
@@ -684,7 +700,15 @@ async function seedArticleFlavor(
   // null/empty profile (nothing to replace). Community-only profiles also carry
   // no article notes, but they live in userTags (untouched by the arrays here).
   const aiOnly = hasTags(existing) && !hasArticleNotes(prov);
-  const res = applyArticleSeed(existing, prov, seed, articleId, evaluative, aiOnly);
+  const res = applyArticleSeed(
+    existing,
+    prov,
+    seed,
+    articleId,
+    evaluative,
+    aiOnly,
+    remerge
+  );
   if (!res.changed) {
     return hasTags(existing) ? existing : null; // nothing new — skip the write
   }
@@ -717,7 +741,8 @@ async function seedArticleFlavor(
  */
 async function extractBottleNames(
   text: string,
-  apiKey: string
+  apiKey: string,
+  logEnvelope = false
 ): Promise<{ articleType: string; bottles: ExtractedBottle[] }> {
   const content =
     (await generateText(apiKey, {
@@ -732,6 +757,13 @@ async function extractBottleNames(
       temperature: 0.15,
       responseSchema: EXTRACTION_RESPONSE_SCHEMA,
     })) || "{}";
+  // BB-233: on a force/backfill run, log the raw model envelope so we can
+  // confirm `finish` is now present in the model output (the schema fix). Only
+  // on the operator-triggered path — never in the steady-state sweep — so it
+  // stays diagnostic, not noise.
+  if (logEnvelope) {
+    logger.info(`[BB-233] raw extraction envelope: ${content.slice(0, 4000)}`);
+  }
   // The article text doubles as the verbatim-fact verifier (BB-219).
   return {
     articleType: parseArticleType(content),

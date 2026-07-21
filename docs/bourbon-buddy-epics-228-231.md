@@ -17,7 +17,7 @@
 | C — BB-230 | Sharing (friends-only) | 6 | Not started |
 | D — BB-231 | Angular 20.3 → latest migration | 1 | Deferred — last |
 | E — BB-232 | Turn the service worker on | 1 | Deferred — owner decision |
-| F — BB-233 | Article flavor profiles missing Finish | 1 | Queued — after Epic B |
+| F — BB-233 | Article flavor profiles missing Finish | 1 | Code landed — owner backfill/verify pending |
 
 **Working agreement for every story:** TDD (test first), `ng build` clean before
 done, then drive it through the `verify` skill against the emulators. Branch
@@ -496,36 +496,62 @@ explicitly request all three stages:
 
 So this is not a missing field in the request.
 
-### Leading hypothesis — truncation eats the last key
+### ROOT CAUSE (found 2026-07-21) — the extraction `flavor` sub-schema left `finish` OPTIONAL
 
-`finish` is the **last** property of each bottle's `flavor` object in both the
-schema and the prompt's example JSON. Any output truncation or token cap
-therefore drops `finish` FIRST, and does so consistently for every bottle —
-which matches the reported symptom exactly (never partial, never a different
-stage, always finish).
+The truncation hypothesis below was **ruled out**, and the true cause is one
+schema difference between the two AI paths:
 
-This codebase already has this failure mode: BB-227 fixed listicle JSON
-truncation and added `repairTruncatedEnvelope()` in `extraction.ts`. A repair
-that salvages the envelope but leaves each bottle's trailing `finish` empty
-would look precisely like this.
+1. **Display is innocent.** `bottle-preview-sheet.component.html:41` renders
+   Finish identically to Nose/Palate (`@if (blendedTags().finish.length)`), so an
+   empty finish array simply renders as absence. The stored `finish` is genuinely
+   empty.
+2. **Truncation is NOT the cause.** Extraction runs at an **8192-token** cap
+   (`index.ts` `MAX_OUTPUT_TOKENS`) — 12 bottles fit easily. And when a reply *does*
+   truncate, `repairTruncatedEnvelope()` keeps only **complete** top-level bottles:
+   a single truncated bottle fails outright (→ retry), earlier bottles keep their
+   finish. Neither path can yield "every bottle, always finish empty."
+3. **The seed/merge/taxonomy path preserves finish** symmetrically
+   (`sanitizeFlavorTags` → `matchCanonicalTags` → `mergeFlavorTags`, all per-stage).
+   Taxonomy-drop can't be 100% systematic either — many review finishes are
+   canonical flavor words (oak, pepper, chocolate) that match.
+4. **True cause:** the `flavor` sub-object in `EXTRACTION_RESPONSE_SCHEMA`
+   (`extraction.ts`) declared `nose`/`palate`/`finish` but had **no `required`
+   array and no `propertyOrdering`**. Under Gemini's controlled decoding an
+   optional trailing property is dropped and ordering defaults to alphabetical, so
+   `finish` was systematically omitted. The **enrichment** schema
+   (`flavor-enrichment.ts:47-55`) lists `required: [nose, palate, finish]` and
+   captures finish fine — same model family, one schema difference, decisive.
 
-### Other candidate to check
+### FIX (landed 2026-07-21)
 
-The seed/merge path — `articleFlavorSeed()` / `applyArticleSeed()` in
-`flavor-enrichment.ts`, and the 6-tag-per-stage cap — could be dropping finish
-after a correct extraction. The display layer is likely innocent: the preview
-sheet renders finish only when non-empty
-(`bottle-preview-sheet.component.html`), so an empty array renders as absence.
+- **`extraction.ts`** — added `required: ["nose","palate","finish"]` +
+  `propertyOrdering: ["nose","palate","finish"]` to the flavor sub-object,
+  mirroring the working enrichment schema. A note-less article still yields
+  `finish: []`; a note-bearing one now always emits the key.
+- **`applyArticleSeed` (`flavor-enrichment.ts`)** — new `remerge` flag: a force
+  re-extraction re-seeds an already-counted article, unioning the newly-captured
+  finish into the arrays **without** re-bumping any count or `seededArticleIds`
+  (the "never double-count" invariant holds). Threaded through
+  `seedArticleFlavor` → `processArticle` → `sweepUnprocessed` (force ⇒ remerge).
+- **AC#1 fold-in** — `extractBottleNames` logs the raw model envelope on the
+  force/backfill path only (`[BB-233]`), so a backfill run *shows* finish
+  returning in real output.
+- Tests: extraction schema now asserted to require finish + pin order; a
+  truncation regression proves the repair never emits a 2-stage bottle; remerge
+  proves finish recovery with no double-count. Full functions suite green (284).
 
 ### Story
 
-- [ ] **BB-233 — Restore Finish on article-sourced flavor profiles.**
+- [~] **BB-233 — Restore Finish on article-sourced flavor profiles.** *(code
+  landed; **owner-driven deploy + backfill + Radar check remaining**)*
   **AC:**
-  - Confirm the cause with a real extraction — log the raw model envelope for a
-    known article and check whether `finish` is absent, empty, or dropped later
-  - Fix at the true layer (token budget / truncation repair / seed merge), not
-    by special-casing the display
-  - A regression test that a truncated envelope either preserves `finish` or
-    fails loudly rather than silently yielding a 2-stage profile
-  - Re-extract or backfill affected catalog docs so existing bottles gain finish
-  - Verify against a bottle the owner can check (e.g. Maker's Mark on Radar)
+  - [x] Cause confirmed (code-level; owner chose to fold the real-envelope check
+    into the backfill run rather than a separate paid call)
+  - [x] Fixed at the true layer (extraction schema), not the display
+  - [x] Regression test — truncated envelope drops the incomplete bottle rather
+    than silently yielding a 2-stage profile
+  - [ ] **Backfill (owner):** deploy functions to dev, then call
+    `backfillArticleBottles({ force: true, sinceHours: 48 })` (admin) to re-extract
+    recent articles — `force ⇒ remerge` recovers finish on already-seeded bottles.
+    Watch the `[BB-233] raw extraction envelope` logs to confirm finish is present.
+  - [ ] **Verify (owner):** re-check Maker's Mark on Radar shows a Finish line.

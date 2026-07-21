@@ -309,6 +309,13 @@ export interface SeedResult {
  * `replaceBase` (BB-227): when the existing arrays are an AI-only guess, the
  * caller sets this so the seed REPLACES them rather than merging under them — a
  * real note supersedes the guess, it never stacks below it.
+ *
+ * `remerge` (BB-233): a force re-extraction re-seeds an article that was already
+ * counted, now carrying tags the old schema dropped (finish). With it set, an
+ * already-seen articleId still unions its seed tags into the arrays — but WITHOUT
+ * re-bumping any count or the seededArticleIds ledger, so the "never double-count"
+ * invariant holds while the newly-captured finish is recovered. `changed` reflects
+ * whether the arrays actually gained anything.
  */
 export function applyArticleSeed(
   tags: FlavorTags,
@@ -316,9 +323,11 @@ export function applyArticleSeed(
   seed: FlavorTags,
   articleId: string,
   evaluative: boolean,
-  replaceBase = false
+  replaceBase = false,
+  remerge = false
 ): SeedResult {
-  if (provenance.seededArticleIds.includes(articleId)) {
+  const alreadySeeded = provenance.seededArticleIds.includes(articleId);
+  if (alreadySeeded && !remerge) {
     return { tags, provenance, changed: false };
   }
   const seedTags = [...new Set([...seed.nose, ...seed.palate, ...seed.finish])];
@@ -339,6 +348,17 @@ export function applyArticleSeed(
     ? { nose: [], palate: [], finish: [] }
     : tags;
   const mergedTags = mergeFlavorTags(base, seed);
+
+  // Re-seed of an already-counted article (BB-233 finish backfill): union the
+  // tags in, but leave every count and the seededArticleIds ledger untouched.
+  if (alreadySeeded) {
+    return {
+      tags: mergedTags,
+      provenance,
+      changed: !sameTags(mergedTags, tags),
+    };
+  }
+
   if (evaluative) {
     return {
       tags: mergedTags,
