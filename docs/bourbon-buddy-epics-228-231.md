@@ -545,8 +545,15 @@ schema difference between the two AI paths:
 - [~] **BB-233 — Restore Finish on article-sourced flavor profiles.** *(code
   landed; **owner-driven deploy + backfill + Radar check remaining**)*
   **AC:**
-  - [x] Cause confirmed (code-level; owner chose to fold the real-envelope check
-    into the backfill run rather than a separate paid call)
+  - [x] Cause confirmed against a **real model envelope** (2026-07-21): ran the
+    live `gemini-3.1-flash-lite` extraction with the fixed schema on a Maker's Mark
+    review — envelope returned
+    `finish: ["long","warming","lingering oak","dark chocolate","peppery kick"]`
+    (was omitted entirely pre-fix); a note-less announcement returned zero bottles
+    (no fabrication). **Follow-up noted:** some finish terms are length/texture
+    words ("long","warming") that `matchCanonicalTags` drops, but flavor words
+    survive (→ Oak, Dark Chocolate), so finish populates and renders — a minor
+    taxonomy-coverage polish, not a blocker.
   - [x] Fixed at the true layer (extraction schema), not the display
   - [x] Regression test — truncated envelope drops the incomplete bottle rather
     than silently yielding a 2-stage profile
