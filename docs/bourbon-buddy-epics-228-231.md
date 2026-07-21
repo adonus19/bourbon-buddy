@@ -557,8 +557,17 @@ schema difference between the two AI paths:
   - [x] Fixed at the true layer (extraction schema), not the display
   - [x] Regression test — truncated envelope drops the incomplete bottle rather
     than silently yielding a 2-stage profile
-  - [ ] **Backfill (owner):** deploy functions to dev, then call
-    `backfillArticleBottles({ force: true, sinceHours: 48 })` (admin) to re-extract
-    recent articles — `force ⇒ remerge` recovers finish on already-seeded bottles.
-    Watch the `[BB-233] raw extraction envelope` logs to confirm finish is present.
-  - [ ] **Verify (owner):** re-check Maker's Mark on Radar shows a Finish line.
+  - [x] **Backfill run 2026-07-21** (deployed dev; `invoke-backfill.js 60 60 force`,
+    server clamps `sinceHours` to `REPROCESS_MAX_HOURS = 48`). Ran 13:54→14:03,
+    hit the 540s timeout before the summary line (per-article writes persist; no
+    errors, no rate-limit). Live `[BB-233]` envelopes confirmed finish now emits on
+    every bottle: **populated** where the article had notes — The Lakes Chocolatier
+    `["dark chocolate"]`, Copperworks Farmsmith `["cereal","mealy"]` — and correctly
+    **empty** on announcements (Bulleit, Fireball, Old Forester 86, Skrewball), no
+    fabrication.
+  - [ ] **Verify (owner):** open The Lakes Chocolatier / Copperworks on Radar to
+    see the new Finish line. **Caveat:** the owner's original Maker's Mark
+    ("Based on 1 review") is sourced from an article >48h old, so it was NOT in
+    this window — it'll gain finish when a fresh article mentions it, or if we
+    widen the reprocess window. Deeper backfill = raise `REPROCESS_MAX_HOURS` (or
+    add an id-targeted reseed) + redeploy; deferred unless the owner wants it now.
