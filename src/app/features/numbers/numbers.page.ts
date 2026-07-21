@@ -9,10 +9,26 @@ import { Router } from '@angular/router';
 import { ViewDidEnter } from '@ionic/angular';
 import { ChartConfiguration } from 'chart.js';
 
+import { ModalController } from '@ionic/angular';
+
 import { StatsService } from '../../core/services/stats.service';
+import { LogEntryService } from '../../core/services/log-entry.service';
+import { NewsService } from '../../core/services/news.service';
+import { AuthService } from '../../core/auth/auth.service';
+import { UserService } from '../../core/services/user.service';
 import { OnboardingService } from '../../core/onboarding/onboarding.service';
 import { TIPS } from '../../core/onboarding/tips.config';
 import { cssVarValue } from '../../shared/utils/css-var';
+import {
+  displaySpend,
+  isSpendHidden,
+  spendPrivacyOf,
+} from '../../shared/utils/spend-privacy';
+import { GauntletSources } from '../../shared/utils/gauntlet';
+import { SpendPrivacyMode } from '../../models';
+import { releaseRadar } from '../../shared/utils/release-radar';
+import { SpendGauntletComponent } from '../../shared/components/spend-gauntlet/spend-gauntlet.component';
+import { SpendModeModalComponent } from '../../shared/components/spend-mode-modal/spend-mode-modal.component';
 import {
   ActivityRange,
   MonthActivity,
@@ -32,6 +48,22 @@ export class NumbersPage implements ViewDidEnter {
   private readonly router = inject(Router);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly onboarding = inject(OnboardingService);
+  private readonly auth = inject(AuthService);
+  private readonly users = inject(UserService);
+  private readonly log = inject(LogEntryService);
+  private readonly news = inject(NewsService);
+  private readonly modalCtrl = inject(ModalController);
+
+  /**
+   * Discreet Total Spent (BB-229). Derived from the profile listener
+   * AuthService already holds — no extra read, no listener of our own.
+   */
+  readonly spendPrivacy = computed(() => spendPrivacyOf(this.auth.profile()));
+  /** Transient: a reveal lasts for this visit only, never flipping `hidden`. */
+  readonly revealedThisSession = signal(false);
+  readonly spendHidden = computed(() =>
+    isSpendHidden(this.spendPrivacy(), this.revealedThisSession())
+  );
 
   readonly hasData = this.stats.hasData;
   readonly summary = this.stats.summary;
@@ -251,8 +283,137 @@ export class NumbersPage implements ViewDidEnter {
     }
   }
 
-  spent(): string {
+  /** The real figure, before any masking. */
+  private rawSpent(): string {
     return `$${Math.round(this.summary().totalSpent).toLocaleString()}`;
+  }
+
+  /** What the Total Spent tile renders — masked when hidden (BB-229). */
+  spent(): string {
+    return displaySpend(
+      this.rawSpent(),
+      this.spendPrivacy(),
+      this.revealedThisSession()
+    );
+  }
+
+  /** Eye icon reflects what tapping will do. */
+  spendActionIcon(): string {
+    return this.spendHidden() ? 'eye-outline' : 'eye-off-outline';
+  }
+
+  spendActionLabel(): string {
+    return this.spendHidden() ? 'Show total spent' : 'Hide total spent';
+  }
+
+  /**
+   * Corner-action tap. Hiding is immediate and persistent; revealing is
+   * session-only so the amount re-hides on the next visit rather than quietly
+   * undoing the user's setting.
+   */
+  async toggleSpendPrivacy(): Promise<void> {
+    const uid = this.auth.snapshotUser?.uid;
+    if (!uid) {
+      return;
+    }
+
+    // Branch on what is CURRENTLY DISPLAYED, not on the stored flag — while a
+    // session reveal is active the amount is visible even though `hidden` is
+    // still true, and tapping then must re-hide rather than re-reveal.
+    if (!this.spendHidden()) {
+      this.revealedThisSession.set(false);
+      const privacy = this.spendPrivacy();
+      if (privacy.hidden) {
+        return; // was only visible via a session reveal; nothing to store
+      }
+
+      // First time hiding: ask who we're hiding from before committing, since
+      // the answer decides whether every future reveal costs a tap or a minute.
+      if (!privacy.configured) {
+        const mode = await this.askSpendMode();
+        if (!mode) {
+          return; // dismissed — never silently assign a mode
+        }
+        await this.users.setSpendPrivacy(uid, {
+          hidden: true,
+          mode,
+          configured: true,
+        });
+        return;
+      }
+      await this.users.setSpendPrivacy(uid, { hidden: true });
+      return;
+    }
+
+    // Masked → reveal for this visit only. Turning the setting back OFF for
+    // good lives in Settings (BB-229d), deliberately: the tile's own control
+    // shouldn't be able to undo the choice as easily as it was made.
+    if (this.spendPrivacy().mode === 'self') {
+      await this.runGauntlet(uid);
+      return;
+    }
+    // partner + plain reveal instantly — a partner mode that made you solve
+    // puzzles while someone waits would be worse than not hiding at all.
+    this.revealedThisSession.set(true);
+  }
+
+  /** First-run mode picker (BB-229b). Null when dismissed without choosing. */
+  private async askSpendMode(): Promise<SpendPrivacyMode | null> {
+    const modal = await this.modalCtrl.create({
+      component: SpendModeModalComponent,
+      breakpoints: [0, 0.6],
+      initialBreakpoint: 0.6,
+      cssClass: 'glass-modal',
+    });
+    await modal.present();
+    const { data, role } = await modal.onDidDismiss<SpendPrivacyMode>();
+    return role === 'chosen' && data ? data : null;
+  }
+
+  /**
+   * Self mode (BB-229c): all seven stages, every time. A cancel leaves the
+   * amount masked and discards progress, so the next attempt starts over.
+   */
+  private async runGauntlet(uid: string): Promise<void> {
+    const modal = await this.modalCtrl.create({
+      component: SpendGauntletComponent,
+      componentProps: { sources: this.gauntletSources() },
+      cssClass: 'glass-modal',
+      backdropDismiss: false,
+    });
+    await modal.present();
+    const { role } = await modal.onDidDismiss();
+    if (role !== 'revealed') {
+      return;
+    }
+    this.revealedThisSession.set(true);
+    // Best-effort counter; failing to record a run must never block the reveal
+    // the user just earned.
+    void this.users
+      .setSpendPrivacy(uid, {
+        gauntletRuns: this.spendPrivacy().gauntletRuns + 1,
+      })
+      .catch(() => undefined);
+  }
+
+  /**
+   * Puzzle material, richest source first — all from already-loaded signals,
+   * so building a run costs zero reads.
+   */
+  private gauntletSources(): GauntletSources {
+    const entries = this.log.entries();
+    return {
+      rated: entries
+        .filter((e) => e.rating != null)
+        .map((e) => ({ name: e.bourbonName, rating: e.rating as number })),
+      priced: entries
+        .filter((e) => e.purchasePrice != null)
+        .map((e) => ({
+          name: e.bourbonName,
+          price: e.purchasePrice as number,
+        })),
+      radar: releaseRadar(this.news.articles()).map((r) => r.bottle.name),
+    };
   }
 
   avg(): string {

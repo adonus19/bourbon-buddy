@@ -39,6 +39,9 @@
           icon="cash-outline"
           [value]="spent()"
           label="Total spent"
+          [actionIcon]="spendActionIcon()"
+          [actionLabel]="spendActionLabel()"
+          (action)="toggleSpendPrivacy()"
         ></app-metric-card>
         <app-metric-card
           icon="star-outline"

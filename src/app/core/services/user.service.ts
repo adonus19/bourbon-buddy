@@ -12,7 +12,7 @@ import {
 import { User } from '@angular/fire/auth';
 import { Observable } from 'rxjs';
 
-import { SightingVisibility, UserProfile } from '../../models';
+import { SightingVisibility, SpendPrivacy, UserProfile } from '../../models';
 import { usernameKey } from '../../shared/utils/username';
 
 /** Thrown by `claimUsername` when the desired handle is already reserved. */
@@ -227,6 +227,27 @@ export class UserService {
       alertRadiusMiles: miles,
       updatedAt: serverTimestamp(),
     });
+  }
+
+  /**
+   * Updates the Discreet Total Spent setting (BB-229).
+   *
+   * Deliberately private-profile ONLY — this never touches `/publicProfiles`.
+   * Whether someone hides their spend is nobody else's business, and the public
+   * projection has no reason to carry it.
+   *
+   * Patch-merged with dot paths so a partial update (just `hidden`, just
+   * `tier`) can't blow away the rest of the map.
+   */
+  async setSpendPrivacy(
+    uid: string,
+    patch: Partial<SpendPrivacy>
+  ): Promise<void> {
+    const update: Record<string, unknown> = { updatedAt: serverTimestamp() };
+    for (const [key, value] of Object.entries(patch)) {
+      update[`spendPrivacy.${key}`] = value;
+    }
+    await updateDoc(this.userDocRef(uid), update);
   }
 
   /** Flips the discoverable-by-username opt-in on both profile docs. */

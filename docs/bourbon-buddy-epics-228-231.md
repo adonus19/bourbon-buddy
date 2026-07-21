@@ -13,10 +13,11 @@
 | Epic | Theme | Stories | Status |
 |---|---|---|---|
 | A — BB-228 | Radar / preview-sheet load time | 4 | **Complete** |
-| B — BB-229 | Discreet Total Spent | 4 | Not started |
+| B — BB-229 | Discreet Total Spent | 4 | **Complete** |
 | C — BB-230 | Sharing (friends-only) | 6 | Not started |
 | D — BB-231 | Angular 20.3 → latest migration | 1 | Deferred — last |
 | E — BB-232 | Turn the service worker on | 1 | Deferred — owner decision |
+| F — BB-233 | Article flavor profiles missing Finish | 1 | Queued — after Epic B |
 
 **Working agreement for every story:** TDD (test first), `ng build` clean before
 done, then drive it through the `verify` skill against the emulators. Branch
@@ -270,14 +271,66 @@ Every rung must be solvable.
 - [ ] **BB-229a — Toggle + masked tile + persistence.**
   Eye toggle top-right of the Total Spent card; masked `—` value; `spendPrivacy`
   persisted on the user doc via the existing profile listener.
-- [ ] **BB-229b — First-run "Who are we hiding this from?" modal.**
-  Three modes above; copy pass.
-- [ ] **BB-229c — The gauntlet.**
-  7-tier ladder, tier state + weekly reset; partner mode bypasses entirely.
-- [ ] **BB-229d — Escape hatch.**
-  Settings kill-switch (gauntlet once, then off forever) **and** a quiet "fine,
-  show me" after N failed attempts. Without this the feature traps users in their
+- [x] **BB-229b — First-run "Who are we hiding this from?" modal.** *(DONE)*
+  Three modes; the joke lives in the hints, not the labels (labels must work for
+  whoever holds the phone). Shown only on the FIRST hide (`configured` gates it);
+  dismissing cancels the hide rather than defaulting a mode — `self` costs a
+  minute per reveal and nobody should land in it by closing a sheet. Self-mode
+  hint states the real cost up front: "All seven stages, every time."
+
+  **Verified end-to-end 2026-07-20** (emulators, seeded user, $145 total):
+  $145 → mode modal → "Me. I don't want to know." → masked `—` → tap reveal →
+  gauntlet opens → 3 wrong phrases → escape hatch ("Alright, you've suffered
+  enough.") → $145 revealed. Partner/plain reveal instantly; confirmed the
+  self path runs the gauntlet and the others don't.
+- [x] **BB-229c — The gauntlet.** *(DONE — self mode only; partner and plain skip it)*
+
+  **Shape (owner-corrected 2026-07-20):** ONE reveal runs **all seven stages,
+  every time**, easy → absurd. There is no per-attempt tier counter and nothing
+  to resume — an earlier plan had the ladder escalating across attempts, which
+  was a misreading. Closing the sheet mid-run (e.g. to go look up which bottle
+  you rated highest) means **starting over at stage 1**. Repeating the same
+  questions on a restart is acceptable; fresh ones are better.
+
+  **Stages:** 1 tap · 2 double-confirm · 3 type `I can afford this` ·
+  4 arithmetic · 5 hold 10s · 6 pick-the-answer · 7 twenty-second cooldown
+  (owner confirmed 20s stands, on every reveal).
+
+  **Puzzle freshness — own-data + procedural, no AI.** Rationale: an AI puzzle
+  pool is per-user on-demand generation, the exact shape the extract-once cost
+  discipline exists to avoid, and a hallucinated answer key locks a user out of
+  their own data with nothing to validate against. Own-data is infinitely
+  varied, always correct (the database IS the answer key), personal, and free.
+  - stage 4 — random operands, generated client-side
+  - stage 3 — rotate a written phrase bank
+  - stage 6 — from the user's own cellar ("which of these did you rate
+    higher?" / "which cost you more?"); **fallback when cellar data is thin:
+    the Radar** ("which bottle is Nth on your Radar right now?"), whose answer
+    the app always knows. Fixed proof bank as the last resort.
+
+  **Escape hatch:** after 3 failures at any stage, a quiet "Fine, show me."
+  Copy should have a little edge — the user cannot hack it and we're bailing
+  them out — but no profanity and nothing suggestive.
+- [x] **BB-229d — Escape hatch.** *(DONE)*
+  Settings kill-switch **and** a quiet "fine, show me" after 3 failed attempts
+  (the latter ships with BB-229c). Without this the feature traps users in their
   own joke — this is an accessibility requirement, not a nicety.
+
+  **Built:** a "Total spent" section on the profile page — an unconditional
+  off-switch plus a mode selector shown only while hiding is on. Turning it off
+  clears ONLY `hidden`, so mode/`configured`/`gauntletRuns` survive and
+  re-hiding later doesn't re-interrogate the user.
+
+  **The exit is unconditional in every mode, including `self`** — guarded by a
+  regression test, because "make self mode harder to escape" is a tempting
+  future change that would defeat the story. The gauntlet is a commitment
+  device, not security: anyone can read purchase prices off their own cellar
+  entries, so gating this buys no real friction and only risks a genuine lockout.
+
+  **Owner addition (2026-07-20):** turning the switch off pops a confirmation
+  that acknowledges the loophole rather than pretending it isn't one —
+  *"Thought you could just come here and turn it off? …You're right."* — then
+  yes/no. Friction and a joke, not a barrier.
 
 ---
 
@@ -413,3 +466,63 @@ works fine — so this is a latent capability gap, not a live defect.
   - `AppUpdateService` verified end-to-end — a new deploy prompts an update
     rather than silently serving a stale shell
   - Verified on an installed iOS home-screen PWA, including the update path
+
+---
+
+# Epic F — BB-233: Article-extracted flavor profiles are missing Finish
+
+**Reported by owner 2026-07-20.** On a bottle opened from the Dispatch Feed or
+Radar, a flavor profile sourced from an article ("Based on 1 review") shows
+**Nose** and **Palate** but never **Finish**. Reproduced by the owner across
+every bottle checked (example: Maker's Mark, 3rd on Radar — "Nose: Lemon,
+vanilla, cocoa", Palate present, Finish absent).
+
+**Slated after Epic B (BB-229) by owner decision.**
+
+### What has already been ruled out
+
+The owner's hypothesis was that the model sees the word "Finish" and treats it
+as an end-of-output marker. The schemas say otherwise — **both** AI paths
+explicitly request all three stages:
+
+- `functions/src/ai/extraction.ts:193-195` — per-article bottle extraction
+  declares `nose`, `palate`, **`finish`** in the response schema, and the prompt
+  text at `:91-92` spells out the same shape.
+- `functions/src/ai/flavor-enrichment.ts:47-55` — the feed-(b) enrichment schema
+  declares all three and lists all three in `required`.
+
+So this is not a missing field in the request.
+
+### Leading hypothesis — truncation eats the last key
+
+`finish` is the **last** property of each bottle's `flavor` object in both the
+schema and the prompt's example JSON. Any output truncation or token cap
+therefore drops `finish` FIRST, and does so consistently for every bottle —
+which matches the reported symptom exactly (never partial, never a different
+stage, always finish).
+
+This codebase already has this failure mode: BB-227 fixed listicle JSON
+truncation and added `repairTruncatedEnvelope()` in `extraction.ts`. A repair
+that salvages the envelope but leaves each bottle's trailing `finish` empty
+would look precisely like this.
+
+### Other candidate to check
+
+The seed/merge path — `articleFlavorSeed()` / `applyArticleSeed()` in
+`flavor-enrichment.ts`, and the 6-tag-per-stage cap — could be dropping finish
+after a correct extraction. The display layer is likely innocent: the preview
+sheet renders finish only when non-empty
+(`bottle-preview-sheet.component.html`), so an empty array renders as absence.
+
+### Story
+
+- [ ] **BB-233 — Restore Finish on article-sourced flavor profiles.**
+  **AC:**
+  - Confirm the cause with a real extraction — log the raw model envelope for a
+    known article and check whether `finish` is absent, empty, or dropped later
+  - Fix at the true layer (token budget / truncation repair / seed merge), not
+    by special-casing the display
+  - A regression test that a truncated envelope either preserves `finish` or
+    fails loudly rather than silently yielding a 2-stage profile
+  - Re-extract or backfill affected catalog docs so existing bottles gain finish
+  - Verify against a bottle the owner can check (e.g. Maker's Mark on Radar)

@@ -8,6 +8,34 @@
   flex-direction: column;
   gap: 4px;
 
+  // Anchor for the optional corner action (BB-229).
+  &--has-action {
+    position: relative;
+  }
+
+  &__action {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    // Deliberately quiet: this sits on a stats tile, not a primary control.
+    background: transparent;
+    border: 0;
+    padding: 8px;
+    margin: 0;
+    line-height: 0;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    border-radius: 999px;
+
+    ion-icon {
+      font-size: 18px;
+    }
+
+    &:active {
+      color: var(--color-amber);
+    }
+  }
+
   &__icon {
     font-size: 20px;
     color: var(--color-amber);

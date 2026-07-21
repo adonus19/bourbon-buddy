@@ -1,0 +1,24 @@
+<ion-content>
+  <div class="mode">
+    <header class="mode__head">
+      <span class="eyebrow">Total spent</span>
+      <button class="mode__close" type="button" (click)="cancel()" aria-label="Close">
+        <ion-icon name="close" aria-hidden="true"></ion-icon>
+      </button>
+    </header>
+
+    <h2 class="mode__title">Hiding the damage?</h2>
+    <p class="mode__body">Fair enough. Who are we hiding it from?</p>
+
+    <div class="mode__choices">
+      @for (c of choices; track c.mode) {
+        <button class="mode__choice" type="button" (click)="choose(c.mode)">
+          <span class="mode__choice-label">{{ c.label }}</span>
+          <span class="mode__choice-hint">{{ c.hint }}</span>
+        </button>
+      }
+    </div>
+
+    <p class="mode__foot">You can change this any time in Settings.</p>
+  </div>
+</ion-content>
