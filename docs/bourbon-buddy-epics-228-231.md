@@ -455,6 +455,12 @@ Every rung must be solvable.
     `shared-item-receive.page.spec` (4), notification-link assertion in
     `sharing.spec`. Functions 298 green; `ng build` clean; add-entry specs fixed
     for the new dependency (21 green).
+  - **Verified live (verify skill, emulators, 2026-07-21):** seeded an approved
+    user + a pending shared item; logged in → deep-linked to `/shared/{id}` → the
+    chooser rendered the sharer (@bob), bottle, category, distillery, **their
+    rating (4.5★)**, the note, and both intent groups. Tapped "I'm hunting it" →
+    a wishlist entry was created and the app landed on the Hunt List showing the
+    bottle. Fully client-side (no functions emulator needed).
   - **Deploy pending** (owner) — the notification-link change redeploys `shareBottle`.
 - [ ] **BB-230d — Share the full Hunt List** as a frozen snapshot.
 - [ ] **BB-230e — "Shared with me" segment** in the Hunt List page: grouped by
