@@ -424,6 +424,12 @@ Every rung must be solvable.
   - Tests: `sharing.spec` (8, incl. rating validation), `sharing.service.spec`
     (2), `share-bottle-modal.component.spec` (4, incl. the rating opt-in branch).
     Functions + `ng build` clean; no regressions in touched specs.
+  - **Verified live (verify skill, emulators, 2026-07-21):** seeded an approved
+    user with a friend (Bob) + a rated Cellar entry; logged in → Cellar detail →
+    tapped Share → the modal rendered the bottle, the friend picker (Bob/@bob),
+    the note field, and the **"Include my rating (4.5★)" toggle** (present only
+    because the surface has a rating). The `shareBottle` write itself is covered
+    by unit tests (functions emulator skipped).
   - **Deploy pending** (owner) — the `shareBottle` rating change redeploys the
     callable.
 - [ ] **BB-230c — Receive chooser.**
