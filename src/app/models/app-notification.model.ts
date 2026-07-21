@@ -8,7 +8,10 @@ export type NotificationType =
   | 'newsDigest'
   // Gated access (BB-210): admin's new-signup alert AND the "you're in"
   // welcome. Operational — the server delivers it regardless of prefs.
-  | 'accessRequest';
+  | 'accessRequest'
+  // Friends-only sharing (BB-230): a friend shared a bottle or their hunt list.
+  | 'bottleShare'
+  | 'listShare';
 
 /**
  * In-app inbox record (BB-113). Written at /users/{uid}/notifications/{id} by
