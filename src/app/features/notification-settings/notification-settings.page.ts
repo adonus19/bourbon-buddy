@@ -50,6 +50,16 @@ export class NotificationSettingsPage implements OnInit {
       label: 'News digest',
       desc: 'A periodic roundup of bourbon news',
     },
+    {
+      key: 'bottleShare',
+      label: 'Shared bottles',
+      desc: 'A friend shares a bottle with you',
+    },
+    {
+      key: 'listShare',
+      label: 'Shared hunt lists',
+      desc: 'A friend shares their hunt list with you',
+    },
   ];
 
   async ngOnInit(): Promise<void> {

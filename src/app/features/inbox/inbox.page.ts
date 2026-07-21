@@ -12,6 +12,8 @@ const TYPE_ICON: Record<NotificationType, string> = {
   friendRequest: 'person-add',
   newsDigest: 'newspaper',
   accessRequest: 'key',
+  bottleShare: 'wine',
+  listShare: 'list',
 };
 
 /**

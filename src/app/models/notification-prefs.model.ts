@@ -9,6 +9,8 @@ export interface NotificationPrefs {
   tasteMatch: boolean; // a friend spots a bottle matching your taste (BB-199)
   friendRequest: boolean; // someone sends you a friend request
   newsDigest: boolean; // periodic news digest
+  bottleShare: boolean; // a friend shares a bottle with you (BB-230)
+  listShare: boolean; // a friend shares their hunt list with you (BB-230)
   pausedAll: boolean; // master pause
 }
 
@@ -18,6 +20,8 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
   tasteMatch: false,
   friendRequest: false,
   newsDigest: false,
+  bottleShare: false,
+  listShare: false,
   pausedAll: false,
 };
 

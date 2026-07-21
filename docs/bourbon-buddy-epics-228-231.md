@@ -14,7 +14,7 @@
 |---|---|---|---|
 | A — BB-228 | Radar / preview-sheet load time | 4 | **Complete** |
 | B — BB-229 | Discreet Total Spent | 4 | **Complete** |
-| C — BB-230 | Sharing (friends-only) | 6 | Not started |
+| C — BB-230 | Sharing (friends-only) | 6 | In progress — 230a done (foundation) |
 | D — BB-231 | Angular 20.3 → latest migration | 1 | Deferred — last |
 | E — BB-232 | Turn the service worker on | 1 | Deferred — owner decision |
 | F — BB-233 | Article flavor profiles missing Finish | 1 | Code landed — owner backfill/verify pending |
@@ -373,10 +373,38 @@ Every rung must be solvable.
 
 ### Stories
 
-- [ ] **BB-230a — Schema + callables.**
-  `/users/{uid}/sharedItems/{id}`; `shareBottle` / `shareList` callables with
-  server-side `findOrCreate`, block enforcement, rate limit, size cap. New
-  `bottleShare` / `listShare` notification types + prefs. Rules + indexes.
+- [x] **BB-230a — Schema + callables.** *(DONE — functions + tests; not yet deployed)*
+  **Built:**
+  - `SharedItem` model (`src/app/models/shared-item.model.ts`) at
+    `/users/{recipientUid}/sharedItems/{id}` — durable state that outlives the
+    30-day notification TTL; `kind: 'bottle' | 'list'`, denormalized sharer +
+    bottle, `status: pending|imported|dismissed`, reserved `sharerRating`.
+  - `shareBottle` callable (`functions/src/sharing/index.ts`) as an extracted,
+    unit-tested `shareBottleLogic` behind a thin onCall (codebase pattern):
+    `requireApproved` → **friends-only** (recipient must be a `/friends/` edge)
+    → **block check both directions** → **findOrCreate catalog** → **50/day
+    rate limit** (BB-122 transaction pattern) → durable write → notify.
+  - `findOrCreateBourbon` (`functions/src/shared/catalog.ts`) — reusable, mirrors
+    the extraction match order (nameNormalized→alias→nameLowercase→create), so
+    Radar/Dispatch bottles with no `bourbonId` resolve to a shared id.
+  - `bottleShare` / `listShare` added to `NotificationType` (functions + frontend)
+    and `NotificationPrefs` (default off) with toggle rows in notification
+    settings + an inbox icon.
+  - Composite index `sharedItems (status ASC, createdAt DESC)`.
+  - Tests: `catalog.spec` (6) + `sharing.spec` (6, covering friends-only, block,
+    rate limit, findOrCreate, notify). Functions suite 296 green; `ng build` +
+    `functions` build clean.
+
+  **Scoping decisions (locked here):**
+  - **`shareList` deferred to BB-230d** — its body needs the frozen-snapshot
+    design. BB-230a lays the full foundation (`kind`, `listShare` type/pref,
+    limits); only `shareBottle` ships now.
+  - **Rating opt-in reserved, wired in BB-230b** — `SharedItem.sharerRating`
+    exists; the share UI toggle + server-side rating lookup land with the button.
+  - **No new Firestore rule needed** — the catch-all `/users/{userId}/{sub}/**`
+    already scopes `/sharedItems` to owner-only, and cross-user injection is
+    impossible (only the Admin-SDK callable writes cross-user).
+  - **Deploy pending** (owner) — new callable + index not yet deployed to dev.
 - [ ] **BB-230b — Share button on all four bottle surfaces.**
   Cellar detail, Hunt List detail, Dispatch feed preview sheet, Radar preview
   sheet. Shares the catalog bottle only.

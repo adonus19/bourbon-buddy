@@ -18,7 +18,10 @@ export type NotificationType =
   | "tasteMatch"
   | "friendRequest"
   | "newsDigest"
-  | "accessRequest";
+  | "accessRequest"
+  // Friends-only sharing (BB-230): a friend shared a bottle or their hunt list.
+  | "bottleShare"
+  | "listShare";
 
 /**
  * Operational types (BB-210) are delivered regardless of the user's per-type
