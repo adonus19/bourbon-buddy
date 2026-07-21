@@ -54,7 +54,15 @@ ion-content {
     color: var(--color-text-secondary);
   }
 
-  &__close {
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  &__close,
+  &__action {
     display: grid;
     place-items: center;
     width: 32px;

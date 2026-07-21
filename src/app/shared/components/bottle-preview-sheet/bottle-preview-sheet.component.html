@@ -14,9 +14,14 @@
         }
       </div>
     </div>
-    <button class="sheet__close" type="button" (click)="close()" aria-label="Close">
-      <ion-icon name="close" aria-hidden="true"></ion-icon>
-    </button>
+    <div class="sheet__actions">
+      <button class="sheet__action" type="button" (click)="share()" aria-label="Share bottle">
+        <ion-icon name="share-social-outline" aria-hidden="true"></ion-icon>
+      </button>
+      <button class="sheet__close" type="button" (click)="close()" aria-label="Close">
+        <ion-icon name="close" aria-hidden="true"></ion-icon>
+      </button>
+    </div>
   </header>
 
   @if (taste().matched) {

@@ -25,6 +25,7 @@ import { PriceHistoryComponent } from './components/price-history/price-history.
 import { BottlePreviewSheetComponent } from './components/bottle-preview-sheet/bottle-preview-sheet.component';
 import { RadarCardComponent } from './components/radar-card/radar-card.component';
 import { CriticSummaryComponent } from './components/critic-summary/critic-summary.component';
+import { ShareBottleModalComponent } from './components/share-bottle-modal/share-bottle-modal.component';
 import { InputHelpersDirective } from './directives/input-helpers.directive';
 import { OnboardingModule } from './onboarding.module';
 
@@ -56,6 +57,7 @@ const COMPONENTS = [
   BottlePreviewSheetComponent,
   RadarCardComponent,
   CriticSummaryComponent,
+  ShareBottleModalComponent,
 ];
 
 @NgModule({

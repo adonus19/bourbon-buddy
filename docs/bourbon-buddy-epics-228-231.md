@@ -405,9 +405,27 @@ Every rung must be solvable.
     already scopes `/sharedItems` to owner-only, and cross-user injection is
     impossible (only the Admin-SDK callable writes cross-user).
   - **Deploy pending** (owner) — new callable + index not yet deployed to dev.
-- [ ] **BB-230b — Share button on all four bottle surfaces.**
-  Cellar detail, Hunt List detail, Dispatch feed preview sheet, Radar preview
-  sheet. Shares the catalog bottle only.
+- [x] **BB-230b — Share button on all four bottle surfaces.** *(DONE — functions
+  + frontend; not yet deployed)*
+  **Built:**
+  - `SharingService` (`core/services/sharing.service.ts`) — thin wrapper over the
+    `shareBottle` callable.
+  - `ShareBottleModalComponent` (`shared/components/share-bottle-modal/`) — friend
+    picker (`friendsOnce()`), optional note, and a **rating opt-in toggle shown
+    only when the surface has a rating** (Cellar). Friends-only empty state links
+    to `/friends`.
+  - Share button wired on **three code locations covering all four surfaces**:
+    Cellar detail (`log-entry-detail`, passes the entry's rating), Hunt List
+    detail (`wishlist-detail`), and the `bottle-preview-sheet` — which is opened
+    from **both** the Dispatch feed and the Radar, so one button covers two of
+    the four surfaces.
+  - Backend: `shareBottleLogic` now accepts a range-validated `sharerRating`
+    (0–5, client-provided own rating), stored on the shared item.
+  - Tests: `sharing.spec` (8, incl. rating validation), `sharing.service.spec`
+    (2), `share-bottle-modal.component.spec` (4, incl. the rating opt-in branch).
+    Functions + `ng build` clean; no regressions in touched specs.
+  - **Deploy pending** (owner) — the `shareBottle` rating change redeploys the
+    callable.
 - [ ] **BB-230c — Receive chooser.**
   Cellar (Shelf / Journal / Graveyard as form presets) or Hunt List (Hunting /
   Got Away).

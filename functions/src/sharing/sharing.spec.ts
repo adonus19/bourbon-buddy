@@ -140,6 +140,23 @@ describe("shareBottleLogic (BB-230a)", () => {
     await expect(shareBottleLogic(FROM, { toUid: TO })).rejects.toThrow(/nothing to share/i);
   });
 
+  it("includes a valid opt-in rating, and drops an out-of-range one", async () => {
+    await share({ sharerRating: 4.5 });
+    let item = setCalls.find((c) => c.path.startsWith(`users/${TO}/sharedItems/`));
+    expect(item?.data.sharerRating).toBe(4.5);
+
+    setCalls.length = 0;
+    await share({ sharerRating: 9 }); // out of 0–5 range
+    item = setCalls.find((c) => c.path.startsWith(`users/${TO}/sharedItems/`));
+    expect(item?.data.sharerRating).toBeNull();
+  });
+
+  it("omits the rating (null) when the sharer didn't opt in", async () => {
+    await share();
+    const item = setCalls.find((c) => c.path.startsWith(`users/${TO}/sharedItems/`));
+    expect(item?.data.sharerRating).toBeNull();
+  });
+
   it("findOrCreates the catalog bottle from a Radar bottle with no bourbonId", async () => {
     await shareBottleLogic(FROM, {
       toUid: TO,

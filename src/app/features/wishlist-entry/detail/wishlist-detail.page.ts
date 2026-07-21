@@ -5,7 +5,7 @@ import {
   toSignal,
 } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
-import { AlertController, ToastController } from '@ionic/angular';
+import { AlertController, ModalController, ToastController } from '@ionic/angular';
 import { combineLatest, from, of } from 'rxjs';
 import {
   distinctUntilChanged,
@@ -15,6 +15,7 @@ import {
 } from 'rxjs/operators';
 
 import { CriticSignal, Sighting, WishlistEntry } from '../../../models';
+import { ShareBottleModalComponent } from '../../../shared/components/share-bottle-modal/share-bottle-modal.component';
 import { WishlistService } from '../../../core/services/wishlist.service';
 import { SightingService } from '../../../core/services/sighting.service';
 import { BourbonCatalogService } from '../../../core/services/bourbon-catalog.service';
@@ -43,6 +44,7 @@ export class WishlistDetailPage {
   private readonly catalog = inject(BourbonCatalogService);
   private readonly router = inject(Router);
   private readonly alertCtrl = inject(AlertController);
+  private readonly modalCtrl = inject(ModalController);
   private readonly toast = inject(ToastController);
 
   readonly entryId =
@@ -170,6 +172,28 @@ export class WishlistDetailPage {
         returnTo: `/wishlist/${this.entryId}`,
       },
     });
+  }
+
+  /** Share this hunt-list bottle with a friend (BB-230b). No rating to offer. */
+  async share(): Promise<void> {
+    const e = this.entry();
+    if (!e) {
+      return;
+    }
+    const modal = await this.modalCtrl.create({
+      component: ShareBottleModalComponent,
+      componentProps: {
+        bottle: {
+          name: e.bourbonName,
+          bourbonId: e.bourbonId,
+          distillery: e.distillery ?? null,
+          category: e.category ?? null,
+        },
+      },
+      breakpoints: [0, 0.9],
+      initialBreakpoint: 0.9,
+    });
+    await modal.present();
   }
 
   async toggleStale(s: Sighting): Promise<void> {
