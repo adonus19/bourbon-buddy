@@ -1,4 +1,5 @@
 import {
+  EXTRACTION_RESPONSE_SCHEMA,
   isProductName,
   numberAppearsInText,
   parseArticleType,
@@ -157,6 +158,67 @@ describe("parseExtractionResponse (whiskey-only filter, BB-195)", () => {
       "Weller 12 Year",
       "Blanton's Single Barrel",
     ]);
+  });
+
+  // BB-233: truncation must never yield a bottle with nose+palate but no finish.
+  // finish is the LAST key in the flavor object, so a token-capped reply cuts it
+  // first — the repair must DROP the incomplete bottle, not emit a 2-stage one.
+  it("never emits a 2-stage bottle when a reply truncates mid-finish", () => {
+    const truncated =
+      '{"articleType":"independent_review","bottles":[' +
+      // A complete bottle keeps all three stages...
+      '{"name":"Maker\'s Mark","spirit":"whiskey","category":"bourbon",' +
+      '"flavor":{"nose":["lemon","vanilla"],"palate":["caramel"],"finish":["oak"]}},' +
+      // ...the trailing bottle is cut off partway through its finish array.
+      '{"name":"Weller 12 Year","spirit":"whiskey","category":"bourbon",' +
+      '"flavor":{"nose":["honey"],"palate":["cherry"],"finish":["cinna';
+    const out = parseExtractionResponse(truncated);
+    // Only the complete bottle survives — the half-finished one is dropped whole.
+    expect(out.map((b) => b.name)).toEqual(["Maker's Mark"]);
+    expect(out[0].flavor).toEqual({
+      nose: ["lemon", "vanilla"],
+      palate: ["caramel"],
+      finish: ["oak"],
+    });
+    // No survivor may ever carry a finish-less flavor object.
+    for (const b of out) {
+      const flavor = b.flavor as { finish?: unknown } | null;
+      if (flavor && "nose" in (flavor as object)) {
+        expect(flavor).toHaveProperty("finish");
+      }
+    }
+  });
+});
+
+describe("EXTRACTION_RESPONSE_SCHEMA flavor object (BB-233)", () => {
+  const flavor = (
+    (EXTRACTION_RESPONSE_SCHEMA.properties as Record<string, unknown>)
+      .bottles as { items?: { properties?: Record<string, unknown> } }
+  ).items?.properties?.flavor as {
+    required?: string[];
+    propertyOrdering?: string[];
+    properties?: Record<string, unknown>;
+  };
+
+  it("declares all three stages", () => {
+    expect(Object.keys(flavor.properties ?? {})).toEqual([
+      "nose",
+      "palate",
+      "finish",
+    ]);
+  });
+
+  // The root cause: without `required`, Gemini's controlled decoding drops the
+  // optional trailing `finish` field, so review-sourced profiles arrived with
+  // only nose + palate. Requiring all three forces the key to be emitted.
+  it("requires nose, palate, AND finish so finish is never dropped", () => {
+    expect(flavor.required).toEqual(["nose", "palate", "finish"]);
+  });
+
+  // propertyOrdering pins generation to nose → palate → finish (Gemini defaults
+  // to alphabetical otherwise, which reorders and degrades results).
+  it("pins stage generation order", () => {
+    expect(flavor.propertyOrdering).toEqual(["nose", "palate", "finish"]);
   });
 });
 

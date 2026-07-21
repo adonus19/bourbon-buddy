@@ -194,6 +194,15 @@ export const EXTRACTION_RESPONSE_SCHEMA: Record<string, unknown> = {
               palate: { type: "ARRAY", items: { type: "STRING" } },
               finish: { type: "ARRAY", items: { type: "STRING" } },
             },
+            // BB-233: without `required`, Gemini's controlled decoding drops the
+            // optional trailing `finish`, so article-sourced profiles arrived
+            // with only nose + palate. Requiring all three (the enrichment schema
+            // already does, and captures finish fine) forces every stage to be
+            // emitted — an empty array when the article gives no finish notes,
+            // never an absent key. propertyOrdering pins nose → palate → finish
+            // (Gemini defaults to alphabetical, which reorders and hurts quality).
+            required: ["nose", "palate", "finish"],
+            propertyOrdering: ["nose", "palate", "finish"],
           },
         },
         required: ["name", "spirit"],
