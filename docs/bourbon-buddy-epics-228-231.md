@@ -14,7 +14,7 @@
 |---|---|---|---|
 | A — BB-228 | Radar / preview-sheet load time | 4 | **Complete** |
 | B — BB-229 | Discreet Total Spent | 4 | **Complete** |
-| C — BB-230 | Sharing (friends-only) | 6 | In progress — 230a done (foundation) |
+| C — BB-230 | Sharing (friends-only) | 6 | **Complete** (a–f done) |
 | D — BB-231 | Angular 20.3 → latest migration | 1 | Deferred — last |
 | E — BB-232 | Turn the service worker on | 1 | Deferred — owner decision |
 | F — BB-233 | Article flavor profiles missing Finish | 1 | Code landed — owner backfill/verify pending |
@@ -496,13 +496,44 @@ Every rung must be solvable.
     client-side.)
   - **Deploy pending** (owner) — new `shareList` callable (+ `shareBottle` was
     refactored, so redeploy both). No new indexes/rules.
-- [ ] **BB-230e — "Shared with me" segment** in the Hunt List page: grouped by
-  sharer with metadata, collapsible, all but the top group collapsed by default;
-  import-into-my-list or keep-separate.
-- [ ] **BB-230f — Housekeeping: delete `src/assets/shapes.svg`.**
+- [x] **BB-230e — "Shared with me" segment** in the Hunt List page. *(DONE —
+  frontend-only; no functions/index/rule changes)*
+  **Built:**
+  - `SharedItemsService.received` — a **single shared listener** (state-holder
+    pattern, mirrors `WishlistService`) over `users/{me}/sharedItems` filtered to
+    `status == 'pending'`, `orderBy('createdAt','desc')` (matches the BB-230a
+    `sharedItems (status ASC, createdAt DESC)` index) exposed as a signal, plus
+    `receivedLoaded`. Acting on a share flips its status, so it drops out live.
+  - `groupSharesBySharer` (`shared/utils/shared-groups.ts`) — pure grouping into
+    `SharerGroup[]`, insertion-order preserved so the newest sharer leads and each
+    group's items stay newest-first.
+  - Hunt List page — the segment is now **Hunting / Got Away / Shared (N)** via a
+    single `view` signal (`archived` derives from it). The Shared view renders each
+    sharer as a **collapsible group** (avatar + @handle + count); only the **top
+    group is expanded by default** (derived purely from a nullable
+    `expandedGroups` set — no effect). Each share row shows the bottle
+    (name/distillery) or "Hunt list · N bottles" + the note; tapping opens the
+    existing receive chooser (`/shared/:id`) = **import into my list**, and a swipe
+    **Dismiss** discards it. **Keep-separate is the passive default** — an
+    un-acted share simply stays in the segment, browsable, without polluting the
+    Mine list.
+  - Tests: `shared-groups.spec` (5), `shared-items.service.spec` +2 (received
+    query + signed-out), `hunt-list.page.spec` (6, new — grouping, default-top
+    expansion, toggle, open→chooser, dismiss, view switch). **Frontend 579 green;
+    `ng build` clean.**
+  - **Verified live (verify skill, emulators, 2026-07-22):** seeded an approved
+    user with pending shares from **two** sharers (Bob: a bottle + a hunt-list;
+    Carol: a bottle). Hunt List → **Shared (3)** segment: Bob's group (top)
+    rendered expanded showing both his shares with notes; **Carol's group was
+    collapsed by default** (her Lagavulin hidden until the group was tapped open);
+    tapping Bob's Blanton's navigated to the receive chooser at `/shared/{id}`
+    with sharer, rating, note, and the Cellar/Hunt intents. Dismiss is unit-tested.
+  - **No deploy needed** — no functions/index/rule changes.
+- [x] **BB-230f — Housekeeping: delete `src/assets/shapes.svg`.** *(DONE —
+  `git rm`; re-confirmed **zero references** across `src/` and `angular.json`
+  2026-07-22)*
   Untouched Ionic starter boilerplate in a light palette that contradicts the
-  always-dark design system. Confirmed **zero references** across `src/` and
-  `angular.json` (grep, 2026-07-20). Surfaced by the graphify run.
+  always-dark design system. Surfaced by the graphify run.
   *Considered and rejected:* adding a visible Glencairn/Noun Project attribution —
   owner decision 2026-07-20, would clutter the UI and there are no
   commercialization plans. The SVG is never loaded at runtime anyway (its path

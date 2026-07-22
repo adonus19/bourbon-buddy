@@ -5,6 +5,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { Router } from '@angular/router';
 import {
   ActionSheetController,
   AlertController,
@@ -14,10 +15,13 @@ import {
 
 import {
   ACTIVE_WISHLIST_STATUSES,
+  SharedItem,
   WishlistEntry,
   WISHLIST_PRIORITY_ORDER,
 } from '../../models';
 import { WishlistService } from '../../core/services/wishlist.service';
+import { SharedItemsService } from '../../core/services/shared-items.service';
+import { groupSharesBySharer } from '../../shared/utils/shared-groups';
 import {
   EMPTY_WISHLIST_FILTER,
   WishlistFilter,
@@ -30,6 +34,9 @@ import { ShareListModalComponent } from '../../shared/components/share-list-moda
 import { BottleLookupComponent } from './bottle-lookup/bottle-lookup.component';
 
 type WishlistSort = 'priority' | 'name' | 'msrp' | 'best';
+
+/** Which segment of the Hunt List is showing. */
+type HuntView = 'active' | 'archived' | 'shared';
 
 const SORT_LABELS: Record<WishlistSort, string> = {
   priority: 'priority',
@@ -46,6 +53,8 @@ const SORT_LABELS: Record<WishlistSort, string> = {
 })
 export class HuntListPage implements ViewWillEnter {
   private readonly wishlist = inject(WishlistService);
+  private readonly sharedItems = inject(SharedItemsService);
+  private readonly router = inject(Router);
   private readonly actionSheet = inject(ActionSheetController);
   private readonly alertCtrl = inject(AlertController);
   private readonly modalCtrl = inject(ModalController);
@@ -53,7 +62,9 @@ export class HuntListPage implements ViewWillEnter {
 
   readonly entries = this.wishlist.entries;
   readonly loaded = this.wishlist.loaded;
-  readonly archived = signal(false);
+  /** Segment state: Hunting / Got Away / Shared with me. `archived` derives from it. */
+  readonly view = signal<HuntView>('active');
+  readonly archived = computed(() => this.view() === 'archived');
   readonly sort = signal<WishlistSort>('priority');
   readonly sortLabel = computed(() => SORT_LABELS[this.sort()]);
   readonly filter = signal<WishlistFilter>(EMPTY_WISHLIST_FILTER);
@@ -68,6 +79,53 @@ export class HuntListPage implements ViewWillEnter {
   readonly archivedCount = computed(
     () => this.entries().filter((e) => e.status === 'got_away').length
   );
+
+  // "Shared with me" segment (BB-230e) — pending shares from the shared listener,
+  // grouped by sharer (newest sharer first, its items newest-first).
+  readonly sharedLoaded = this.sharedItems.receivedLoaded;
+  private readonly received = this.sharedItems.received;
+  readonly sharedCount = computed(() => this.received().length);
+  readonly sharedGroups = computed(() => groupSharesBySharer(this.received()));
+
+  // Collapsible groups: all but the top group collapsed by default. `null` means
+  // the user hasn't touched them yet, so the default (top open) applies — derived
+  // purely, no effect needed. A user toggle materializes the explicit set.
+  private readonly expandedGroups = signal<Set<string> | null>(null);
+
+  isGroupExpanded(uid: string): boolean {
+    const set = this.expandedGroups();
+    return set === null ? this.sharedGroups()[0]?.fromUid === uid : set.has(uid);
+  }
+
+  toggleGroup(uid: string): void {
+    const next = new Set(this.expandedGroups() ?? this.defaultExpanded());
+    if (next.has(uid)) {
+      next.delete(uid);
+    } else {
+      next.add(uid);
+    }
+    this.expandedGroups.set(next);
+  }
+
+  private defaultExpanded(): Set<string> {
+    const top = this.sharedGroups()[0]?.fromUid;
+    return new Set(top ? [top] : []);
+  }
+
+  /** Open the receive chooser for a share — the "import into my list" path. */
+  async openShare(item: SharedItem): Promise<void> {
+    if (item.id) {
+      await this.router.navigate(['/shared', item.id]);
+    }
+  }
+
+  /** Discard a share. Keep-separate is the passive default (leave it here); this
+   * is the explicit "no thanks" that removes it from the segment. */
+  async dismissShare(item: SharedItem): Promise<void> {
+    if (item.id) {
+      await this.sharedItems.markStatus(item.id, 'dismissed');
+    }
+  }
 
   readonly visibleEntries = computed<WishlistEntry[]>(() => {
     const showArchived = this.archived();
@@ -112,8 +170,8 @@ export class HuntListPage implements ViewWillEnter {
     this.cdr.detectChanges();
   }
 
-  setArchived(value: boolean): void {
-    this.archived.set(value);
+  setView(value: HuntView): void {
+    this.view.set(value);
   }
 
   /** Archive a bottle you didn't get to the "Got Away" list. */
