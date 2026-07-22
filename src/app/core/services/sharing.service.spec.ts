@@ -43,4 +43,13 @@ describe('SharingService', () => {
       service.shareBottle({ toUid: 'bob', bourbonId: 'b1' })
     ).rejects.toThrow('failed-precondition');
   });
+
+  it('calls the shareList callable and returns its data', async () => {
+    const callable = jest.fn(() => Promise.resolve({ data: { shareId: 's2', bottleCount: 7 } }));
+    asMock(httpsCallable).mockReturnValue(callable);
+    const res = await service.shareList({ toUid: 'bob', note: 'my list' });
+    expect(asMock(httpsCallable)).toHaveBeenCalledWith(expect.anything(), 'shareList');
+    expect(callable).toHaveBeenCalledWith({ toUid: 'bob', note: 'my list' });
+    expect(res).toEqual({ shareId: 's2', bottleCount: 7 });
+  });
 });

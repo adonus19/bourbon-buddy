@@ -462,7 +462,40 @@ Every rung must be solvable.
     a wishlist entry was created and the app landed on the Hunt List showing the
     bottle. Fully client-side (no functions emulator needed).
   - **Deploy pending** (owner) — the notification-link change redeploys `shareBottle`.
-- [ ] **BB-230d — Share the full Hunt List** as a frozen snapshot.
+- [x] **BB-230d — Share the full Hunt List as a frozen snapshot.** *(DONE —
+  functions + frontend; not yet deployed)*
+  **Built:**
+  - `shareList` callable (`functions/src/sharing/index.ts`) — reads the sharer's
+    **active** `wishlistEntries` server-side (Admin SDK → authoritative frozen
+    snapshot; cross-user reads on that collection are owner-only, so a live
+    subscription isn't possible anyway), name-sorts, caps at `SHARED_LIST_MAX`
+    (100), writes a `SharedItem { kind:'list', bottles[], bottleCount }`, notifies
+    `listShare` → `/shared/{id}`. Friends-only + block + daily-limit guards are
+    now factored into shared helpers (`assertShareAllowed`, `bumpShareLimit`,
+    `sharerFields`) reused by both share callables.
+  - `SharedItem` gained `bottles?` / `bottleCount?`; bottle-only fields are now
+    optional (consumers branch on `kind`) + `SharedListBottle`.
+  - `SharingService.shareList`; `ShareListModalComponent` (friend picker + note,
+    "Sharing your hunt list · N bottles"); a **Share hunt list** toolbar button on
+    the Hunt List page (guards the empty-list case).
+  - Receive page handles `kind:'list'` — shows the count + a bottle preview and
+    **Import all to my hunt list** (adds each active bottle, skipping dupes) or
+    **No thanks**. add-entry prefill guards against a list share (no single bottle).
+  - Tests: `sharing.spec` +4 (snapshot, empty, cap, guard → 12 total),
+    `sharing.service.spec` +1, `share-list-modal.spec` (2),
+    receive-page list-import (+1). Functions 302 green; frontend 566 green;
+    `ng build` clean.
+  - **Verified live (verify skill, emulators, 2026-07-22):** seeded an approved
+    user with a friend + a 2-bottle hunt list + a pending 3-bottle list share.
+    **Send:** the Hunt List "Share hunt list" button opened the modal showing
+    "Sharing your hunt list · 2 bottles" + the friend picker. **Receive:**
+    deep-linked to `/shared/{id}` → the list page rendered "@bob shared their
+    hunt list · 3 bottles", the note, and the bottle preview; "Import all to my
+    hunt list" added all three and landed on the Hunt List showing them alongside
+    the user's own bottles. (Send write needs the callable; receive is fully
+    client-side.)
+  - **Deploy pending** (owner) — new `shareList` callable (+ `shareBottle` was
+    refactored, so redeploy both). No new indexes/rules.
 - [ ] **BB-230e — "Shared with me" segment** in the Hunt List page: grouped by
   sharer with metadata, collapsible, all but the top group collapsed by default;
   import-into-my-list or keep-separate.

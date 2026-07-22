@@ -11,11 +11,19 @@ import { BourbonCategory } from './enums';
  * deep-links here. Snapshots, not live subscriptions.
  */
 
-/** What a shared item carries. `list` snapshot shape lands in BB-230d. */
+/** What a shared item carries. */
 export type SharedItemKind = 'bottle' | 'list';
 
 /** Recipient-side lifecycle: unopened → imported into their own log/list, or dismissed. */
 export type SharedItemStatus = 'pending' | 'imported' | 'dismissed';
+
+/** One bottle in a shared hunt-list snapshot (BB-230d). */
+export interface SharedListBottle {
+  bourbonId: string;
+  bottleName: string;
+  distillery: string | null;
+  category: BourbonCategory | null;
+}
 
 /**
  * Stored at /users/{recipientUid}/sharedItems/{id} (BB-230a). Display fields are
@@ -34,18 +42,24 @@ export interface SharedItem {
 
   // The shared catalog bottle (kind: 'bottle'). The callable findOrCreates the
   // catalog entry server-side so both sides key on the same bourbonId, even for
-  // Radar/Dispatch bottles that had none.
-  bourbonId: string;
-  bottleName: string;
-  distillery: string | null;
-  category: BourbonCategory | null;
-
-  // Optional short message from the sharer.
-  note?: string | null;
+  // Radar/Dispatch bottles that had none. Absent on a list share.
+  bourbonId?: string;
+  bottleName?: string;
+  distillery?: string | null;
+  category?: BourbonCategory | null;
 
   // The sharer's own rating (0–5), included ONLY when they opt in at share time
   // (BB-230b). Separate opt-in per the locked decision — absent by default.
   sharerRating?: number | null;
+
+  // A frozen hunt-list snapshot (kind: 'list', BB-230d). Not a live subscription
+  // — cross-user reads on wishlistEntries are owner-only, so the list is captured
+  // at share time.
+  bottles?: SharedListBottle[];
+  bottleCount?: number;
+
+  // Optional short message from the sharer.
+  note?: string | null;
 
   status: SharedItemStatus;
   createdAt: Timestamp;

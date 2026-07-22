@@ -274,8 +274,8 @@ export class AddEditEntryPage {
    */
   private async prefillFromShared(shareId: string): Promise<void> {
     const item = await this.sharedItems.get(shareId).catch(() => null);
-    if (!item) {
-      return;
+    if (!item || !item.bourbonId) {
+      return; // a list share has no single bottle to preset
     }
     const intent = isCellarIntent(this.sharedIntent) ? this.sharedIntent : 'shelf';
     const preset = cellarIntentPreset(intent);
