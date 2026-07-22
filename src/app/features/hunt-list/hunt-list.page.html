@@ -1,6 +1,6 @@
 <ion-header [translucent]="true">
   <ion-toolbar>
-    @if (entries().length) {
+    @if (entries().length && view() !== 'shared') {
       <ion-buttons slot="start">
         <ion-button (click)="openFilter()" aria-label="Filter">
           <ion-icon
@@ -31,11 +31,11 @@
     </ion-buttons>
   </ion-toolbar>
 
-  @if (entries().length) {
+  @if (entries().length || sharedCount()) {
     <ion-toolbar>
       <ion-segment
-        [value]="archived() ? 'archived' : 'active'"
-        (ionChange)="setArchived($any($event.detail.value) === 'archived')"
+        [value]="view()"
+        (ionChange)="setView($any($event.detail.value))"
       >
         <ion-segment-button value="active">
           <ion-label>Hunting ({{ activeCount() }})</ion-label>
@@ -43,9 +43,12 @@
         <ion-segment-button value="archived">
           <ion-label>Got Away ({{ archivedCount() }})</ion-label>
         </ion-segment-button>
+        <ion-segment-button value="shared">
+          <ion-label>Shared ({{ sharedCount() }})</ion-label>
+        </ion-segment-button>
       </ion-segment>
 
-      @if (chips().length) {
+      @if (chips().length && view() !== 'shared') {
         <div class="hunt-chips">
           @for (chip of chips(); track chip.label) {
             <button
@@ -66,7 +69,98 @@
 <ion-content [fullscreen]="true">
   <app-offline-sync-badge></app-offline-sync-badge>
 
-  @if (!loaded()) {
+  @if (view() === 'shared') {
+    @if (!sharedLoaded()) {
+      <app-list-skeleton [count]="4"></app-list-skeleton>
+    } @else if (sharedGroups().length === 0) {
+      <div class="hunt-empty">
+        <ion-icon name="share-social-outline" aria-hidden="true"></ion-icon>
+        <h2 class="hunt-empty__title">Nothing shared with you yet.</h2>
+        <p class="hunt-empty__sub">
+          Bottles and hunt lists your friends share will land here.
+        </p>
+      </div>
+    } @else {
+      <div class="shared-groups">
+        @for (group of sharedGroups(); track group.fromUid) {
+          <section class="shared-group">
+            <button
+              type="button"
+              class="shared-group__header"
+              (click)="toggleGroup(group.fromUid)"
+              [attr.aria-expanded]="isGroupExpanded(group.fromUid)"
+            >
+              <ion-avatar class="shared-group__avatar">
+                @if (group.avatarUrl) {
+                  <img [src]="group.avatarUrl" alt="" />
+                } @else {
+                  <ion-icon name="person" aria-hidden="true"></ion-icon>
+                }
+              </ion-avatar>
+              <span class="shared-group__meta">
+                <span class="shared-group__name">
+                  {{ group.username ? '@' + group.username : group.displayName }}
+                </span>
+                <span class="shared-group__count">
+                  {{ group.items.length }} shared
+                </span>
+              </span>
+              <ion-icon
+                class="shared-group__chevron"
+                [name]="isGroupExpanded(group.fromUid) ? 'chevron-up' : 'chevron-down'"
+                aria-hidden="true"
+              ></ion-icon>
+            </button>
+
+            @if (isGroupExpanded(group.fromUid)) {
+              <ion-list class="shared-items" lines="none">
+                @for (item of group.items; track item.id) {
+                  <ion-item-sliding>
+                    <ion-item
+                      class="shared-item"
+                      lines="none"
+                      detail="false"
+                      button
+                      (click)="openShare(item)"
+                    >
+                      <ion-icon
+                        slot="start"
+                        [name]="item.kind === 'list' ? 'list-outline' : 'wine-outline'"
+                        aria-hidden="true"
+                      ></ion-icon>
+                      <ion-label>
+                        @if (item.kind === 'list') {
+                          <h3>Hunt list</h3>
+                          <p>
+                            {{ item.bottleCount }} bottle{{
+                              item.bottleCount === 1 ? '' : 's'
+                            }}
+                          </p>
+                        } @else {
+                          <h3>{{ item.bottleName }}</h3>
+                          @if (item.distillery) {
+                            <p>{{ item.distillery }}</p>
+                          }
+                        }
+                        @if (item.note) {
+                          <p class="shared-item__note">"{{ item.note }}"</p>
+                        }
+                      </ion-label>
+                    </ion-item>
+                    <ion-item-options side="end">
+                      <ion-item-option color="medium" (click)="dismissShare(item)">
+                        Dismiss
+                      </ion-item-option>
+                    </ion-item-options>
+                  </ion-item-sliding>
+                }
+              </ion-list>
+            }
+          </section>
+        }
+      </div>
+    }
+  } @else if (!loaded()) {
     <app-list-skeleton [count]="6"></app-list-skeleton>
   } @else if (entries().length === 0) {
     <div class="hunt-empty">
