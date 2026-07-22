@@ -16,6 +16,33 @@
       <p>This share isn't available anymore.</p>
       <ion-button fill="outline" routerLink="/tabs/dispatch">Back to the app</ion-button>
     </div>
+  } @else if (item()!.kind === 'list') {
+    <p class="eyebrow">{{ sharerLabel() }} shared their hunt list</p>
+    <h1 class="receive__bottle">
+      {{ item()!.bottleCount }} bottle{{ item()!.bottleCount === 1 ? '' : 's' }}
+    </h1>
+    @if (item()!.note) {
+      <blockquote class="receive__note">"{{ item()!.note }}"</blockquote>
+    }
+
+    <ion-list lines="none" class="receive__preview">
+      @for (b of item()!.bottles; track b.bourbonId) {
+        <ion-item>
+          <ion-label>{{ b.bottleName }}</ion-label>
+        </ion-item>
+      }
+    </ion-list>
+
+    @if (item()!.status !== 'pending') {
+      <p class="receive__already">You've already handled this one — pick again to redo it.</p>
+    }
+
+    <ion-button expand="block" [disabled]="busy()" (click)="receiveListToHuntList()">
+      Import all to my hunt list
+    </ion-button>
+    <ion-button class="receive__skip" expand="block" fill="clear" color="medium" [disabled]="busy()" (click)="dismiss()">
+      No thanks
+    </ion-button>
   } @else {
     <p class="eyebrow">{{ sharerLabel() }} shared</p>
     <h1 class="receive__bottle">{{ item()!.bottleName }}</h1>

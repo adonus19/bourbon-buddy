@@ -75,7 +75,7 @@ export class SharedItemReceivePage implements OnInit {
   /** Hunt List intents add a wishlist entry directly (Hunting / Got Away). */
   async receiveToHuntList(status: WishlistStatus): Promise<void> {
     const it = this.item();
-    if (!it || this.busy()) {
+    if (!it || !it.bourbonId || !it.bottleName || this.busy()) {
       return;
     }
     this.busy.set(true);
@@ -99,6 +99,46 @@ export class SharedItemReceivePage implements OnInit {
       await this.router.navigateByUrl('/tabs/hunt-list');
     } catch {
       await this.presentToast("Couldn't add that bottle. Try again.");
+      this.busy.set(false);
+    }
+  }
+
+  /** Import every bottle from a shared list into the hunt list (BB-230d). Skips
+   * bottles already on the list; the richer keep-separate/grouped view is BB-230e. */
+  async receiveListToHuntList(): Promise<void> {
+    const it = this.item();
+    if (!it || !it.bottles?.length || this.busy()) {
+      return;
+    }
+    this.busy.set(true);
+    try {
+      const existing = new Set(this.wishlist.entries().map((e) => e.bourbonId));
+      let added = 0;
+      for (const b of it.bottles) {
+        if (existing.has(b.bourbonId)) {
+          continue;
+        }
+        await this.wishlist.add({
+          bourbonId: b.bourbonId,
+          bourbonName: b.bottleName,
+          distillery: b.distillery ?? null,
+          category: b.category ?? null,
+          reviewLinks: [],
+          priority: 'normal',
+          status: 'actively_looking',
+          discoverySource: 'Shared',
+        });
+        added++;
+      }
+      await this.sharedItems.markStatus(this.id, 'imported').catch(() => undefined);
+      await this.presentToast(
+        added
+          ? `Added ${added} bottle${added === 1 ? '' : 's'} to your hunt list.`
+          : 'Those bottles are already on your hunt list.'
+      );
+      await this.router.navigateByUrl('/tabs/hunt-list');
+    } catch {
+      await this.presentToast("Couldn't import the list. Try again.");
       this.busy.set(false);
     }
   }

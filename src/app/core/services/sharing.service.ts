@@ -42,4 +42,21 @@ export class SharingService {
     const res = await callable(input);
     return res.data;
   }
+
+  /**
+   * Share the whole active hunt list with a friend as a frozen snapshot
+   * (BB-230d). The snapshot is read server-side, so the client just names the
+   * recipient and an optional note.
+   */
+  async shareList(input: {
+    toUid: string;
+    note?: string | null;
+  }): Promise<{ shareId: string; bottleCount: number }> {
+    const callable = httpsCallable<
+      { toUid: string; note?: string | null },
+      { shareId: string; bottleCount: number }
+    >(this.functions, 'shareList');
+    const res = await callable(input);
+    return res.data;
+  }
 }

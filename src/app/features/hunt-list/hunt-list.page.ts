@@ -26,6 +26,7 @@ import {
   wishlistChips,
 } from './wishlist-filter';
 import { WishlistFilterModalComponent } from './filter-modal/wishlist-filter-modal.component';
+import { ShareListModalComponent } from '../../shared/components/share-list-modal/share-list-modal.component';
 import { BottleLookupComponent } from './bottle-lookup/bottle-lookup.component';
 
 type WishlistSort = 'priority' | 'name' | 'msrp' | 'best';
@@ -157,6 +158,27 @@ export class HuntListPage implements ViewWillEnter {
   async openLookup(): Promise<void> {
     const modal = await this.modalCtrl.create({
       component: BottleLookupComponent,
+    });
+    await modal.present();
+  }
+
+  /** Share the whole active hunt list with a friend (BB-230d). */
+  async shareList(): Promise<void> {
+    const count = this.activeCount();
+    if (count === 0) {
+      const alert = await this.alertCtrl.create({
+        header: 'Nothing to share',
+        message: 'Your hunt list is empty — add a bottle first.',
+        buttons: ['OK'],
+      });
+      await alert.present();
+      return;
+    }
+    const modal = await this.modalCtrl.create({
+      component: ShareListModalComponent,
+      componentProps: { bottleCount: count },
+      breakpoints: [0, 0.9],
+      initialBreakpoint: 0.9,
     });
     await modal.present();
   }

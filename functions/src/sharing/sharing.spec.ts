@@ -8,6 +8,8 @@ const docs = new Map<
   string,
   { exists: boolean; data: () => Record<string, unknown> | undefined }
 >();
+// Collection-query results keyed by path (used for the wishlist snapshot read).
+const collections = new Map<string, Array<Record<string, unknown>>>();
 const setCalls: Array<{ path: string; data: Record<string, unknown> }> = [];
 const sendNotificationToUser: jest.Mock<Promise<number>, unknown[]> = jest.fn(
   () => Promise.resolve(1)
@@ -33,6 +35,10 @@ jest.mock("firebase-admin/firestore", () => ({
     doc: (path: string) => makeRef(path),
     collection: (path: string) => ({
       doc: (id?: string) => makeRef(`${path}/${id ?? `gen-${++autoId}`}`),
+      get: () =>
+        Promise.resolve({
+          docs: (collections.get(path) ?? []).map((data) => ({ data: () => data })),
+        }),
     }),
     runTransaction: async (
       fn: (tx: {
@@ -50,7 +56,12 @@ jest.mock("firebase-admin/firestore", () => ({
 jest.mock("../shared/catalog", () => ({ findOrCreateBourbon }));
 jest.mock("../notifications", () => ({ sendNotificationToUser }));
 
-import { DAILY_SHARE_LIMIT, shareBottleLogic } from "./index";
+import {
+  DAILY_SHARE_LIMIT,
+  SHARED_LIST_MAX,
+  shareBottleLogic,
+  shareListLogic,
+} from "./index";
 
 const FROM = "alice";
 const TO = "bob";
@@ -59,6 +70,7 @@ const seedDoc = (path: string, data?: Record<string, unknown>) =>
 
 beforeEach(() => {
   docs.clear();
+  collections.clear();
   setCalls.length = 0;
   autoId = 0;
   jest.clearAllMocks();
@@ -170,5 +182,67 @@ describe("shareBottleLogic (BB-230a)", () => {
       expect.anything(),
       expect.objectContaining({ name: "The Lakes Chocolatier", createdByUserId: FROM })
     );
+  });
+});
+
+describe("shareListLogic (BB-230d)", () => {
+  const seedList = (entries: Array<Record<string, unknown>>) =>
+    collections.set(`users/${FROM}/wishlistEntries`, entries);
+
+  it("shares a frozen snapshot of the ACTIVE hunt list and notifies", async () => {
+    seedList([
+      { bourbonId: "b1", bourbonName: "Weller 12", distillery: "BT", category: "bourbon", status: "actively_looking" },
+      { bourbonId: "b2", bourbonName: "Blanton's", distillery: "BT", category: "bourbon", status: "casually_looking" },
+      { bourbonId: "b3", bourbonName: "Logged One", status: "logged" }, // excluded
+      { bourbonId: "b4", bourbonName: "Gone", status: "got_away" }, // excluded
+    ]);
+    const res = await shareListLogic(FROM, { toUid: TO, note: "my list" });
+    expect(res.bottleCount).toBe(2);
+
+    const item = setCalls.find((c) => c.path.startsWith(`users/${TO}/sharedItems/`));
+    expect(item?.data.kind).toBe("list");
+    expect(item?.data.bottleCount).toBe(2);
+    // Name-sorted; only the active statuses.
+    expect((item?.data.bottles as Array<{ bottleName: string }>).map((b) => b.bottleName)).toEqual([
+      "Blanton's",
+      "Weller 12",
+    ]);
+
+    expect(sendNotificationToUser).toHaveBeenCalledTimes(1);
+    const [uid, payload, type] = sendNotificationToUser.mock.calls[0] as [
+      string,
+      { body: string; link: string; data: Record<string, string> },
+      string,
+    ];
+    expect(uid).toBe(TO);
+    expect(type).toBe("listShare");
+    expect(payload.link).toBe("/shared/gen-1");
+    expect(payload.data).toMatchObject({ type: "listShare", shareId: "gen-1" });
+  });
+
+  it("rejects when the active hunt list is empty", async () => {
+    seedList([{ bourbonId: "b3", bourbonName: "Logged", status: "logged" }]);
+    await expect(shareListLogic(FROM, { toUid: TO })).rejects.toThrow(/hunt list is empty/i);
+    expect(setCalls).toHaveLength(0);
+    expect(sendNotificationToUser).not.toHaveBeenCalled();
+  });
+
+  it("caps the snapshot at SHARED_LIST_MAX bottles", async () => {
+    seedList(
+      Array.from({ length: SHARED_LIST_MAX + 25 }, (_, i) => ({
+        bourbonId: `b${i}`,
+        bourbonName: `Bottle ${String(i).padStart(3, "0")}`,
+        status: "actively_looking",
+      }))
+    );
+    const res = await shareListLogic(FROM, { toUid: TO });
+    expect(res.bottleCount).toBe(SHARED_LIST_MAX);
+  });
+
+  it("enforces friends-only (shared guard)", async () => {
+    docs.delete(`users/${FROM}/friends/${TO}`);
+    seedList([{ bourbonId: "b1", bourbonName: "Weller 12", status: "actively_looking" }]);
+    await expect(shareListLogic(FROM, { toUid: TO })).rejects.toThrow(/only share with friends/i);
+    expect(setCalls).toHaveLength(0);
   });
 });

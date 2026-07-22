@@ -68,5 +68,5 @@ export {
   onFriendRequestCreated,
 } from "./social";
 
-// Friends-only sharing (BB-230): share a catalog bottle with a friend.
-export { shareBottle } from "./sharing";
+// Friends-only sharing (BB-230): share a catalog bottle or a hunt list.
+export { shareBottle, shareList } from "./sharing";
