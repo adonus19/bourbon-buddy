@@ -208,10 +208,23 @@
 
       <app-similar-bottles [bourbonId]="e.bourbonId" />
     </div>
-  } @else {
+  } @else if (loaded()) {
     <div class="wdetail-missing">
       <p>That bottle isn't on your Hunt List.</p>
       <ion-button routerLink="/tabs/hunt-list" fill="clear">Back to Hunt List</ion-button>
+    </div>
+  } @else {
+    <!-- BB-236: the entry snapshot is still loading — show a skeleton, never the
+         "not found" state, so a slow load doesn't read as a frozen/broken app. -->
+    <div class="wdetail-loading" aria-busy="true" aria-label="Loading bottle">
+      <ion-skeleton-text [animated]="true" class="wdetail-loading__name"></ion-skeleton-text>
+      <ion-skeleton-text [animated]="true" class="wdetail-loading__sub"></ion-skeleton-text>
+      <div class="wdetail-loading__badges">
+        <ion-skeleton-text [animated]="true" class="wdetail-loading__badge"></ion-skeleton-text>
+        <ion-skeleton-text [animated]="true" class="wdetail-loading__badge"></ion-skeleton-text>
+      </div>
+      <ion-skeleton-text [animated]="true" class="wdetail-loading__line"></ion-skeleton-text>
+      <ion-skeleton-text [animated]="true" class="wdetail-loading__line wdetail-loading__line--short"></ion-skeleton-text>
     </div>
   }
 </ion-content>

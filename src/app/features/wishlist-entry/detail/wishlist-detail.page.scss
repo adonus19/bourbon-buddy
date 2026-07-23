@@ -281,3 +281,51 @@ app-similar-bottles {
   color: var(--color-text-secondary);
   gap: 8px;
 }
+
+// BB-236: loading placeholder — matches the real detail layout (name, sub,
+// badges, a couple of lines) so the page doesn't jump when content lands.
+.wdetail-loading {
+  padding: 20px 16px 24px;
+  max-width: 600px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  ion-skeleton-text {
+    margin: 0;
+    border-radius: 6px;
+  }
+
+  &__name {
+    width: 70%;
+    height: 26px;
+  }
+
+  &__sub {
+    width: 45%;
+    height: 14px;
+  }
+
+  &__badges {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  &__badge {
+    width: 84px;
+    height: 22px;
+    border-radius: 999px;
+  }
+
+  &__line {
+    width: 100%;
+    height: 14px;
+    margin-top: 8px;
+
+    &--short {
+      width: 60%;
+    }
+  }
+}
