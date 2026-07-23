@@ -24,6 +24,26 @@
     </div>
   </header>
 
+  <!-- BB-234: the primary action sits directly under the header actions, not
+       buried at the foot of the sheet, so it's the first thing in reach. -->
+  <div class="sheet__cta">
+    @if (onHuntList()) {
+      <div class="sheet__listed">
+        <ion-icon name="checkmark-circle" aria-hidden="true"></ion-icon>
+        Already on your hunt list
+      </div>
+    } @else {
+      <ion-button
+        expand="block"
+        (click)="addToHuntList()"
+        [disabled]="adding()"
+      >
+        <ion-icon slot="start" name="add" aria-hidden="true"></ion-icon>
+        Add to hunt list
+      </ion-button>
+    }
+  </div>
+
   @if (taste().matched) {
     <div class="sheet__taste">
       <ion-icon name="sparkles" aria-hidden="true"></ion-icon>
@@ -72,23 +92,5 @@
     <app-price-history [bourbonId]="bottle.bourbonId" [compact]="true" />
     <app-similar-bottles [bourbonId]="bottle.bourbonId" />
   }
-
-  <footer class="sheet__actions">
-    @if (onHuntList()) {
-      <div class="sheet__listed">
-        <ion-icon name="checkmark-circle" aria-hidden="true"></ion-icon>
-        Already on your hunt list
-      </div>
-    } @else {
-      <ion-button
-        expand="block"
-        (click)="addToHuntList()"
-        [disabled]="adding()"
-      >
-        <ion-icon slot="start" name="add" aria-hidden="true"></ion-icon>
-        Add to hunt list
-      </ion-button>
-    }
-  </footer>
 </div>
 </ion-content>
