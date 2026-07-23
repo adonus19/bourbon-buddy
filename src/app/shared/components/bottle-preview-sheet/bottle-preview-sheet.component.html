@@ -51,27 +51,8 @@
     </div>
   }
 
-  @if (profile()) {
-    <section class="sheet__flavor">
-      <span class="eyebrow">Flavor profile</span>
-      @if (sourceLabel(); as src) {
-        <span class="sheet__source">{{ src }}</span>
-      }
-      @if (blendedTags().nose.length) {
-        <p class="sheet__stage"><strong>Nose</strong> {{ stageDisplay('nose') }}</p>
-      }
-      @if (blendedTags().palate.length) {
-        <p class="sheet__stage"><strong>Palate</strong> {{ stageDisplay('palate') }}</p>
-      }
-      @if (blendedTags().finish.length) {
-        <p class="sheet__stage"><strong>Finish</strong> {{ stageDisplay('finish') }}</p>
-      }
-      @if (claims().length) {
-        <p class="sheet__claims">
-          <strong>Distillery says</strong> {{ claims().join(' · ') }}
-        </p>
-      }
-    </section>
+  @if (profile() && hasFlavor()) {
+    <app-flavor-profile [profile]="profile()" />
   } @else if (loaded()) {
     <p class="sheet__empty">No flavor profile for this bottle yet.</p>
   } @else {

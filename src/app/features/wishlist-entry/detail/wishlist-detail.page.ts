@@ -14,7 +14,12 @@ import {
   switchMap,
 } from 'rxjs/operators';
 
-import { CriticSignal, Sighting, WishlistEntry } from '../../../models';
+import {
+  CriticSignal,
+  FlavorProfile,
+  Sighting,
+  WishlistEntry,
+} from '../../../models';
 import { ShareBottleModalComponent } from '../../../shared/components/share-bottle-modal/share-bottle-modal.component';
 import { WishlistService } from '../../../core/services/wishlist.service';
 import { SightingService } from '../../../core/services/sighting.service';
@@ -69,19 +74,26 @@ export class WishlistDetailPage {
     initialValue: [] as Sighting[],
   });
 
-  // Critic signals (BB-221) for the app-critic-summary section: ONE getDoc when
-  // the bottle changes (never a listener), fed from the already-loaded entry's
-  // bourbonId — distinctUntilChanged keeps a wishlist edit from re-reading it.
-  private readonly criticSignals$ = toObservable(this.entry).pipe(
+  // The catalog bottle (BB-221 + BB-235): ONE getDoc when the bottle changes
+  // (never a listener), fed from the already-loaded entry's bourbonId —
+  // distinctUntilChanged keeps a wishlist edit from re-reading it. Both the
+  // critic summary and the tasting-notes block derive from this single read.
+  private readonly catalogBottle$ = toObservable(this.entry).pipe(
     map((e) => e?.bourbonId ?? null),
     distinctUntilChanged(),
     switchMap((id) => (id ? from(this.catalog.getById(id)) : of(null))),
-    map((b) => b?.criticSignals ?? null),
     shareReplay({ bufferSize: 1, refCount: true })
   );
-  readonly criticSignals = toSignal(this.criticSignals$, {
-    initialValue: null as Record<string, CriticSignal> | null,
-  });
+  readonly criticSignals = toSignal(
+    this.catalogBottle$.pipe(map((b) => b?.criticSignals ?? null)),
+    { initialValue: null as Record<string, CriticSignal> | null }
+  );
+  // Structured tasting notes (BB-235) — nose/palate/finish, rendered by the
+  // shared app-flavor-profile. Was missing on this page entirely.
+  readonly flavorProfile = toSignal(
+    this.catalogBottle$.pipe(map((b) => b?.flavorProfile ?? null)),
+    { initialValue: null as FlavorProfile | null }
+  );
 
   constructor() {
     // Self-heal the cached best-sighting price (BB-161). The card on the Hunt

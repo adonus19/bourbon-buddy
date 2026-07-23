@@ -12,13 +12,7 @@ import { TasteMatchService } from '../../../core/services/taste-match.service';
 import { WishlistService } from '../../../core/services/wishlist.service';
 import { CATEGORY_DISPLAY } from '../../constants/category-display';
 import { ShareBottleModalComponent } from '../share-bottle-modal/share-bottle-modal.component';
-import {
-  blendedProfileTags,
-  consensusCount,
-  marketingOnlyTags,
-  orderTagsByWeight,
-  profileSourceLabel,
-} from '../../utils/flavor-provenance';
+import { blendedProfileTags } from '../../utils/flavor-provenance';
 
 /**
  * Minimal bottle identity the preview sheet needs. Both a Dispatch
@@ -78,33 +72,16 @@ export class BottlePreviewSheetComponent {
   /** Arrays with the BB-188 community tier blended in (community-first). */
   readonly blendedTags = computed(() => blendedProfileTags(this.profile()));
 
+  /** Whether the blended profile has anything to show (drives the empty state).
+   * The rendering itself lives in the shared `app-flavor-profile` (BB-235). */
+  readonly hasFlavor = computed(() => {
+    const t = this.blendedTags();
+    return t.nose.length + t.palate.length + t.finish.length > 0;
+  });
+
   /** Taste Match badge (BB-199): shared taste tags, strongest first. Matches
    * against the community-blended tags (BB-188) so tasters' notes count too. */
   readonly taste = computed(() => this.tasteMatch.matches(this.blendedTags()));
-
-  /** Provenance line (BB-222): "Based on N reviews" vs "AI-suggested". */
-  readonly sourceLabel = computed(() => profileSourceLabel(this.profile()));
-
-  /** Producer claims no review corroborates — shown apart, never as consensus. */
-  readonly claims = computed(() => marketingOnlyTags(this.profile()).slice(0, 6));
-
-  /**
-   * One stage's tags as display text, consensus-weighted (BB-222): ordered by
-   * review mentions (+ half-weight corroborating claims), with an ×N marker
-   * once two or more reviews agree — e.g. "Banana ×3 · Corn · Oak".
-   */
-  stageDisplay(stage: 'nose' | 'palate' | 'finish'): string {
-    const p = this.profile();
-    const tags = this.blendedTags()[stage];
-    return orderTagsByWeight(tags, p)
-      .map((tag) => {
-        // Tasters-first consensus (BB-188): a drinker-confirmed tag badges its
-        // taster count; otherwise the review count. Below 2 → no badge.
-        const n = consensusCount(p, tag);
-        return n >= 2 ? `${tag} ×${n}` : tag;
-      })
-      .join(' · ');
-  }
 
   ionViewWillEnter(): void {
     void this.load();
