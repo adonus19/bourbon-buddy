@@ -149,6 +149,32 @@ ion-modal.glass-modal {
   }
 }
 
+/* BB-237: a centered, auto-height card variant of the glass modal. Used by the
+ * Discreet Total Spent gauntlet — a fixed, short flow that has no business being
+ * a full-screen sheet whose top row sits under the notch/camera. Auto height
+ * plus a top safe-area margin keeps the card clear of the front camera on every
+ * device, and centering reads as an intentional card rather than a broken sheet.
+ * Layer it after `glass-modal` (`cssClass="glass-modal glass-modal-centered"`)
+ * so it inherits the frosted background and overrides only the geometry. */
+ion-modal.glass-modal-centered {
+  --height: auto;
+  --width: min(92%, 420px);
+  --border-radius: 20px;
+  align-items: center;
+  justify-content: center;
+
+  &::part(content) {
+    border: 1px solid rgba(200, 135, 58, 0.18);
+    border-radius: 20px;
+    /* Never ride under the front camera, even for a tall card on a small phone. */
+    margin-top: env(safe-area-inset-top);
+    max-height: calc(
+      100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 32px
+    );
+    overflow-y: auto;
+  }
+}
+
 /* ----------------------------------------------------------------------------
  * Speed-dial FAB action labels (BB-173)
  * A pill label to the left of each mini-FAB in an ion-fab-list. The pseudo-

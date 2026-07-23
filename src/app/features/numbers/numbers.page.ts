@@ -378,7 +378,9 @@ export class NumbersPage implements ViewDidEnter {
     const modal = await this.modalCtrl.create({
       component: SpendGauntletComponent,
       componentProps: { sources: this.gauntletSources() },
-      cssClass: 'glass-modal',
+      // BB-237: a centered, auto-height card (not a full-screen modal), so the
+      // close button / stage label no longer collide with the notch/camera.
+      cssClass: 'glass-modal glass-modal-centered',
       backdropDismiss: false,
     });
     await modal.present();
