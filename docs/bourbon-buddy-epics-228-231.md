@@ -541,33 +541,84 @@ Every rung must be solvable.
 
 ---
 
-# Epic D — BB-231: Angular 20.3 → latest migration
+# Epic D — BB-231: Angular 20.3 → 21 migration
 
 **Deferred until all of Epics A–C are complete.** Owner decision 2026-07-20:
 prefer staying current with Angular rather than pinning the vendored
 `angular-developer` skill docs to 20.3.
 
-**Context.** `.agents/skills/angular-developer/references/` is a generic vendored
-Angular skill documenting **v21+** idioms — `@Service()`, Signal Forms,
-`httpResource`. This project is pinned to **20.3** with
-`@Injectable({providedIn:'root'})` and Reactive Forms. Today that mismatch is a
-footgun: an agent following the reference docs literally writes code that doesn't
-compile. Migrating resolves the contradiction in the right direction.
+**Context.** `.claude/skills/angular-developer/references/` is a generic vendored
+Angular skill documenting **v21+** idioms — Signal Forms, `httpResource` (and a
+non-standard `@Service()` claim — *ignore it*, `@Injectable` stays correct). This
+project is pinned to **20.3** with `@Injectable({providedIn:'root'})` and Reactive
+Forms. Today that mismatch is a footgun: an agent following the reference docs
+literally writes code that doesn't compile. Migrating to 21 resolves it.
 
-### Story
+## Research findings (2026-07-22)
 
-- [ ] **BB-231 — Migrate Angular 20.3 → latest.**
-  **AC:**
-  - `ng update @angular/core @angular/cli` through each major, running the
-    official migration schematics per step (see the skill's `migrations.md`)
-  - Ionic 8 + AngularFire compatibility verified against the target major before
-    starting
-  - Full unit suite green; `ng build` and `npm run build:prod` clean
-  - `verify` skill pass over the primary flows (auth, cellar, hunt list,
-    dispatch, numbers)
-  - Decide per-surface whether to adopt Signal Forms; **no big-bang forms
-    rewrite** — Reactive Forms keep working
-  - CLAUDE.md updated: version, forms guidance, and the `@Service()` note
+**The migration is gated by AngularFire, not Angular.** Angular itself is at
+**22.0.7** (latest) / **21.2.18** (LTS), but every Firebase call in this app rides
+`@angular/fire`, and:
+
+- **`@angular/fire` latest *stable* is `20.0.1`** (peer `@angular/core ^20.0.0`).
+  There is **no stable v21 and nothing for v22** — only a **`21.0.0-rc.0`**
+  (published 2026-07-16), peer `^21.0.0`, which also pulls **`firebase ^12.4.0`**
+  (a major bump from the pinned 11.10.0).
+- ⇒ **Target is Angular 21, not 22.** Going to 22 would force AngularFire-for-21
+  onto a 22 runtime via peer-dep overrides — unsupported. Even 21 requires the RC.
+
+**Owner decisions (2026-07-22):**
+- **Target Angular 21** (not 22).
+- **Wait for `@angular/fire` 21 GA before merging/deploying.** Do the Sprint 0
+  spike now to surface blockers; hold the merge until AngularFire ships stable.
+- **Scope = version bump + safe automated modernization** (`inject()`,
+  signal-input/queries/output schematics). **Keep NgModule + Reactive Forms.**
+  **No Signal Forms** (experimental in 21, stable only in 22), **no zoneless**,
+  **no standalone migration.**
+
+**Breaking changes that DON'T apply here** (codebase scanned 2026-07-22):
+- *Zoneless by default* — new-app only; app keeps `zone.js` (polyfills.ts:50).
+  Ionic + AngularFire rely on zone patching → **keep zone.js**.
+- *HttpClient auto-provisioned in root* — **N/A**, app uses zero `HttpClient`
+  (all I/O is the Firebase SDK).
+- *Karma → Vitest default* — **N/A**, project uses **Jest** via
+  `jest-preset-angular` (17.0.0, peer `core <23`), not `ng test`. Just re-verify
+  the Jest config compiles against the A21 compiler.
+- *Standalone idioms / removed-since-v19 APIs* — **N/A**, 0 `standalone:true`,
+  no `TestBed.get`/`ComponentFixtureAutoDetect`/`async()` in `src/`.
+
+**Coupled dependency bumps required:** `@angular/cdk` 20→21, `ng2-charts` 9→**10**
+(peer now needs A21 + cdk 21), `@angular-eslint/*` 20→21, `@ionic/angular` stays
+(peer `>=16`). Pin `@angular/fire` to the exact RC (no `^`) during the spike.
+
+### Sprint plan
+
+- [ ] **Sprint 0 — Spike & go/no-go** *(do now; branch
+  `feature/BB-231-angular-21` off `main`)*. `ng update @angular/core@21
+  @angular/cli@21`; install `@angular/fire@21.0.0-rc.0` + firebase 12 + cdk 21 +
+  ng2-charts 10 + eslint 21; get `ng build` green. **Deliverable:** a written
+  go/no-go naming any blockers found in the RC. **Do not merge.**
+- [ ] **Sprint 1 — Green build & tests** *(gated on AngularFire 21 GA)*. Fix
+  compile/type errors; verify `jest-preset-angular`; full Jest suite green;
+  `ng build` + `npm run build:prod` clean.
+- [ ] **Sprint 2 — Firebase 12 + Safari fix.** Read firebase 12 migration notes;
+  **re-verify the BB-228 `experimentalForceLongPolling` Safari fix** against
+  firebase 12; emulator smoke test (Auth/Firestore/Storage/Functions).
+- [ ] **Sprint 3 — `verify` skill pass** over the 5 primary flows (auth, cellar,
+  hunt list, dispatch, numbers).
+- [ ] **Sprint 4 — Safe modernization + docs.** Run `inject()` +
+  signal-input/queries/output schematics (keep NgModule/Reactive Forms); update
+  CLAUDE.md (version → 21, forms guidance, drop the `@Service()` note, fix the
+  skill path `.agents/` → `.claude/`); mark BB-231 done.
+
+**AC (rolls up the sprints):**
+  - Angular 21 via `ng update`, official schematics per step
+  - `@angular/fire` on a **stable 21 GA** release (not the RC) before merge
+  - firebase 12 verified — including the BB-228 Safari long-polling fix
+  - Full Jest suite green; `ng build` + `npm run build:prod` clean
+  - `verify` pass over auth, cellar, hunt list, dispatch, numbers
+  - Reactive Forms kept; **no Signal Forms rewrite**
+  - CLAUDE.md updated (version, forms guidance, `@Service()` note, skill path)
 
 ---
 

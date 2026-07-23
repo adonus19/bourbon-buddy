@@ -165,4 +165,38 @@ describe('BottlePreviewSheetComponent (BB-198)', () => {
     await component.addToHuntList();
     expect(wishlist.add).not.toHaveBeenCalled();
   });
+
+  // BB-234: the Add-to-hunt CTA used to be the very last item in the sheet
+  // (below flavor, critic summary, price history and similar bottles), so it was
+  // hard to find. It now sits at the top, right under the header actions.
+  it('surfaces the Add to hunt list CTA above the flavor/critic sections', () => {
+    component.bottle = chip();
+    fixture.detectChanges();
+
+    const cta = fixture.nativeElement.querySelector('.sheet__cta');
+    const critic = fixture.nativeElement.querySelector('app-critic-summary');
+    expect(cta).toBeTruthy();
+    expect(critic).toBeTruthy();
+    // CTA precedes the critic summary in document order → it reads near the top.
+    expect(
+      cta.compareDocumentPosition(critic) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
+  it('renders the CTA outside any footer', () => {
+    component.bottle = chip();
+    fixture.detectChanges();
+
+    const cta = fixture.nativeElement.querySelector('.sheet__cta');
+    expect(cta.closest('footer')).toBeNull();
+  });
+
+  it('shows the already-on-list state in the top CTA slot', () => {
+    wishlist.entries.set([{ bourbonId: 'b1', status: 'actively_looking' }]);
+    component.bottle = chip();
+    fixture.detectChanges();
+
+    const cta = fixture.nativeElement.querySelector('.sheet__cta');
+    expect(cta.querySelector('.sheet__listed')).toBeTruthy();
+  });
 });

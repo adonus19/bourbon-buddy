@@ -141,8 +141,12 @@ ion-content {
     color: var(--color-text-secondary);
   }
 
-  &__actions {
-    margin-top: 4px;
+  // BB-234: the primary action, promoted directly under the header. Sits above
+  // the flavor profile so it's the first thing in reach when the sheet opens.
+  &__cta {
+    ion-button {
+      margin: 0;
+    }
   }
 
   // BB-228b: placeholder for the flavor block while the catalog read is in
