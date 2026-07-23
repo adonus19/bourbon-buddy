@@ -59,6 +59,15 @@ export class WishlistDetailPage {
 
   readonly entry = this.wishlist.selectById(this.entryId);
 
+  /**
+   * BB-236: the hunt-list snapshot may still be in flight when this page mounts
+   * (cold start, deep link, or a hard refresh on /wishlist/:id). Drives a
+   * skeleton instead of flashing the "not on your Hunt List" state — which read
+   * as the app being frozen or broken — before we actually know the entry is
+   * absent. Only once `loaded` is true and there's still no entry is it missing.
+   */
+  readonly loaded = this.wishlist.loaded;
+
   // Sightings are keyed by the bottle (bourbonId), not the wishlist entry, so
   // the listener swaps once the entry (hence its bourbonId) has loaded.
   private readonly sightings$ = toObservable(this.entry).pipe(
