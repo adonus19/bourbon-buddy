@@ -1,6 +1,8 @@
-<ion-content>
-  <div class="gaunt" [class.gaunt--shake]="shake()">
-    <header class="gaunt__head">
+<!-- BB-237: no ion-content wrapper — this renders inside an auto-height centered
+     card (glass-modal-centered), and ion-content's absolute fill would collapse
+     that auto height. The card scrolls internally if a stage ever overflows. -->
+<div class="gaunt" [class.gaunt--shake]="shake()">
+  <header class="gaunt__head">
       <span class="eyebrow">Stage {{ stepLabel() }}</span>
       <button class="gaunt__close" type="button" (click)="giveUp()" aria-label="Give up">
         <ion-icon name="close" aria-hidden="true"></ion-icon>
@@ -108,5 +110,4 @@
         }
       </section>
     }
-  </div>
-</ion-content>
+</div>

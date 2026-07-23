@@ -196,6 +196,20 @@ describe('NumbersPage — Discreet Total Spent (BB-229)', () => {
     expect(page.spendHidden()).toBe(false);
   });
 
+  it('presents the gauntlet as a centered card so it clears the camera (BB-237)', async () => {
+    // A full-screen modal put the close button / stage label under the notch.
+    // The centered-card variant is auto-height and respects the top safe area.
+    gauntletRole = 'revealed';
+    setup({ hidden: true, mode: 'self', configured: true });
+    await page.toggleSpendPrivacy();
+
+    expect(modalCtrl.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cssClass: expect.stringContaining('glass-modal-centered'),
+      })
+    );
+  });
+
   it('leaves the amount masked when the gauntlet is abandoned', async () => {
     // Closing mid-run discards progress — the next attempt starts at stage 1.
     gauntletRole = 'cancel';
