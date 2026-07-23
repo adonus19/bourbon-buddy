@@ -61,6 +61,15 @@
         }
       </div>
 
+      @if (flavorProfile()) {
+        <div class="section">
+          <app-flavor-profile
+            [profile]="flavorProfile()"
+            heading="Tasting notes"
+          />
+        </div>
+      }
+
       <div class="section">
         <div class="wdetail__section-head">
           <p class="eyebrow">Sightings</p>

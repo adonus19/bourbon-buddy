@@ -92,49 +92,6 @@ ion-content {
     }
   }
 
-  &__flavor {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  &__stage {
-    margin: 0;
-    font-size: 14px;
-    color: var(--color-text-secondary);
-
-    strong {
-      color: var(--color-text-primary);
-      font-weight: 600;
-      margin-right: 6px;
-    }
-  }
-
-  // Provenance line (BB-222): earned consensus vs an AI guess, at a glance.
-  &__source {
-    font-size: 11px;
-    color: var(--color-text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  // Producer claims (BB-222): visibly quieter than the earned profile above —
-  // marketing is noted, never presented as consensus.
-  &__claims {
-    margin: 2px 0 0;
-    font-size: 13px;
-    font-style: italic;
-    color: var(--color-text-secondary);
-    opacity: 0.75;
-
-    strong {
-      font-style: normal;
-      font-weight: 600;
-      margin-right: 6px;
-      color: var(--color-text-secondary);
-    }
-  }
-
   &__empty {
     margin: 0;
     font-size: 14px;

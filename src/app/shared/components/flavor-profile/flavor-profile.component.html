@@ -1,0 +1,22 @@
+@if (profile() && hasTags()) {
+  <section class="flavor">
+    <span class="eyebrow">{{ heading() }}</span>
+    @if (sourceLabel(); as src) {
+      <span class="flavor__source">{{ src }}</span>
+    }
+    @if (blendedTags().nose.length) {
+      <p class="flavor__stage"><strong>Nose</strong> {{ stageDisplay('nose') }}</p>
+    }
+    @if (blendedTags().palate.length) {
+      <p class="flavor__stage"><strong>Palate</strong> {{ stageDisplay('palate') }}</p>
+    }
+    @if (blendedTags().finish.length) {
+      <p class="flavor__stage"><strong>Finish</strong> {{ stageDisplay('finish') }}</p>
+    }
+    @if (claims().length) {
+      <p class="flavor__claims">
+        <strong>Distillery says</strong> {{ claims().join(' · ') }}
+      </p>
+    }
+  </section>
+}
