@@ -98,11 +98,14 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
-      # The Firestore emulator is a Java process.
+      # The Firestore emulator is a Java process, and firebase-tools refuses to
+      # start it on anything below JDK 21 ("no longer supports Java version
+      # before 21"). 21 is the current LTS and the documented floor — if a future
+      # firebase-tools raises the minimum again, this is the line to bump.
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
 
       - name: Install dependencies
         run: npm ci
@@ -113,5 +116,9 @@ jobs:
       - name: Install Firebase CLI
         run: npm i -g firebase-tools@15.24.0
 
+      # Emulators need no Firebase credentials, so the CLI's "You are not
+      # currently authenticated" line is expected noise here, not a failure —
+      # the emulator reads the project id from .firebaserc (bourbonbuddy-dev)
+      # and never talks to a real project.
       - name: Rules tests
         run: npm run test:rules
