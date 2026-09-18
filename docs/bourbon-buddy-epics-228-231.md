@@ -898,3 +898,51 @@ opposite of what BB-130 and BB-227 were written to achieve.
 **Also reproduced here:** The Spirits Business fails inside the real handler with
 `Invalid character in entity name (Line 3, Column 491, Char: &)` — sax choking on
 a bare `&`. That is **BB-240**, still open.
+
+---
+
+# Epic J — BB-241/242/243: clear the lint backlog
+
+**Context.** `ng lint` reported 18 errors and `functions` 2, all pre-existing on
+`main`. Triage found **none of them was a real defect** — every one is the linter
+disagreeing with deliberate, correct code. They accumulated because **no CI
+workflow has ever run lint or tests** (that is BB-244).
+
+- [x] **BB-241 — `template/eqeqeq` fought `x != null`** (15 errors, 8 files).
+  Every occurrence compares a field typed `?: T | null` — optional *and*
+  nullable, so the value can be `undefined` or `null`. `!= null` catches both;
+  the linter's suggested `!== null` lets `undefined` through and would render
+  rating/price blocks for entries that have none. **Applying the suggested fix
+  would have introduced 15 bugs.** Configured `allowNullOrUndefined: true`
+  rather than touching the code.
+  - Verified the relaxation is *narrow*: temporarily adding a real
+    `@if (entry().rating == 5)` still errors with
+    `Expected === but received ==`. Only null/undefined comparisons are exempt.
+- [x] **BB-242 — `functions/invoke-backfill.js` require() errors** (2 errors).
+  An operator script, not deployed code. `functions/.eslintrc.js` already ignores
+  `scripts/`, which already held ~10 siblings; this one had just been left at the
+  functions root. `git mv`d into `scripts/` and its header updated with the new
+  invocation path. Verified it still parses and resolves `firebase-admin` from
+  the new location.
+- [x] **BB-243 — Two directives flagged for intentional design** (3 errors).
+  - `directive-selector` prefix is now `["app", "bb"]` — the project genuinely
+    uses both, and `bbTourAnchor` is the established name.
+  - `InputHelpersDirective`'s element selector (`ion-input, ion-textarea`) is
+    the whole point of the directive: every input gets the attributes without
+    opting in. An attribute selector would mean marking every input in the app
+    and would silently miss new ones. Disabled **inline, with the reason at the
+    code**, not hidden in config.
+  - `TourAnchorDirective`'s `@Input('bbTourAnchor')` alias is required for
+    `[bbTourAnchor]="key"` to bind — the same shape `ngModel` uses. Also an
+    inline, documented disable.
+
+**Policy split used here:** things that are project-wide policy (the null
+comparison idiom, the two directive prefixes) live in `.eslintrc.json`; genuine
+one-off exceptions carry an inline disable with the reason next to the code, so a
+future reader sees *why* at the point it matters.
+
+**Result: `ng lint` reports "All files pass linting"; functions lint is 0 errors**
+(33 quote-style warnings remain, unchanged and pre-existing). Tests: frontend
+599/599, functions 324/324, production build clean.
+
+**BB-244 (CI runs lint + tests) is now unblocked** — it can be switched on green.

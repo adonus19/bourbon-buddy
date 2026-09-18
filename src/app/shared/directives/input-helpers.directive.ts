@@ -11,6 +11,11 @@ const NO_ASSIST_TYPES = ['email', 'password', 'number', 'tel', 'url'];
  * fields can opt out.
  */
 @Directive({
+  // Element selector on purpose (BB-243): the point of this directive is that
+  // EVERY ion-input/ion-textarea gets the attributes without a template opting
+  // in. An attribute selector, which the lint rule wants, would mean adding a
+  // marker to every input in the app and would silently miss any new one.
+  // eslint-disable-next-line @angular-eslint/directive-selector
   selector: 'ion-input, ion-textarea',
   standalone: false,
 })
