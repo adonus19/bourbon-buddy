@@ -66,6 +66,7 @@ beforeEach(async () => {
     });
     await setDoc(doc(db, 'bourbons/b1'), { name: 'Test Bourbon' });
     await setDoc(doc(db, 'newsArticles/a1'), { title: 'News' });
+    await setDoc(doc(db, 'articleBodies/a1'), { bodyText: 'full article body' });
     await setDoc(doc(db, `publicProfiles/${APPROVED}`), {
       displayName: 'Approved Amy',
     });
@@ -139,6 +140,14 @@ describe('approved user', () => {
     await assertSucceeds(
       getDoc(doc(approvedDb(), `publicProfiles/${APPROVED}`))
     );
+  });
+
+  // BB-239: bodies are server-only. If this ever passes, the Dispatch feed is
+  // paying ~75KB per page for text the UI never renders — and the reason the
+  // body was moved off the article doc has been undone.
+  it('cannot read article bodies, even though it can read the article', async () => {
+    await assertSucceeds(getDoc(doc(approvedDb(), 'newsArticles/a1')));
+    await assertFails(getDoc(doc(approvedDb(), 'articleBodies/a1')));
   });
 
   it('writes their own subcollections as before', async () => {

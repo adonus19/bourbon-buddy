@@ -179,3 +179,45 @@ describe("publishedAt", () => {
     expect(publishedAt({ isoDate: "not-a-date" })).toBeNull();
   });
 });
+
+// BB-239: the body the extractor gets. Lives here rather than in a functions
+// integration test because the selection rule is the whole fix — reading the
+// wrong rss-parser key silently fed the model a 320-char teaser for years.
+describe("body selection (content:encoded vs description)", () => {
+  // Mirrors news/index.ts: prefer content:encoded, longer-wins over the teaser.
+  const pickBody = (item: {
+    "content:encoded"?: string;
+    content?: string;
+  }): string => {
+    const full = (item["content:encoded"] ?? "").trim();
+    const teaser = (item.content ?? "").trim();
+    return full.length >= teaser.length ? full : teaser;
+  };
+
+  it("prefers content:encoded over the description teaser", () => {
+    const item = {
+      "content:encoded": "<p>" + "the full article body. ".repeat(60) + "</p>",
+      content: "<p>A 320-char teaser.</p>",
+    };
+    expect(pickBody(item)).toContain("the full article body");
+    expect(pickBody(item).length).toBeGreaterThan(1000);
+  });
+
+  it("falls back to the description when there is no content:encoded", () => {
+    // Bourbon Guy syndicates its whole post in <description>; dropping to a
+    // teaser here would be a regression, not a fix.
+    const item = { content: "<p>" + "whole post in description. ".repeat(40) + "</p>" };
+    expect(pickBody(item)).toContain("whole post in description");
+  });
+
+  it("does not let an empty or stub content:encoded beat a real teaser", () => {
+    expect(pickBody({ "content:encoded": "   ", content: "<p>real text here</p>" }))
+      .toBe("<p>real text here</p>");
+    expect(pickBody({ "content:encoded": "<p>hi</p>", content: "<p>much longer teaser text</p>" }))
+      .toBe("<p>much longer teaser text</p>");
+  });
+
+  it("yields empty for a feed item with neither", () => {
+    expect(pickBody({})).toBe("");
+  });
+});

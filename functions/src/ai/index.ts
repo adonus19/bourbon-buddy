@@ -422,7 +422,19 @@ async function processArticle(
   }
   const headline = (article.headline as string) ?? "";
   const excerpt = (article.excerpt as string) ?? "";
-  const storedBody = (article.bodyText as string) ?? "";
+  // BB-239: the body lives in /articleBodies/{articleId}, not on the article
+  // doc (the Dispatch feed reads whole article documents). Pre-BB-239 articles
+  // still carry it inline, so fall back to that until they age out.
+  let storedBody = (article.bodyText as string) ?? "";
+  try {
+    const bodyDoc = await db.collection("articleBodies").doc(ref.id).get();
+    const fromCollection = (bodyDoc.data()?.bodyText as string) ?? "";
+    if (fromCollection.length > storedBody.length) {
+      storedBody = fromCollection;
+    }
+  } catch (err) {
+    logger.warn(`Body lookup failed for ${ref.id}`, err); // fall through to fetch
+  }
   const url = (article.url as string) ?? "";
 
   // Prefer the full body from the feed; if it's only a teaser (or absent),
