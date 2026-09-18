@@ -1,0 +1,113 @@
+# Lint, unit tests, and Security Rules tests on every PR and every push to main.
+#
+# Why this exists (BB-244): until now the only workflows were deploy-only, so
+# nothing ever ran `ng lint` or a test suite in CI. 18 frontend lint errors and 2
+# in functions accumulated on main unnoticed, and a source that had silently
+# stopped ingesting went unnoticed for months. Deploys stay separate — this
+# workflow never touches Firebase and needs no secrets.
+#
+# Three independent jobs so a functions failure doesn't mask a frontend one, and
+# so they run in parallel.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  # So the workflow can be exercised from the Actions tab without opening a PR.
+  workflow_dispatch:
+
+# A new push to the same branch supersedes the previous run.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: Frontend (lint + tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      # --ci: never write snapshots on CI. --runInBand: one worker. The suite
+      # takes ~55s serial vs ~20s parallel, which is worth paying — parallel
+      # Angular/jsdom workers are the usual cause of OOM and "worker process
+      # failed to exit gracefully" flakes on small runners, and a CI that fails
+      # intermittently is worse than a CI that takes another half minute.
+      - name: Unit tests
+        run: npm test -- --ci --runInBand
+
+  functions:
+    name: Functions (lint + build + tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: functions
+
+      - name: Lint
+        run: npm run lint
+        working-directory: functions
+
+      # Catches type errors the unit tests wouldn't, and mirrors what deploy does.
+      - name: Build
+        run: npm run build
+        working-directory: functions
+
+      - name: Unit tests
+        run: npm test -- --ci --runInBand
+        working-directory: functions
+
+  rules:
+    name: Firestore Security Rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      # The Firestore emulator is a Java process.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # firebase-tools is deliberately NOT a dependency of the app (it's a heavy
+      # CLI, not a runtime need), so CI installs it. Pinned for reproducibility —
+      # bump deliberately rather than letting a CLI release break the build.
+      - name: Install Firebase CLI
+        run: npm i -g firebase-tools@15.24.0
+
+      - name: Rules tests
+        run: npm run test:rules
