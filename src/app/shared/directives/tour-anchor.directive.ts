@@ -24,6 +24,10 @@ export class TourAnchorDirective implements OnDestroy {
 
   private key = '';
 
+  // Aliased to match the selector so `[bbTourAnchor]="key"` binds (BB-243) —
+  // the same shape ngModel uses. Without the alias the directive would need a
+  // second attribute on every anchor. The lint rule can't tell the two apart.
+  // eslint-disable-next-line @angular-eslint/no-input-rename
   @Input('bbTourAnchor')
   set bbTourAnchor(key: string) {
     if (this.key && this.key !== key) {

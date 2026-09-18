@@ -5,8 +5,12 @@
  * Toolkit exchange, then POSTs to the callable. App Check is currently disabled
  * (ENFORCE_APP_CHECK=false) so no App Check token is needed.
  *
- * Run from functions/ (has firebase-admin):
- *   GCLOUD_PROJECT=bourbonbuddy-dev node <this> [limit] [sinceHours]
+ * Run from functions/ (node resolves firebase-admin from ../node_modules):
+ *   GCLOUD_PROJECT=bourbonbuddy-dev node scripts/invoke-backfill.js [limit] [sinceHours]
+ *
+ * Lives in scripts/ with the other operator tools (BB-242) — that directory is
+ * in .eslintrc.js ignorePatterns, because these are throwaway admin scripts and
+ * not part of the deployed bundle.
  */
 const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
