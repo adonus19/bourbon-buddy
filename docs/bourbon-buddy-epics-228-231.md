@@ -1075,3 +1075,67 @@ flavor-seeding rights, press releases don't.
 **Note:** BB-245 branches off `main`, which does **not** yet carry BB-244/BB-246
 — so the floors aren't active on this branch. They will be once those merge,
 which is why the coverage was checked explicitly rather than assumed.
+
+---
+
+## BB-247 — One header menu across the tabs
+
+**The problem.** Every tab rendered a different set of header buttons, so the
+top-right of the app changed meaning as you moved between tabs. The Hunt List
+was the worst case: four end-slot buttons (Share, Lookup, Stores, "+ Sighting")
+next to Filter and Sort. It also left two dead ends — **Settings was reachable
+only from the Cellar**, **My Stores only from the Hunt List**.
+
+**The shape now.** One right-side drawer, identical on all five tabs, holding
+every action that used to be scattered. Each header reads
+`[left: view controls] · [right: ☰]`.
+
+- [x] **BB-247a — The drawer.** `app-menu` (`ion-menu side="end"`), mounted once
+  in `app.component.html` as a direct child of `ion-app`. Lives in its own small
+  `AppMenuModule` — the OnboardingModule trick — so the eager AppModule can
+  mount it without pulling SharedModule into the initial bundle. `swipeGesture`
+  is **off**: an edge-swipe would fight the `ion-item-sliding` rows on the
+  Cellar and Hunt List.
+- [x] **BB-247b — The trigger.** `app-menu-button`, one per tab page (six
+  templates — the Social tab is *two* pages, `friends-feed` and `friends`, or
+  the ☰ vanishes when you flip the segment). A plain `ion-button` rather than
+  `ion-menu-button` so the unread badge can overlay the icon.
+- [x] **BB-247c — Moved, not buried.** Dispatch (Feed settings), Numbers (Year
+  in Review) and Friends (Sightings map, Toggle stale) keep their own buttons —
+  moved to the header's **left**, where Cellar/Hunt already put Filter and Sort.
+  The `numbers-year` and `social-map` tour anchors ride along with them.
+- [x] **BB-247d — The two modals stay lazy.** "Look up a bottle" and "Share hunt
+  list" route to `/tabs/hunt-list?lookup=1` / `?share=1` instead of opening the
+  modal from the drawer. The lookup sheet drags `@zxing/browser`, the preview
+  sheet and TasteMatchService; opening it from an eager root component would
+  pull all of that into the initial bundle. `HuntListPage` reads the flag from
+  `queryParamMap` (**not** `ionViewWillEnter` — Ionic caches the page, so a flag
+  arriving while Hunt is already showing would never re-fire the hook), clears it
+  with `replaceUrl`, then opens the existing modal.
+- [x] **BB-247e — The badge went global, and a race got fixed.** The unread count
+  moved off the Cellar-only bell onto the trigger, so it's visible from every
+  tab. `InboxService` exposes it as a signal kept in step by `applyAppBadge` —
+  the funnel every read/write path already called. Verification caught a real
+  bug: `snapshotUser` is null until Firebase restores the session, so the
+  launch-time count raced auth and returned 0, leaving the badge blank until
+  something else refreshed it. It now seeds off the shared `currentUser$`
+  stream — no new listener, one COUNT aggregation per auth change, and fewer
+  reads than the old every-Cellar-tab-enter behaviour.
+
+**Verified in the browser against the emulators.**
+- Trigger present on all **six** tab pages; badge correct on every one.
+- Drawer items and live counts: `Share hunt list 3`, `Notifications 1`.
+- Hand-off works from a tab that never owned the action — "Look up a bottle"
+  from **Numbers** and "Share hunt list" from **Dispatch** both land on
+  `/tabs/hunt-list` with the modal open and the query flag cleared.
+- Gating holds: on `/login` no trigger renders and a forced `menu.open()`
+  returns `opened=false`.
+- Filter/Sort still conditional — 2 buttons on Hunting, 0 on Shared.
+- `ion-item-sliding` rows still open (3 on the Hunt List), so nothing regressed
+  from turning the swipe gesture off.
+- Closes on Escape and on a tap outside the panel. With the drawer open, browser
+  Back navigates and closes it — no trap, no stale overlay. (Ionic's hardware
+  back-button handling on Android was not exercised here.)
+- Tests **627** (24 new), lint clean, initial bundle **317.33 kB** vs **314.48 kB**
+  on `main` — **+2.87 kB** for the whole drawer, confirming the lazy chunks
+  stayed lazy. Coverage 53.45/43.16/44.36/53.18, above all four BB-246 floors.

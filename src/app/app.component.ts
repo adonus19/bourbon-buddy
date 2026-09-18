@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { NavigationEnd, NavigationError, Router } from '@angular/router';
-import { filter, take } from 'rxjs/operators';
+import { filter, map, take } from 'rxjs/operators';
+import { toSignal } from '@angular/core/rxjs-interop';
 
 import { AppUpdateService } from './core/services/app-update.service';
 import { InboxService } from './core/services/inbox.service';
@@ -23,6 +24,19 @@ export class AppComponent implements OnInit {
   // are deliberately ignored: their follow-up navigation still ends.
   readonly bootSplashFading = signal(false);
   readonly bootSplashGone = signal(false);
+
+  /**
+   * True while the user is inside the tab shell — the only place the header
+   * menu applies (BB-247). Gates the drawer so it can't be opened over Login
+   * or a full-screen detail page.
+   */
+  readonly inTabs = toSignal(
+    this.router.events.pipe(
+      filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+      map((e) => e.urlAfterRedirects.startsWith('/tabs'))
+    ),
+    { initialValue: false }
+  );
 
   constructor() {
     this.router.events

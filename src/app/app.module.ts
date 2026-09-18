@@ -43,6 +43,7 @@ import { environment } from '../environments/environment';
 import { AppComponent } from './app.component';
 import { AppRoutingModule } from './app-routing.module';
 import { OnboardingModule } from './shared/onboarding.module';
+import { AppMenuModule } from './shared/app-menu.module';
 
 @NgModule({
   declarations: [AppComponent],
@@ -53,6 +54,8 @@ import { OnboardingModule } from './shared/onboarding.module';
     // Guided walkthrough overlay lives at the app root so it can spotlight
     // elements on any route (tabs and top-level detail pages alike).
     OnboardingModule,
+    // The single app-wide header menu drawer (BB-247), mounted in app.component.
+    AppMenuModule,
     // App-shell caching (ngsw): instant repeat-visit paint + offline startup.
     // Registered at scope '/', coexisting with firebase-messaging-sw.js which
     // FCM registers at its own push scope. 'registerWhenStable' keeps SW setup

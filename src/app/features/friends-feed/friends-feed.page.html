@@ -1,7 +1,6 @@
 <ion-header [translucent]="true">
   <ion-toolbar>
-    <ion-title>Friends</ion-title>
-    <ion-buttons slot="end">
+    <ion-buttons slot="start">
       <ion-button
         routerLink="/sightings/map"
         aria-label="Sightings map"
@@ -15,6 +14,10 @@
           [name]="hideStale() ? 'eye-off-outline' : 'eye-outline'"
         ></ion-icon>
       </ion-button>
+    </ion-buttons>
+    <ion-title>Friends</ion-title>
+    <ion-buttons slot="end">
+      <app-menu-button></app-menu-button>
     </ion-buttons>
   </ion-toolbar>
   <ion-toolbar>

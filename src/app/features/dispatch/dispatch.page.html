@@ -1,10 +1,13 @@
 <ion-header [translucent]="true">
   <ion-toolbar>
-    <ion-title>Dispatch</ion-title>
-    <ion-buttons slot="end">
+    <ion-buttons slot="start">
       <ion-button routerLink="/feed-settings" aria-label="Feed settings">
         <ion-icon slot="icon-only" name="options-outline"></ion-icon>
       </ion-button>
+    </ion-buttons>
+    <ion-title>Dispatch</ion-title>
+    <ion-buttons slot="end">
+      <app-menu-button></app-menu-button>
     </ion-buttons>
   </ion-toolbar>
   <ion-toolbar>

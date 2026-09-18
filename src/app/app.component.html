@@ -1,5 +1,9 @@
 <ion-app>
-  <ion-router-outlet></ion-router-outlet>
+  <!-- One app-wide header menu (BB-247). Must be a direct child of ion-app,
+       alongside the outlet it targets via contentId. Disabled outside the tab
+       shell, where its actions don't apply and no trigger is rendered. -->
+  <app-menu [disabled]="!inTabs()"></app-menu>
+  <ion-router-outlet id="main-content"></ion-router-outlet>
 </ion-app>
 
 <!-- Guided walkthrough / contextual tips; renders only when a step is active. -->

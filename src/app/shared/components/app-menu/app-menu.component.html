@@ -1,0 +1,72 @@
+<ion-menu
+  side="end"
+  menuId="app-menu"
+  contentId="main-content"
+  [swipeGesture]="false"
+  [disabled]="disabled"
+  (ionDidOpen)="onOpen()"
+  (ionDidClose)="onClose()"
+>
+  <ion-header [translucent]="true">
+    <ion-toolbar>
+      <ion-title>Menu</ion-title>
+      <ion-buttons slot="end">
+        <ion-button (click)="close()" aria-label="Close menu">
+          <ion-icon slot="icon-only" name="close-outline"></ion-icon>
+        </ion-button>
+      </ion-buttons>
+    </ion-toolbar>
+  </ion-header>
+
+  <ion-content class="app-menu">
+    <p class="eyebrow app-menu__eyebrow">Actions</p>
+    <ion-list lines="none">
+      <ion-item button detail="false" (click)="go(['/spotted/new'])">
+        <ion-icon slot="start" name="add-circle-outline"></ion-icon>
+        <ion-label>Log a sighting</ion-label>
+      </ion-item>
+
+      <ion-item
+        button
+        detail="false"
+        (click)="go(['/tabs/hunt-list'], { lookup: 1 })"
+      >
+        <ion-icon slot="start" name="search-outline"></ion-icon>
+        <ion-label>Look up a bottle</ion-label>
+      </ion-item>
+
+      @if (activeCount() > 0) {
+        <ion-item
+          button
+          detail="false"
+          (click)="go(['/tabs/hunt-list'], { share: 1 })"
+        >
+          <ion-icon slot="start" name="share-social-outline"></ion-icon>
+          <ion-label>Share hunt list</ion-label>
+          <ion-note slot="end">{{ activeCount() }}</ion-note>
+        </ion-item>
+      }
+    </ion-list>
+
+    <p class="eyebrow app-menu__eyebrow">Go to</p>
+    <ion-list lines="none">
+      <ion-item button detail="false" (click)="go(['/stores'])">
+        <ion-icon slot="start" name="storefront-outline"></ion-icon>
+        <ion-label>My stores</ion-label>
+      </ion-item>
+
+      <ion-item button detail="false" (click)="go(['/inbox'])">
+        <ion-icon slot="start" name="notifications-outline"></ion-icon>
+        <ion-label>Notifications</ion-label>
+        @if (unread() > 0) {
+          <ion-badge slot="end" color="warning">{{ unread() }}</ion-badge>
+        }
+      </ion-item>
+
+      <ion-item button detail="false" (click)="go(['/settings'])">
+        <ion-icon slot="start" name="person-circle-outline"></ion-icon>
+        <ion-label>Settings</ion-label>
+      </ion-item>
+    </ion-list>
+  </ion-content>
+</ion-menu>

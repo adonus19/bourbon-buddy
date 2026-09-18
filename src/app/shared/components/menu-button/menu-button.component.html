@@ -1,0 +1,14 @@
+<ion-button
+  class="app-menu-button"
+  aria-label="Menu"
+  aria-haspopup="menu"
+  [attr.aria-expanded]="expanded()"
+  (click)="open()"
+>
+  <ion-icon slot="icon-only" name="menu-outline"></ion-icon>
+  @if (unread() > 0) {
+    <ion-badge class="app-menu-button__badge" color="warning">
+      {{ unread() > 9 ? '9+' : unread() }}
+    </ion-badge>
+  }
+</ion-button>

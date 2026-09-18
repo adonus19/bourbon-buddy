@@ -1,11 +1,14 @@
 import {
   ChangeDetectorRef,
   Component,
+  DestroyRef,
+  OnInit,
   computed,
   inject,
   signal,
 } from '@angular/core';
-import { Router } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router } from '@angular/router';
 import {
   ActionSheetController,
   AlertController,
@@ -51,10 +54,12 @@ const SORT_LABELS: Record<WishlistSort, string> = {
   styleUrls: ['./hunt-list.page.scss'],
   standalone: false,
 })
-export class HuntListPage implements ViewWillEnter {
+export class HuntListPage implements OnInit, ViewWillEnter {
   private readonly wishlist = inject(WishlistService);
   private readonly sharedItems = inject(SharedItemsService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly actionSheet = inject(ActionSheetController);
   private readonly alertCtrl = inject(AlertController);
   private readonly modalCtrl = inject(ModalController);
@@ -163,6 +168,33 @@ export class HuntListPage implements ViewWillEnter {
             : a.bourbonName.localeCompare(b.bourbonName);
         });
     }
+  }
+
+  ngOnInit(): void {
+    // The app menu drawer (BB-247) reaches these two modals by routing here
+    // with a flag rather than opening them itself — that keeps the barcode
+    // scanner and preview sheet inside this lazy chunk (BB-228).
+    //
+    // Deliberately queryParamMap, not ionViewWillEnter: Ionic caches this page,
+    // so a flag arriving while the Hunt tab is already showing would never
+    // re-fire the lifecycle hook. The flag is cleared as soon as it's handled
+    // so Back can't re-open the modal.
+    this.route.queryParamMap
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((params) => {
+        const lookup = params.get('lookup');
+        const share = params.get('share');
+        if (!lookup && !share) {
+          return;
+        }
+        void this.router
+          .navigate([], {
+            relativeTo: this.route,
+            queryParams: {},
+            replaceUrl: true,
+          })
+          .then(() => (lookup ? this.openLookup() : this.shareList()));
+      });
   }
 
   ionViewWillEnter(): void {

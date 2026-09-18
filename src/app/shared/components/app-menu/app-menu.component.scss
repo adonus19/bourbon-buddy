@@ -1,0 +1,27 @@
+.app-menu {
+  --background: var(--color-bg-primary);
+
+  ion-list {
+    background: transparent;
+  }
+
+  ion-item {
+    --background: transparent;
+    --padding-start: 16px;
+  }
+
+  ion-icon[slot="start"] {
+    color: var(--color-copper);
+    margin-inline-end: 14px;
+  }
+
+  // The drawer runs to the bottom of the screen, past the tab bar — keep the
+  // last item clear of the home indicator on notched devices.
+  &::part(scroll) {
+    padding-bottom: calc(16px + var(--ion-safe-area-bottom, 0px));
+  }
+}
+
+.app-menu__eyebrow {
+  margin: 20px 16px 4px;
+}
