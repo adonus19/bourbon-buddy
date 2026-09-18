@@ -1,0 +1,16 @@
+// Fixed ratio so the card reserves the image's space before it loads: the feed
+// doesn't reflow as heroes arrive, and a failed load can't leave a gap.
+.hero {
+  aspect-ratio: 16 / 9;
+  margin-bottom: 10px;
+  border-radius: var(--radius-input);
+  overflow: hidden;
+  background: var(--color-bg-elevated);
+
+  &__img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}

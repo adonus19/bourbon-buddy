@@ -28,6 +28,7 @@ import { CriticSummaryComponent } from './components/critic-summary/critic-summa
 import { FlavorProfileComponent } from './components/flavor-profile/flavor-profile.component';
 import { ShareBottleModalComponent } from './components/share-bottle-modal/share-bottle-modal.component';
 import { ShareListModalComponent } from './components/share-list-modal/share-list-modal.component';
+import { ArticleHeroComponent } from './components/article-hero/article-hero.component';
 import { InputHelpersDirective } from './directives/input-helpers.directive';
 import { OnboardingModule } from './onboarding.module';
 
@@ -40,6 +41,7 @@ const COMPONENTS = [
   InputHelpersDirective,
   ComingSoonComponent,
   WordmarkComponent,
+  ArticleHeroComponent,
   RatingWidgetComponent,
   FlavorTagSelectorComponent,
   BourbonAutocompleteComponent,

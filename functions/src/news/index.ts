@@ -18,6 +18,7 @@ import {
   thumbnailFrom,
   urlHash,
 } from "./parse";
+import { fetchOgImage } from "./og-image";
 import { htmlToText } from "../ai/article-text";
 
 const MAX_AGE_DAYS = 90;
@@ -28,19 +29,85 @@ const READ_RETENTION_MS = 24 * 60 * 60 * 1000;
 // Matches the extractor's MAX_TEXT_CHARS so a long listicle's tail bottles
 // aren't pre-truncated out of the stored body before the model ever sees them.
 const MAX_BODY_CHARS = 12000;
+// og:image fallback (BB-238) for feeds that carry no image in the item at all.
+// Only runs for items the feed itself couldn't supply, so on a steady-state
+// cycle it's a handful of requests. Bounded so a slow host can't eat the 300s
+// ingest budget: worst case here is MAX/CONCURRENCY * TIMEOUT ≈ 32s per source.
+const OG_IMAGE_TIMEOUT_MS = 5000;
+const OG_IMAGE_CONCURRENCY = 4;
+const OG_IMAGE_MAX_PER_SOURCE = 25;
 
 type FeedItem = Parser.Item & {
   enclosure?: { url?: string };
   "media:content"?: { $?: { url?: string } };
-  // rss-parser maps <content:encoded> to `content` (full HTML body); many
-  // WordPress feeds populate it. `contentSnippet` is its stripped teaser.
+  "media:thumbnail"?: { $?: { url?: string } };
+  // rss-parser puts <content:encoded> on its own key; `content` is the
+  // <description> teaser, which parseItemRss writes last. Both are scanned for
+  // a hero image (BB-238) — see parse.ts's thumbnailFrom.
+  "content:encoded"?: string;
   content?: string;
 };
 
 const parser: Parser<unknown, FeedItem> = new Parser({
   timeout: 15000,
-  customFields: { item: [["media:content", "media:content"]] },
+  customFields: {
+    item: [
+      ["media:content", "media:content"],
+      ["media:thumbnail", "media:thumbnail"],
+    ],
+  },
 });
+
+/** Feed items that survived the link/age filter, with their parsed date. */
+interface FreshItem {
+  item: FeedItem;
+  link: string;
+  published: Date | null;
+}
+
+/** Run `work` over `items` with at most `limit` in flight. */
+async function pool<T>(
+  items: T[],
+  limit: number,
+  work: (item: T) => Promise<void>
+): Promise<void> {
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, () =>
+    (async () => {
+      for (let i = next++; i < items.length; i = next++) {
+        await work(items[i]);
+      }
+    })()
+  );
+  await Promise.all(workers);
+}
+
+/**
+ * Hero image per item, keyed by link (BB-238). The feed itself answers for
+ * nearly every source; only items it can't supply cost an og:image fetch, and
+ * those are capped so one slow host can't stall the whole ingest.
+ */
+async function resolveThumbnails(
+  fresh: FreshItem[]
+): Promise<Map<string, string | null>> {
+  const thumbs = new Map<string, string | null>();
+  const needsFetch: FreshItem[] = [];
+  for (const f of fresh) {
+    const fromFeed = thumbnailFrom(f.item, f.link);
+    thumbs.set(f.link, fromFeed);
+    if (!fromFeed) {
+      needsFetch.push(f);
+    }
+  }
+  await pool(
+    needsFetch.slice(0, OG_IMAGE_MAX_PER_SOURCE),
+    OG_IMAGE_CONCURRENCY,
+    async (f) => {
+      thumbs.set(f.link, await fetchOgImage(f.link, OG_IMAGE_TIMEOUT_MS));
+    }
+  );
+  return thumbs;
+}
 
 async function ingestSource(
   db: FirebaseFirestore.Firestore,
@@ -50,6 +117,7 @@ async function ingestSource(
   const now = Date.now();
   let written = 0;
 
+  const fresh: FreshItem[] = [];
   for (const item of feed.items ?? []) {
     const link = item.link?.trim();
     if (!link) {
@@ -59,33 +127,43 @@ async function ingestSource(
     if (published && now - published.getTime() > MAX_AGE_MS) {
       continue; // older than 90 days
     }
+    fresh.push({ item, link, published });
+  }
 
+  const thumbs = await resolveThumbnails(fresh);
+
+  for (const { item, link, published } of fresh) {
     const headline = (item.title ?? "").trim() || "(untitled)";
     const excerpt = (item.contentSnippet ?? "").trim().slice(0, 320) || null;
     // Full body for AI extraction only (not shown in the UI). Empty when the
     // feed syndicates just a teaser — the extractor then fetches the URL itself.
     const bodyText = htmlToText(item.content ?? "").slice(0, MAX_BODY_CHARS) || null;
 
+    const doc: Record<string, unknown> = {
+      sourceName: source.name,
+      headline,
+      excerpt,
+      bodyText,
+      url: link,
+      publishedAt: published ? Timestamp.fromDate(published) : null,
+      fetchedAt: Timestamp.now(),
+      categories: categorize(`${headline} ${excerpt ?? ""}`),
+      keywords: [],
+    };
+    // Only written when we actually found one: with merge:true a null here
+    // would ERASE a good image stored by an earlier run (BB-238) — e.g. when a
+    // later og:image fetch times out, or a feed drops its media:content.
+    const thumbnailUrl = thumbs.get(link);
+    if (thumbnailUrl) {
+      doc.thumbnailUrl = thumbnailUrl;
+    }
+
     await db
       .collection("newsArticles")
       .doc(urlHash(link)) // URL-derived id => dedupe on write
       // merge:true so re-fetching an existing article updates its fields WITHOUT
       // wiping the AI-extracted mentionedBottles/bottlesExtractedAt (BB-130).
-      .set(
-        {
-          sourceName: source.name,
-          headline,
-          excerpt,
-          bodyText,
-          url: link,
-          thumbnailUrl: thumbnailFrom(item),
-          publishedAt: published ? Timestamp.fromDate(published) : null,
-          fetchedAt: Timestamp.now(),
-          categories: categorize(`${headline} ${excerpt ?? ""}`),
-          keywords: [],
-        },
-        { merge: true }
-      );
+      .set(doc, { merge: true });
     written++;
   }
   return written;
