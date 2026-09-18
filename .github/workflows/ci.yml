@@ -45,13 +45,16 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # test:cov, not test — the coverage FLOORS in jest.config.js (BB-246) are
+      # only evaluated when coverage is actually collected, so plain `npm test`
+      # would leave the ratchet unenforced.
       # --ci: never write snapshots on CI. --runInBand: one worker. The suite
       # takes ~55s serial vs ~20s parallel, which is worth paying — parallel
       # Angular/jsdom workers are the usual cause of OOM and "worker process
       # failed to exit gracefully" flakes on small runners, and a CI that fails
       # intermittently is worse than a CI that takes another half minute.
-      - name: Unit tests
-        run: npm test -- --ci --runInBand
+      - name: Unit tests + coverage floor
+        run: npm run test:cov -- --ci --runInBand
 
   functions:
     name: Functions (lint + build + tests)
@@ -78,8 +81,9 @@ jobs:
         run: npm run build
         working-directory: functions
 
-      - name: Unit tests
-        run: npm test -- --ci --runInBand
+      # test:cov so the coverage floors in functions/jest.config.js are enforced.
+      - name: Unit tests + coverage floor
+        run: npm run test:cov -- --ci --runInBand
         working-directory: functions
 
   rules:

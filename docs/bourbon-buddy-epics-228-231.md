@@ -1006,3 +1006,42 @@ would fail CI on day one — the opposite of switching it on green. **Follow-up
 (BB-246): ratchet coverage**, starting the threshold at roughly today's numbers
 so it can only go up, rather than setting 80% and disabling it the first time it
 hurts.
+
+---
+
+# Epic L — BB-246: Coverage ratchet
+
+**Depends on BB-244** — it edits `.github/workflows/ci.yml`, which only exists on
+that branch. **Merge BB-244 first.**
+
+**Problem.** The standing policy ([testing-coverage-policy]) is 80% overall and
+60% on new code, but nothing enforced it, and BB-244 deliberately shipped without
+a coverage gate because setting 80% against a ~53% baseline would fail every
+build on day one — and a gate that fails every build gets deleted, not satisfied.
+
+- [x] **BB-246 — `coverageThreshold` floors in both jest configs**, set just
+  under the measured baseline so the number can only go up:
+
+  | | Statements | Branches | Functions | Lines |
+  |---|---|---|---|---|
+  | Frontend measured | 52.94% | 43.00% | 43.63% | 52.67% |
+  | **Frontend floor** | **52** | **42** | **43** | **52** |
+  | Functions measured | 52.72% | 52.31% | 62.00% | 52.60% |
+  | **Functions floor** | **52** | **51** | **61** | **52** |
+
+  The ~1-point gap absorbs normal churn; a real regression still trips it.
+- [x] **CI now runs `test:cov`, not `test`.** This is the part that makes the
+  ratchet real: `coverageThreshold` is only evaluated when coverage is actually
+  collected, so with plain `npm test` the floors would have sat in the config
+  doing nothing.
+
+**Verified.**
+- Passes at today's numbers: frontend 599/599, functions 324/324, exit 0 both.
+- **The gate actually bites**: temporarily raising the functions statements floor
+  to 99 produced exit code 1 and
+  `Jest: "global" coverage threshold for statements (99%) not met: 52.72%`.
+  Restored → exit 0. A threshold that is never exercised is indistinguishable
+  from no threshold, so this negative test is the real proof.
+
+**The rule going forward:** when a suite moves the number, RAISE the floor to just
+under the new figure. Never lower a floor to make a build pass — add the tests.
