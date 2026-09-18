@@ -1006,99 +1006,72 @@ future reader sees *why* at the point it matters.
 
 ---
 
-# Epic K — BB-244: CI runs lint and tests
+# Epic M — BB-245: Breaking Bourbon via sitemap + JSON-LD
 
-**Problem.** All three workflows (`deploy.yml`, `deploy-staging.yml`,
-`deploy-backend.yml`) were build-and-deploy only. **Nothing had ever run
-`ng lint`, `npm test`, the functions suite, or the Rules tests in CI.** That is
-how 18 frontend lint errors plus 2 in functions accumulated on `main` unnoticed
-(BB-241/242/243), and it is the same class of gap that let a dead news source
-and an unmerged branch slip past.
+**Platform.** Webflow, and it publishes no feed of any kind: `/feed`, `/rss`,
+`/feed.xml`, `/blog/rss.xml`, `/review/rss.xml` and `wp-json` all 404, so
+BB-240's REST-API route does **not** transfer. The sitemap is the only entry
+point, and `robots.txt` advertises exactly that (a `Sitemap:` line, no
+`Disallow`).
 
-- [x] **BB-244 — `.github/workflows/ci.yml`.** Runs on every `pull_request`,
-  every push to `main`, and on demand (`workflow_dispatch`). Three parallel jobs
-  so one failure doesn't mask another:
-  | Job | Steps |
-  |---|---|
-  | **Frontend** | `npm ci` → `npm run lint` → `npm test -- --ci --runInBand` |
-  | **Functions** | `npm ci` → `npm run lint` → `npm run build` → `npm test` |
-  | **Rules** | `npm ci` → Java 17 → Firebase CLI → `npm run test:rules` |
-  - Deploys stay separate: this workflow touches no Firebase project and needs
-    **no secrets**.
-  - `concurrency` cancels superseded runs on the same branch.
-  - The functions job runs `npm run build` as well as tests — it catches type
-    errors the unit tests wouldn't and mirrors what deploy actually does.
-  - `firebase-tools` is intentionally not an app dependency (heavy CLI, no
-    runtime need), so the rules job installs it **pinned at 15.24.0** — matching
-    the version in local use. Bump deliberately rather than letting a CLI release
-    break the build.
-  - `--runInBand` is a deliberate ~55s-vs-~20s trade: parallel Angular/jsdom
-    workers are the usual cause of OOM and "worker failed to exit gracefully"
-    flakes on small runners, and an intermittently-red CI is worse than a slower
-    one.
+**The finding that shaped the design — the site splits in two.**
+`/review/` (~2,400 URLs) carries a JSON-LD `Article` block with a clean
+headline, a real `datePublished`, a description and an image. **Every other
+section** (press releases 1,760, `/article/` 227, roundtables, tnt, roundups)
+has og: tags only and **no publish date anywhere**. `lastmod` cannot stand in
+for one — `/whiskey-roundup/april-2021` carries `lastmod=2022-11-11` because a
+migration touched every page. A fabricated `publishedAt` would misorder the
+feed, defeat the 90-day ingest filter and confuse `cleanupOldArticles`.
 
-**Verified locally (the commands, not the GitHub wiring).** Every command the
-workflow runs was executed exactly as written:
-- `npm test -- --ci --runInBand`: frontend **599/599**, functions **324/324**.
-- `npm run lint`: frontend "All files pass linting", functions 0 errors.
-- `npm run build` (functions): exit 0.
-- `npm ci --dry-run` succeeds against both lockfiles — the real CI failure mode
-  would have been a stale lockfile, and there isn't one.
-- The `npm warn EBADENGINE` seen locally is a local-only artifact (this machine
-  runs node v24; `functions` wants node 20, which is what CI pins).
+**Decisions (user-approved):** ingest `/review/` **only**; **7-day** lastmod
+window. Reviews are also what BB-220 values most — `independent_review` keeps
+flavor-seeding rights, press releases don't.
 
-**The GitHub wiring itself can only be proven by a real run** — the first PR
-after this merges is the actual test. `workflow_dispatch` is enabled so it can
-also be fired from the Actions tab.
+- [x] **BB-245a — `kind: "sitemap"`** on `RssSource`, with a `sitemap` config
+  block (`pathPrefix`, `windowDays`, `maxFetchesPerRun`).
+- [x] **BB-245b — `functions/src/news/sitemap.ts`.** Parses the urlset, selects
+  candidates by prefix + window, pulls the Article out of the page's JSON-LD
+  (past the Organization/Product blocks, `@graph`-aware, surviving a malformed
+  block), and maps onto the **same shape a feed item has** — so `thumbnailFrom`,
+  `publishedAt`, `categorize` and BB-239's body selection work unchanged.
+  Returns null rather than inventing a date when the page has none.
+- [x] **BB-245c — The cost control, and the bug it had.** The design was "only
+  fetch URLs we don't already hold". Verification showed that **converges but
+  never settles**: 13 of 34 candidates are old reviews the site re-touched
+  (real `datePublished` of 2026-01 … 2026-06, `lastmod` this week), which the
+  90-day filter drops — so they never became documents, never satisfied the
+  existence check, and would have been **re-fetched on every run forever**.
+  Fixed with a `newsSkipped/{urlHash}` marker written whenever a page is fetched
+  and deliberately not stored, checked alongside `newsArticles`. Markers age out
+  on the same monthly sweep as articles.
+- [x] **BB-245d — Source health** (`sourceHealth/{sourceName}`), the
+  observability the user asked for. BB-240's zero-item warning only reaches
+  Cloud Logging, which is **pull, not push** — findable once you already suspect
+  something, and buried under audit-log JSON. Every run now records `lastRunAt`,
+  `itemCount`, `lastSuccessAt`, `consecutiveZeroRuns` and `lastError`;
+  `consecutiveZeroRuns` uses `increment()` so it costs no read. Admin-read-only
+  by rules, server-written. The admin page shows it worst-first, amber-flagged
+  after **two** consecutive empty runs (one is normal — a publisher can simply
+  not post in six hours).
+- [x] **BB-245e — `'Breaking Bourbon'`** added to `NEWS_SOURCE_NAMES` (the
+  Source filter is hand-synced with `functions/src/news/sources.ts`).
 
-**Coverage is deliberately NOT gated yet.** Measured baseline 2026-09-18:
+**Verified against the live site (emulators, not deployed).**
+- Cold start → **21 articles, 21/21 with an image, a date and a stored body**,
+  and **0 outside `/review/`**.
+- Convergence, run by run: `13 articles / 12 markers / 9 left` → `21 / 13 / 0` →
+  `21 / 13 / 0` → `21 / 13 / 0`. **Steady state is zero page fetches.** All 13
+  markers are `older-than-max-age`, exactly the diagnosed cause.
+- `sourceHealth` written for all 8 sources with correct counts.
+- Tests: functions **349** (20 new for sitemap parsing/selection/mapping and the
+  network paths), frontend **603** (4 new for the health panel), rules **20/20**
+  (a new case asserting an approved non-admin cannot read `sourceHealth`).
+- **The BB-246 ratchet caught a real regression here**: the new code initially
+  dropped functions coverage to 51.94% against the 52 floor. Per the rule, the
+  fix was tests, not a lower floor — the network paths in `sitemap.ts` are now
+  covered and it sits at 52.73/52.64/61.67/52.70, verified against the actual
+  floors with `--coverageThreshold`.
 
-| | Statements | Branches | Functions | Lines |
-|---|---|---|---|---|
-| Frontend | 52.94% | 43.00% | 43.63% | 52.67% |
-| Functions | 52.72% | 52.31% | 62.00% | 52.60% |
-
-The standing policy is 80% overall / 60% minimum on new code, so a threshold gate
-would fail CI on day one — the opposite of switching it on green. **Follow-up
-(BB-246): ratchet coverage**, starting the threshold at roughly today's numbers
-so it can only go up, rather than setting 80% and disabling it the first time it
-hurts.
-
----
-
-# Epic L — BB-246: Coverage ratchet
-
-**Depends on BB-244** — it edits `.github/workflows/ci.yml`, which only exists on
-that branch. **Merge BB-244 first.**
-
-**Problem.** The standing policy ([testing-coverage-policy]) is 80% overall and
-60% on new code, but nothing enforced it, and BB-244 deliberately shipped without
-a coverage gate because setting 80% against a ~53% baseline would fail every
-build on day one — and a gate that fails every build gets deleted, not satisfied.
-
-- [x] **BB-246 — `coverageThreshold` floors in both jest configs**, set just
-  under the measured baseline so the number can only go up:
-
-  | | Statements | Branches | Functions | Lines |
-  |---|---|---|---|---|
-  | Frontend measured | 52.94% | 43.00% | 43.63% | 52.67% |
-  | **Frontend floor** | **52** | **42** | **43** | **52** |
-  | Functions measured | 52.72% | 52.31% | 62.00% | 52.60% |
-  | **Functions floor** | **52** | **51** | **61** | **52** |
-
-  The ~1-point gap absorbs normal churn; a real regression still trips it.
-- [x] **CI now runs `test:cov`, not `test`.** This is the part that makes the
-  ratchet real: `coverageThreshold` is only evaluated when coverage is actually
-  collected, so with plain `npm test` the floors would have sat in the config
-  doing nothing.
-
-**Verified.**
-- Passes at today's numbers: frontend 599/599, functions 324/324, exit 0 both.
-- **The gate actually bites**: temporarily raising the functions statements floor
-  to 99 produced exit code 1 and
-  `Jest: "global" coverage threshold for statements (99%) not met: 52.72%`.
-  Restored → exit 0. A threshold that is never exercised is indistinguishable
-  from no threshold, so this negative test is the real proof.
-
-**The rule going forward:** when a suite moves the number, RAISE the floor to just
-under the new figure. Never lower a floor to make a build pass — add the tests.
+**Note:** BB-245 branches off `main`, which does **not** yet carry BB-244/BB-246
+— so the floors aren't active on this branch. They will be once those merge,
+which is why the coverage was checked explicitly rather than assumed.

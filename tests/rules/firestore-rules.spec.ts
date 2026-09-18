@@ -67,6 +67,7 @@ beforeEach(async () => {
     await setDoc(doc(db, 'bourbons/b1'), { name: 'Test Bourbon' });
     await setDoc(doc(db, 'newsArticles/a1'), { title: 'News' });
     await setDoc(doc(db, 'articleBodies/a1'), { bodyText: 'full article body' });
+    await setDoc(doc(db, 'sourceHealth/The Whiskey Wash'), { itemCount: 20 });
     await setDoc(doc(db, `publicProfiles/${APPROVED}`), {
       displayName: 'Approved Amy',
     });
@@ -148,6 +149,11 @@ describe('approved user', () => {
   it('cannot read article bodies, even though it can read the article', async () => {
     await assertSucceeds(getDoc(doc(approvedDb(), 'newsArticles/a1')));
     await assertFails(getDoc(doc(approvedDb(), 'articleBodies/a1')));
+  });
+
+  // BB-245: source health is an owner/ops surface, not user-facing data.
+  it('cannot read source health (admin-only)', async () => {
+    await assertFails(getDoc(doc(approvedDb(), 'sourceHealth/The Whiskey Wash')));
   });
 
   it('writes their own subcollections as before', async () => {

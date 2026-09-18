@@ -77,3 +77,22 @@
   font-size: 12.5px;
   color: var(--ion-color-danger);
 }
+
+// A source that has stopped producing (BB-245). Amber, not red — it needs a
+// look, it isn't an outage.
+.admin__row--stale {
+  border-left: 3px solid var(--color-amber);
+
+  ion-icon {
+    color: var(--color-amber);
+    vertical-align: -2px;
+    margin-left: 4px;
+  }
+}
+
+.admin__row-error {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--color-error);
+  word-break: break-word;
+}

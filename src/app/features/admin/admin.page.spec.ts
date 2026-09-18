@@ -16,7 +16,7 @@ import { ToastController } from '@ionic/angular';
 import { Timestamp } from '@angular/fire/firestore';
 import { AdminPage } from './admin.page';
 import { AdminAccessService } from '../../core/services/admin-access.service';
-import { AllowlistEntry, UserProfile } from '../../models';
+import { AllowlistEntry, SourceHealth, UserProfile } from '../../models';
 
 const pete = {
   id: 'u-pete',
@@ -31,6 +31,24 @@ const mike: AllowlistEntry = {
   addedAt: {} as Timestamp,
 };
 
+const ts = (d: Date) => ({ toDate: () => d }) as unknown as Timestamp;
+
+const healthy: SourceHealth = {
+  name: 'The Whiskey Wash',
+  lastRunAt: ts(new Date()),
+  itemCount: 20,
+  lastSuccessAt: ts(new Date()),
+  consecutiveZeroRuns: 0,
+};
+
+const dead: SourceHealth = {
+  name: 'The Spirits Business',
+  lastRunAt: ts(new Date()),
+  itemCount: 0,
+  lastSuccessAt: null,
+  consecutiveZeroRuns: 7,
+};
+
 describe('AdminPage — owner tools (BB-212)', () => {
   let page: AdminPage;
   let admin: {
@@ -40,6 +58,7 @@ describe('AdminPage — owner tools (BB-212)', () => {
     deny: jest.Mock;
     addToAllowlist: jest.Mock;
     removeFromAllowlist: jest.Mock;
+    sourceHealth: jest.Mock;
   };
 
   beforeEach(() => {
@@ -50,6 +69,7 @@ describe('AdminPage — owner tools (BB-212)', () => {
       deny: jest.fn().mockResolvedValue(undefined),
       addToAllowlist: jest.fn().mockResolvedValue('new@example.com'),
       removeFromAllowlist: jest.fn().mockResolvedValue(undefined),
+      sourceHealth: jest.fn().mockResolvedValue([healthy, dead]),
     };
     TestBed.configureTestingModule({
       imports: [ReactiveFormsModule],
@@ -132,5 +152,37 @@ describe('AdminPage — owner tools (BB-212)', () => {
     await page.remove(mike);
     expect(admin.removeFromAllowlist).toHaveBeenCalledWith('mike@example.com');
     expect(page.entries()).toEqual([]);
+  });
+
+  // BB-245: the ingest-health panel. The whole reason it exists is that the
+  // zero-item warning only reached Cloud Logging, where nobody saw it.
+  describe('news source health', () => {
+    it('loads health alongside the queue on view enter', async () => {
+      page.ionViewWillEnter();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(admin.sourceHealth).toHaveBeenCalled();
+      expect(page.health().map((h) => h.name)).toEqual([
+        'The Whiskey Wash',
+        'The Spirits Business',
+      ]);
+    });
+
+    it('flags a source as stale only after two consecutive empty runs', () => {
+      // One empty run is normal — a publisher can just not post in six hours.
+      expect(page.isStale({ ...healthy, consecutiveZeroRuns: 1 })).toBe(false);
+      expect(page.isStale({ ...healthy, consecutiveZeroRuns: 2 })).toBe(true);
+      expect(page.isStale(dead)).toBe(true);
+      expect(page.isStale(healthy)).toBe(false);
+    });
+
+    it('treats an errored source as stale even if it once produced', () => {
+      expect(page.isStale({ ...healthy, lastError: 'boom' })).toBe(true);
+    });
+
+    it('says so plainly when a source has never produced anything', () => {
+      expect(page.lastSuccess(dead)).toBe('never produced articles');
+      expect(page.lastSuccess(healthy)).not.toBe('never produced articles');
+    });
   });
 });
