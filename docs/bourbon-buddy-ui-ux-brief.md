@@ -165,6 +165,23 @@ Icons use a consistent outline icon set (Ionicons outline variants). The one exc
 
 Ionic `<ion-header>` with `translucent` set to true on iOS for the blur effect. Header background matches `--color-bg-surface`. Page titles in the display typeface. No heavy toolbar borders — use the subtle shadow from translucency.
 
+**Header grammar (BB-247).** Every main tab header reads the same way:
+
+| slot | holds |
+|---|---|
+| `start` | controls that change *this view* — Filter and Sort on the Cellar and Hunt List, Feed settings on Dispatch, Year in Review on Numbers, Sightings map and Toggle stale on Friends |
+| `end` | `<app-menu-button>` — nothing else, on every tab |
+
+The end slot is reserved. Actions that apply app-wide (log a sighting, look up a
+bottle, share the hunt list, stores, notifications, settings) belong in the
+drawer it opens, not in a page header — that's what keeps the top-right of the
+app meaning one thing everywhere. A new per-view control goes on the **left**.
+
+The drawer itself is a right-side `ion-menu` mounted once at the app root, with
+its swipe gesture off so it can't fight the `ion-item-sliding` rows on the list
+tabs. The unread-notification badge rides the trigger, so it's visible from
+every tab rather than only the Cellar.
+
 ---
 
 ## Card Design — Log Entry Card

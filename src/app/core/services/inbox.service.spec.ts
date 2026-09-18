@@ -50,6 +50,48 @@ describe('InboxService', () => {
 
   afterEach(() => jest.clearAllMocks());
 
+  describe('unread signal (BB-247)', () => {
+    it('seeds the badge when auth resolves, not at construction', async () => {
+      // snapshotUser is null until Firebase restores the session, so a
+      // launch-time count races auth and returns 0. The service keys off the
+      // shared auth stream instead; constructing it must already have asked.
+      asMock(getCountFromServer).mockResolvedValue({ data: () => ({ count: 6 }) });
+      setup('u1');
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(getCountFromServer).toHaveBeenCalled();
+      expect(service.unread()).toBe(6);
+    });
+
+
+    it('tracks the count so the menu badge follows every badge sync', async () => {
+      setup('u1');
+      expect(service.unread()).toBe(0);
+      asMock(getCountFromServer).mockResolvedValue({ data: () => ({ count: 7 }) });
+      await service.unreadCount();
+      expect(service.unread()).toBe(7);
+    });
+
+    it('falls back to 0 when the count read is denied', async () => {
+      setup('u1');
+      asMock(getCountFromServer).mockResolvedValue({ data: () => ({ count: 3 }) });
+      await service.unreadCount();
+      expect(service.unread()).toBe(3);
+
+      asMock(getCountFromServer).mockRejectedValue(new Error('permission-denied'));
+      await service.unreadCount();
+      expect(service.unread()).toBe(0);
+    });
+
+    it('clears with the app badge on sign-out', async () => {
+      setup('u1');
+      asMock(getCountFromServer).mockResolvedValue({ data: () => ({ count: 2 }) });
+      await service.unreadCount();
+      service.clearAppBadge();
+      expect(service.unread()).toBe(0);
+    });
+  });
+
   describe('unreadCount', () => {
     it('returns the server aggregation count', async () => {
       setup('u1');

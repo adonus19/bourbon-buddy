@@ -1,4 +1,5 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, Signal, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   Firestore,
   collection,
@@ -30,6 +31,29 @@ import { AuthService } from '../auth/auth.service';
 export class InboxService {
   private readonly firestore = inject(Firestore);
   private readonly auth = inject(AuthService);
+
+  private readonly unreadCounter = signal(0);
+
+  /**
+   * Unread count for the header menu badge (BB-247). Kept in step by
+   * `applyAppBadge`, which every read/write path already funnels through — so
+   * the signal costs no extra reads on top of the existing badge syncs
+   * (launch, foreground, drawer open, mark-read, delete).
+   */
+  readonly unread: Signal<number> = this.unreadCounter.asReadonly();
+
+  constructor() {
+    // Seed the badge once auth resolves, and re-seed on every sign-in/sign-out.
+    //
+    // `snapshotUser` is null until Firebase restores the session, so a launch-time
+    // count (AppComponent's syncBadge) races auth and returns 0 — which left the
+    // menu badge blank until something else refreshed it (BB-247). Keying off the
+    // single shared auth stream removes the race; it opens no new listener and
+    // costs one COUNT aggregation per auth change.
+    this.auth.currentUser$
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => void this.unreadCount());
+  }
 
   /** Recent inbox items, newest-first. Subscribe only where shown. */
   inbox$(max = 50): Observable<AppNotification[]> {
@@ -125,6 +149,9 @@ export class InboxService {
    * no-op everywhere else.
    */
   private applyAppBadge(count: number): void {
+    // Single funnel for "how many are unread" — keeps the in-app badge signal
+    // and the OS app-icon badge from ever disagreeing.
+    this.unreadCounter.set(count);
     const nav = navigator as Navigator & {
       setAppBadge?: (n?: number) => Promise<void>;
       clearAppBadge?: () => Promise<void>;

@@ -31,6 +31,7 @@ import { ShareListModalComponent } from './components/share-list-modal/share-lis
 import { ArticleHeroComponent } from './components/article-hero/article-hero.component';
 import { InputHelpersDirective } from './directives/input-helpers.directive';
 import { OnboardingModule } from './onboarding.module';
+import { AppMenuModule } from './app-menu.module';
 
 /**
  * Shared declarations reused across feature modules (presentational
@@ -77,6 +78,6 @@ const COMPONENTS = [
   ],
   // Re-export OnboardingModule so `bbTourAnchor` is available in every feature
   // template that already imports SharedModule.
-  exports: [...COMPONENTS, OnboardingModule],
+  exports: [...COMPONENTS, OnboardingModule, AppMenuModule],
 })
 export class SharedModule {}
