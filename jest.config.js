@@ -21,4 +21,22 @@ module.exports = {
   ],
   coverageDirectory: '<rootDir>/coverage',
   coverageReporters: ['text-summary', 'lcov'],
+  /**
+   * Coverage ratchet (BB-246). These are FLOORS, not targets — set just under
+   * the measured baseline (2026-09-18: 52.94 / 43.00 / 43.63 / 52.67) so the
+   * number can only go up. The standing goal is 80% overall and 60% on new
+   * code; gating at 80% today would fail every build, and a gate that fails
+   * every build gets deleted rather than satisfied.
+   *
+   * When a suite lands and moves the number, RAISE these to just under the new
+   * figure. Never lower them to make a build pass — add the tests instead.
+   */
+  coverageThreshold: {
+    global: {
+      statements: 52,
+      branches: 42,
+      functions: 43,
+      lines: 52,
+    },
+  },
 };
