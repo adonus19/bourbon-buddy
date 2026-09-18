@@ -143,6 +143,7 @@
             (click)="openArticle(a)"
           >
             <div class="article__body">
+              <app-article-hero [src]="a.thumbnailUrl" />
               <div class="article__text">
                 <h3 class="article__headline">{{ a.headline }}</h3>
                 <p class="article__meta">
@@ -194,9 +195,6 @@
                   </div>
                 }
               </div>
-              @if (a.thumbnailUrl) {
-                <img class="article__thumb" [src]="a.thumbnailUrl" alt="" />
-              }
             </div>
           </ion-item>
 

@@ -765,3 +765,76 @@ schema difference between the two AI paths:
     this window — it'll gain finish when a fresh article mentions it, or if we
     widen the reprocess window. Deeper backfill = raise `REPROCESS_MAX_HOURS` (or
     add an id-targeted reseed) + redeploy; deferred unless the owner wants it now.
+
+---
+
+# Epic G — BB-238: Dispatch article hero images
+
+**Problem.** Feed cards almost never showed an image. `thumbnailFrom()` only read
+`<enclosure>` and `<media:content>`; measured across all 7 sources (2026-09-18)
+**zero** emit `<enclosure>` and only Bourbon & Banter emits `<media:content>` — so
+~1 source in 7 could ever produce an image, while essentially every article has a
+hero. Layout also placed the thumbnail as a 76×76 square to the right of the text.
+
+**Shape.** Find the image reliably, render it above the headline (Google Discover
+style), and degrade to the text-only card when there is genuinely no image.
+
+- [x] **BB-238a — Image-discovery ladder** (`functions/src/news/parse.ts`).
+  `enclosure` → `media:content` → `media:thumbnail` → first `<img>` in
+  `content:encoded` → first `<img>` in `<description>` → null. Covers 5 of the 6
+  working sources with **no extra network calls**.
+  - **Gotcha that drove the design:** rss-parser puts `<content:encoded>` on
+    `item["content:encoded"]`; `item.content` is the `<description>` teaser
+    (`parseItemRss` overwrites it). Reading `content` — as the old comment in
+    `news/index.ts` claimed — misses the hero on every WordPress feed.
+  - `normalizeImageUrl()` accepts only absolute http(s), resolves relative and
+    protocol-relative srcs, decodes `&amp;`, and rejects tracking pixels /
+    spacers / gravatars / avatars. Icon-sized `<img>` (w or h ≤ 64) are skipped,
+    and `data-src` / `srcset` are tried when `src` is a placeholder.
+- [x] **BB-238b — og:image fallback** (`functions/src/news/og-image.ts`).
+  Fred Minnick's feed is **teaser-only** — no enclosure, no media:*, no
+  content:encoded, and a `<description>` of bare `<p>` text — so its hero exists
+  only on the article page. Regex-scans the first 200KB for
+  `og:image` → `twitter:image`. Best-effort: 5s timeout, bounded concurrency (4),
+  capped at 25 per source per run, any failure → null.
+  - Deliberately **not** folded into the AI extractor (which already fetches
+    these pages): that would make images depend on the Gemini rate-limit state.
+- [x] **BB-238c — Stop null from clobbering a good image.** Ingest now omits
+  `thumbnailUrl` entirely when none was found, so `merge: true` preserves a value
+  stored by an earlier run (previously it wrote `null` unconditionally).
+- [x] **BB-238d — `app-article-hero`** (`src/app/shared/components/article-hero/`).
+  Renders nothing when there's no URL **or** when the image errors, so the card
+  falls back to exactly the old text-only layout — no broken-image glyph, no gap.
+  `linkedSignal` resets the failed flag on URL change (`@for` recycles hosts as
+  the feed scrolls). `loading="lazy"` + `decoding="async"` (heroes are unresized
+  originals — one measured 980KB), `referrerpolicy="no-referrer"`, fixed 16:9 box
+  so the list doesn't reflow as images arrive.
+- [x] **BB-238e — Discover layout.** `.article__body` is a column: hero above the
+  headline, inset to the card's content width with the card's corner radius. The
+  76×76 `.article__thumb` is gone.
+
+**Verified (2026-09-18, emulators + live feeds, not yet deployed).**
+- Ladder + og:image over the live feeds: **56/56 items got an image — 100%**
+  (47 in-feed, 9 via og:image), whole run 4.4s.
+- Seeded 46 real articles into the emulator through the real ingest path and drove
+  the app: **46/46 heroes loaded, 0 broken, 0 pending**; the only text-only cards
+  were the two deliberate fixtures (a 404 URL and a null URL). Hero confirmed
+  above and left-aligned with the headline; every `<img>` lazy.
+- Fred Minnick (og:image-only source) renders its hero at 1085×1088.
+- Tests: functions 320/320, frontend 599/599 (incl. 21 new for the ladder,
+  og:image parsing, and the hero component's fallback paths).
+
+**Not deployed yet.** After deploy, force an immediate run rather than waiting 6h:
+`gcloud scheduler jobs run firebase-schedule-fetchRssFeeds-us-central1 --location us-central1`
+(confirm the job name with `gcloud scheduler jobs list`). Because ingest merges on
+the URL-hash doc id, that run also backfills images onto articles already stored.
+
+**Follow-ups filed, not done here:**
+- **`bodyText` stores the teaser, not the article body** — same `item.content`
+  mis-mapping. Undercuts BB-130/BB-227 (the model was meant to see the full body)
+  and forces a page re-fetch for nearly every article. One-line fix, but it changes
+  AI-extraction inputs so it needs its own ticket + verification. **Do this first.**
+- **The Spirits Business ingests nothing** — its feed URL returns HTML, and
+  `rss-parser` fails with `Invalid character in entity name (Line 3, Column 491)`.
+  Find the real feed URL or drop the source; consider warning when a source
+  returns 0 items twice running, since `Promise.allSettled` hides it today.

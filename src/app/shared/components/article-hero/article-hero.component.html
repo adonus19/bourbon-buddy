@@ -1,0 +1,13 @@
+@if (show()) {
+  <div class="hero">
+    <img
+      class="hero__img"
+      [src]="src()"
+      alt=""
+      loading="lazy"
+      decoding="async"
+      referrerpolicy="no-referrer"
+      (error)="failed.set(true)"
+    />
+  </div>
+}
