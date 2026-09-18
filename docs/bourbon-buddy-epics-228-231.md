@@ -838,3 +838,63 @@ the URL-hash doc id, that run also backfills images onto articles already stored
   `rss-parser` fails with `Invalid character in entity name (Line 3, Column 491)`.
   Find the real feed URL or drop the source; consider warning when a source
   returns 0 items twice running, since `Promise.allSettled` hides it today.
+
+---
+
+# Epic H — BB-239: `bodyText` stored the teaser, not the article body
+
+**Problem.** `news/index.ts` built `bodyText` from `item.content`. rss-parser sets
+that from `<description>` — the ~320-char teaser — because `parseItemRss` writes
+it last and overwrites anything else; the full body lives on
+`item["content:encoded"]`. So the body cached for AI extraction was *always* a
+teaser. It never cleared the extractor's `MIN_BODY_CHARS` (600) bar, which meant
+`processArticle` re-fetched almost every article URL over the network — the exact
+opposite of what BB-130 and BB-227 were written to achieve.
+
+- [x] **BB-239a — Read the right key.** Prefer `item["content:encoded"]`, fall
+  back to `item.content`, longer-wins so an empty or stub `content:encoded` can't
+  lose to a teaser that carries more text (Bourbon Guy syndicates its whole post
+  in `<description>` and must not regress).
+
+  | Source | avg `bodyText` | page re-fetches |
+  |---|---|---|
+  | BourbonBlog | 311 → **6,746** | 8/8 → **0/8** |
+  | Bourbon & Banter | 216 → **4,724** | 8/8 → **0/8** |
+  | The Whiskey Wash | 242 → **4,312** | 8/8 → **1/8** |
+  | The Daily Pour | 327 → **3,003** | 8/8 → **0/8** |
+  | Bourbon Guy | 3,601 → 3,601 (no `content:encoded`; fallback holds) | 0/8 → 0/8 |
+  | Fred Minnick | 236 → 236 (teaser-only; correctly still re-fetches) | 6/6 → 6/6 |
+
+  **Outbound page fetches per cycle: 38/46 → 7/46.**
+
+- [x] **BB-239b — Move the body off the article document.** Fixing 239a alone
+  would have made every Dispatch feed page ~75KB heavier: the body is server-only,
+  but `news.service.ts` reads whole article documents and the Firestore **client
+  SDK has no field projection**, so the UI would download a body it never renders
+  (measured 21KB → 96KB per 25-article page). The body now lives at
+  `/articleBodies/{articleId}`:
+  - Ingest writes article + body as one batch; the article doc carries
+    `bodyText: FieldValue.delete()` so pre-BB-239 docs shed the inline field as
+    they are re-ingested.
+  - `processArticle` reads `/articleBodies/{id}`, falling back to the legacy
+    inline field until old docs age out.
+  - **Rules deny the client the collection entirely** (`allow read, write: if false`),
+    with a rules test asserting an approved user can read the article but NOT its body.
+  - Both cleanup paths (`cleanupOldArticles`, `cleanupReadArticles`) delete the
+    body alongside the article, so nothing is orphaned.
+
+**Verified (2026-09-18, emulators + live feeds, not deployed).** Ran the real
+`fetchRssFeeds` handler via `.run({})` against the Firestore emulator:
+- 96 articles ingested; **96/96 have a thumbnailUrl** (BB-238 confirmed at the
+  real function level), **96 articleBodies written, 0 articles carrying an inline
+  bodyText**.
+- **avg article doc 787 bytes → 19KB per 25-article feed page** (vs ~96KB if the
+  body had stayed inline). Avg body doc 4,320 bytes, server-side only.
+- Bodies resolvable at the new path 96/96; only 9/96 would still re-fetch.
+- Seeded an aged article and a 24h-old read article, ran both cleanup handlers:
+  article and body both deleted, **no orphans** in either path.
+- Tests: functions 324/324, rules 19/19 (incl. the new body-denial test).
+
+**Also reproduced here:** The Spirits Business fails inside the real handler with
+`Invalid character in entity name (Line 3, Column 491, Char: &)` — sax choking on
+a bare `&`. That is **BB-240**, still open.

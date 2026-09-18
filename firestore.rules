@@ -265,6 +265,14 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Article bodies (BB-239): server-only, for AI extraction. Kept OUT of the
+    // article doc because the Dispatch feed reads whole documents and the
+    // client SDK cannot project fields — an inline body was ~75KB per feed page
+    // the UI never renders. No client has any reason to read these.
+    match /articleBodies/{articleId} {
+      allow read, write: if false;
+    }
+
     // Per-user news feed preferences (top-level, keyed by UID).
     match /userNewsPreferences/{userId} {
       allow read, write: if isOwner(userId) && isApproved();

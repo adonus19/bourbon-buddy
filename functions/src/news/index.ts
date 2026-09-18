@@ -8,7 +8,7 @@
  */
 import { logger } from "firebase-functions/v2";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { getFirestore, Timestamp } from "firebase-admin/firestore";
+import { FieldValue, getFirestore, Timestamp } from "firebase-admin/firestore";
 import Parser from "rss-parser";
 
 import { RSS_SOURCES } from "./sources";
@@ -36,6 +36,12 @@ const MAX_BODY_CHARS = 12000;
 const OG_IMAGE_TIMEOUT_MS = 5000;
 const OG_IMAGE_CONCURRENCY = 4;
 const OG_IMAGE_MAX_PER_SOURCE = 25;
+// Article bodies live in their own top-level collection (BB-239), NOT on the
+// article doc. The body is server-only (AI extraction); the Dispatch feed reads
+// whole article documents and the client SDK has no field projection, so a body
+// stored alongside the card fields is ~75KB per 25-article page that the UI
+// never renders. Rules deny the client this collection entirely.
+const BODIES = "articleBodies";
 
 type FeedItem = Parser.Item & {
   enclosure?: { url?: string };
@@ -137,13 +143,28 @@ async function ingestSource(
     const excerpt = (item.contentSnippet ?? "").trim().slice(0, 320) || null;
     // Full body for AI extraction only (not shown in the UI). Empty when the
     // feed syndicates just a teaser — the extractor then fetches the URL itself.
-    const bodyText = htmlToText(item.content ?? "").slice(0, MAX_BODY_CHARS) || null;
+    //
+    // BB-239: this used to read `item.content`, which rss-parser sets from
+    // <description> (the ~320-char teaser) — parseItemRss writes it last and
+    // overwrites anything else. The full body lives on item["content:encoded"].
+    // Reading the wrong key meant bodyText was ALWAYS a teaser, so it never
+    // cleared the extractor's MIN_BODY_CHARS bar and every article got re-fetched
+    // over the network — the opposite of what BB-130/BB-227 intended.
+    // Longer-wins rather than a plain ?? so an empty or stub content:encoded
+    // can't lose to a teaser that actually carries more text.
+    const fullBody = (item["content:encoded"] ?? "").trim();
+    const teaser = (item.content ?? "").trim();
+    const bodyText =
+      htmlToText(fullBody.length >= teaser.length ? fullBody : teaser)
+        .slice(0, MAX_BODY_CHARS) || null;
 
     const doc: Record<string, unknown> = {
       sourceName: source.name,
       headline,
       excerpt,
-      bodyText,
+      // Pre-BB-239 docs carry bodyText inline; strip it as each is re-ingested
+      // so the feed stops paying for a field only the server ever reads.
+      bodyText: FieldValue.delete(),
       url: link,
       publishedAt: published ? Timestamp.fromDate(published) : null,
       fetchedAt: Timestamp.now(),
@@ -158,12 +179,19 @@ async function ingestSource(
       doc.thumbnailUrl = thumbnailUrl;
     }
 
-    await db
-      .collection("newsArticles")
-      .doc(urlHash(link)) // URL-derived id => dedupe on write
-      // merge:true so re-fetching an existing article updates its fields WITHOUT
-      // wiping the AI-extracted mentionedBottles/bottlesExtractedAt (BB-130).
-      .set(doc, { merge: true });
+    const id = urlHash(link); // URL-derived id => dedupe on write
+    const batch = db.batch();
+    // merge:true so re-fetching an existing article updates its fields WITHOUT
+    // wiping the AI-extracted mentionedBottles/bottlesExtractedAt (BB-130).
+    batch.set(db.collection("newsArticles").doc(id), doc, { merge: true });
+    if (bodyText) {
+      batch.set(
+        db.collection(BODIES).doc(id),
+        { bodyText, url: link, updatedAt: Timestamp.now() },
+        { merge: true }
+      );
+    }
+    await batch.commit();
     written++;
   }
   return written;
@@ -205,7 +233,10 @@ export const cleanupOldArticles = onSchedule(
         break;
       }
       const batch = db.batch();
-      snap.docs.forEach((d) => batch.delete(d.ref));
+      snap.docs.forEach((d) => {
+        batch.delete(d.ref);
+        batch.delete(db.collection(BODIES).doc(d.id)); // BB-239: no orphans
+      });
       await batch.commit();
       deleted += snap.size;
       if (snap.size < 400) {
@@ -245,6 +276,7 @@ export const cleanupReadArticles = onSchedule(
         batch.delete(stateDoc.ref); // remove from the user's Read tab
         if (stateDoc.id) {
           batch.delete(db.collection("newsArticles").doc(stateDoc.id));
+          batch.delete(db.collection(BODIES).doc(stateDoc.id)); // BB-239
         }
       }
       await batch.commit();
