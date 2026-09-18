@@ -901,6 +901,63 @@ a bare `&`. That is **BB-240**, still open.
 
 ---
 
+# Epic I — BB-240: The Spirits Business ingested nothing
+
+**Problem.** The source produced zero articles and had done for as long as the
+logs go back (confirmed in production 2026-09-18: the 02:41 and 08:41 runs both
+failed). `rss-parser` died on it every cycle with
+`Invalid character in entity name (Line 3, Column 491, Char: &)` — sax choking on
+a bare `&` in HTML, because the URL serves a web page, not a feed.
+
+**Diagnosis.** The site has no RSS any more. `/feed`, `/feed/`, `/?feed=rss2`,
+`/rss`, `/feed/rss`, `/?feed=atom` and category feeds all return the **same
+38,994-byte homepage HTML**; `/rss.xml` and `/atom.xml` 404; no FeedBurner
+mirror; and the page declares **no `application/rss+xml` autodiscovery links**.
+But the publisher is very much alive — posting several times a day — and its
+**WordPress REST API is open**, giving more than RSS would.
+
+- [x] **BB-240a — `kind` on a source.** `RssSource` gains
+  `kind?: "rss" | "wp-json"` (default `"rss"`), so a publisher without a feed
+  can still be ingested. Only The Spirits Business uses `wp-json` today.
+- [x] **BB-240b — wp-json adapter** (`functions/src/news/wp-json.ts`). Maps a
+  `wp/v2/posts` record onto the **same shape a feed item has**, so the ingest
+  loop, `thumbnailFrom()`, `publishedAt()`, `categorize()` and BB-239's body
+  selection all work unchanged:
+  - `title.rendered` → `title`, decoded through `htmlToText` (rendered fields
+    carry entities — `&#8216;` is a curly quote, and untreated it would reach the
+    card headline verbatim).
+  - `content.rendered` → `content:encoded`, so it feeds both `bodyText` and the
+    image ladder's inline-`<img>` rung.
+  - `_embedded["wp:featuredmedia"][0].source_url` → `enclosure.url`, the ladder's
+    top rung, so the featured image always wins.
+  - `date_gmt` → `isoDate` **with a `Z` appended** — WordPress returns UTC with
+    no zone designator, so parsing it raw would skew every timestamp by the
+    server's offset. Already-zoned values are left alone.
+  - Query is `per_page=20&_embed=wp:featuredmedia` plus `_fields=…`: **56KB for
+    20 posts** vs 129KB for a naive `_embed=1` — cheaper than most of the RSS
+    feeds we already pull.
+- [x] **BB-240c — Dead sources stop failing silently.** `fetchRssFeeds` logged
+  `Fetched X: 0 articles` at INFO, which reads like a normal run, and
+  `Promise.allSettled` swallowed the rest — which is how this rotted unnoticed.
+  A zero-item result is now `logger.warn(... source may be dead)`.
+
+**Verified (2026-09-18, emulators + the live endpoint, not deployed).** Ran the
+real `fetchRssFeeds` handler via `.run({})`:
+- The Spirits Business: **20 articles, 20/20 with a thumbnailUrl, 20/20 with a
+  stored body** — from 0.
+- Headlines decode correctly (`SWA ‘profoundly concerned’ about English whisky
+  GI`), URLs are the real article links, timestamps land in UTC.
+- **All 7 sources now ingest** (was 6): Whiskey Wash 20, BourbonBlog 29,
+  Spirits Business 20, Bourbon Guy 16, Bourbon & Banter 15, Daily Pour 10,
+  Fred Minnick 6.
+- Tests: functions 334/334 (10 new for the adapter), rules 19/19.
+
+**Note for the future:** `wp-json` is a general capability now, not a one-off. If
+another source loses its feed, adding `kind: "wp-json"` and the REST endpoint is
+the whole change.
+
+---
+
 # Epic J — BB-241/242/243: clear the lint backlog
 
 **Context.** `ng lint` reported 18 errors and `functions` 2, all pre-existing on

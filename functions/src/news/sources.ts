@@ -14,12 +14,25 @@
 export interface RssSource {
   name: string;
   url: string;
+  /**
+   * How to read this source. "rss" (default) parses an XML feed; "wp-json"
+   * reads the WordPress REST API, for publishers that still post daily but no
+   * longer expose a feed (BB-240). `url` is the wp/v2 posts endpoint then.
+   */
+  kind?: "rss" | "wp-json";
 }
 
 export const RSS_SOURCES: RssSource[] = [
   { name: "The Whiskey Wash", url: "https://thewhiskeywash.com/feed" },
   { name: "Fred Minnick", url: "https://fredminnick.com/news/feed" },
-  { name: "The Spirits Business", url: "https://www.thespiritsbusiness.com/feed" },
+  // BB-240: no RSS any more — every feed path serves the homepage HTML and the
+  // page declares no autodiscovery links, so rss-parser failed every cycle with
+  // "Invalid character in entity name". The REST API is alive and richer.
+  {
+    name: "The Spirits Business",
+    url: "https://www.thespiritsbusiness.com/wp-json/wp/v2/posts",
+    kind: "wp-json",
+  },
   { name: "BourbonBlog", url: "https://bourbonblog.com/feed" },
   { name: "Bourbon Guy", url: "https://www.bourbonguy.com/blog?format=rss" },
   { name: "Bourbon & Banter", url: "https://www.bourbonbanter.com/feed/" },

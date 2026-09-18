@@ -11,7 +11,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { FieldValue, getFirestore, Timestamp } from "firebase-admin/firestore";
 import Parser from "rss-parser";
 
-import { RSS_SOURCES } from "./sources";
+import { RSS_SOURCES, RssSource } from "./sources";
 import {
   categorize,
   publishedAt,
@@ -19,6 +19,7 @@ import {
   urlHash,
 } from "./parse";
 import { fetchOgImage } from "./og-image";
+import { fetchWpJsonItems, WpFeedItem } from "./wp-json";
 import { htmlToText } from "../ai/article-text";
 
 const MAX_AGE_DAYS = 90;
@@ -66,7 +67,7 @@ const parser: Parser<unknown, FeedItem> = new Parser({
 
 /** Feed items that survived the link/age filter, with their parsed date. */
 interface FreshItem {
-  item: FeedItem;
+  item: FeedItem | WpFeedItem;
   link: string;
   published: Date | null;
 }
@@ -117,14 +118,19 @@ async function resolveThumbnails(
 
 async function ingestSource(
   db: FirebaseFirestore.Firestore,
-  source: { name: string; url: string }
+  source: RssSource
 ): Promise<number> {
-  const feed = await parser.parseURL(source.url);
+  // BB-240: a source is either an XML feed or a WordPress REST endpoint; both
+  // yield the same item shape, so everything downstream is identical.
+  const items: (FeedItem | WpFeedItem)[] =
+    source.kind === "wp-json"
+      ? await fetchWpJsonItems(source.url)
+      : (await parser.parseURL(source.url)).items ?? [];
   const now = Date.now();
   let written = 0;
 
   const fresh: FreshItem[] = [];
-  for (const item of feed.items ?? []) {
+  for (const item of items) {
     const link = item.link?.trim();
     if (!link) {
       continue;
@@ -206,10 +212,15 @@ export const fetchRssFeeds = onSchedule(
     );
     results.forEach((r, i) => {
       const name = RSS_SOURCES[i].name;
-      if (r.status === "fulfilled") {
-        logger.info(`Fetched ${name}: ${r.value} articles`);
-      } else {
+      if (r.status === "rejected") {
         logger.error(`Failed ${name}:`, r.reason);
+      } else if (r.value === 0) {
+        // BB-240: a source can rot for months while still "succeeding" —
+        // Promise.allSettled hides it and an INFO line reads like a normal run.
+        // Zero items from a live publisher means the source needs looking at.
+        logger.warn(`Fetched ${name}: 0 articles — source may be dead`);
+      } else {
+        logger.info(`Fetched ${name}: ${r.value} articles`);
       }
     });
   }
