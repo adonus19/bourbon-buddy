@@ -13,7 +13,7 @@ import {
 } from '@angular/fire/firestore';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 
-import { AllowlistEntry, UserProfile } from '../../models';
+import { AllowlistEntry, SourceHealth, UserProfile } from '../../models';
 
 /**
  * Owner tools for gated access (BB-212). Everything here is admin-claim-only:
@@ -57,6 +57,21 @@ export class AdminAccessService {
       'denyUser'
     );
     await callable({ uid });
+  }
+
+  /**
+   * One-shot ingest health for every news source (BB-245). Ordered worst-first
+   * so a broken source is the first thing on screen, not something to scroll to.
+   */
+  async sourceHealth(): Promise<SourceHealth[]> {
+    const snap = await getDocs(collection(this.firestore, 'sourceHealth'));
+    return snap.docs
+      .map((d) => ({ ...d.data(), name: d.data()['name'] ?? d.id }) as SourceHealth)
+      .sort(
+        (a, b) =>
+          b.consecutiveZeroRuns - a.consecutiveZeroRuns ||
+          a.name.localeCompare(b.name)
+      );
   }
 
   /** One-shot allowlist, newest first. */

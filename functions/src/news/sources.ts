@@ -19,7 +19,19 @@ export interface RssSource {
    * reads the WordPress REST API, for publishers that still post daily but no
    * longer expose a feed (BB-240). `url` is the wp/v2 posts endpoint then.
    */
-  kind?: "rss" | "wp-json";
+  kind?: "rss" | "wp-json" | "sitemap";
+  /**
+   * "sitemap" only (BB-245): `url` is the sitemap, and these bound what we read
+   * from it. `pathPrefix` restricts ingest to the section whose pages carry a
+   * real publish date — see sitemap.ts for why lastmod cannot stand in for one.
+   */
+  sitemap?: {
+    pathPrefix: string;
+    /** How far back a `lastmod` may be for a URL to be worth checking. */
+    windowDays: number;
+    /** Hard cap on page fetches per run, so a mass re-publish can't stampede. */
+    maxFetchesPerRun: number;
+  };
 }
 
 export const RSS_SOURCES: RssSource[] = [
@@ -38,4 +50,14 @@ export const RSS_SOURCES: RssSource[] = [
   { name: "Bourbon & Banter", url: "https://www.bourbonbanter.com/feed/" },
   // Formerly Whiskey Raiders → Bottle Raiders → The Daily Pour.
   { name: "The Daily Pour", url: "https://thedailypour.com/feed/" },
+  // BB-245: Webflow, no feed of any kind. Ingested from the sitemap, restricted
+  // to /review/ — the only section whose pages carry a real datePublished (in
+  // JSON-LD). Reviews are also what BB-220 values most: independent_review keeps
+  // flavor-seeding rights, press releases don't.
+  {
+    name: "Breaking Bourbon",
+    url: "https://www.breakingbourbon.com/sitemap.xml",
+    kind: "sitemap",
+    sitemap: { pathPrefix: "/review/", windowDays: 7, maxFetchesPerRun: 25 },
+  },
 ];

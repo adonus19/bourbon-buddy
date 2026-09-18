@@ -273,6 +273,20 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Per-source ingest health (BB-245): written only by fetchRssFeeds, read by
+    // the owner's admin screen so a source that quietly stops producing is
+    // visible in the app rather than only in Cloud Logging.
+    match /sourceHealth/{sourceName} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Fetched-and-rejected URLs (BB-245): server-only bookkeeping that stops a
+    // page which yields no article from being re-fetched every run.
+    match /newsSkipped/{urlHash} {
+      allow read, write: if false;
+    }
+
     // Per-user news feed preferences (top-level, keyed by UID).
     match /userNewsPreferences/{userId} {
       allow read, write: if isOwner(userId) && isApproved();

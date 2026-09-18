@@ -13,6 +13,39 @@
   </ion-refresher>
 
   <div class="admin">
+    <p class="eyebrow admin__section">News source health</p>
+
+    @if (loading() && !health().length) {
+      <div class="admin__loading">
+        <ion-spinner name="crescent"></ion-spinner>
+      </div>
+    } @else if (!health().length) {
+      <p class="admin__empty">No ingest runs recorded yet.</p>
+    } @else {
+      @for (h of health(); track h.name) {
+        <div class="admin__row glass-surface" [class.admin__row--stale]="isStale(h)">
+          <div class="admin__row-body">
+            <p class="admin__row-title">
+              {{ h.name }}
+              @if (isStale(h)) {
+                <ion-icon name="warning-outline" aria-label="Needs attention"></ion-icon>
+              }
+            </p>
+            <p class="admin__row-sub">
+              {{ h.itemCount }} article{{ h.itemCount === 1 ? '' : 's' }} last run
+              @if (h.consecutiveZeroRuns > 0) {
+                · {{ h.consecutiveZeroRuns }} empty run{{ h.consecutiveZeroRuns === 1 ? '' : 's' }} in a row
+              }
+            </p>
+            <p class="admin__row-time">Last produced articles: {{ lastSuccess(h) }}</p>
+            @if (h.lastError) {
+              <p class="admin__row-error">{{ h.lastError }}</p>
+            }
+          </div>
+        </div>
+      }
+    }
+
     <p class="eyebrow admin__section">Access requests</p>
 
     @if (loading() && !pending().length) {

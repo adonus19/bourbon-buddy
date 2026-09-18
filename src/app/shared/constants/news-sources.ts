@@ -22,4 +22,5 @@ export const NEWS_SOURCE_NAMES: string[] = [
   'Bourbon Guy',
   'Bourbon & Banter',
   'The Daily Pour',
+  'Breaking Bourbon',
 ];

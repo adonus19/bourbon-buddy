@@ -8,7 +8,7 @@ import {
 import { ToastController } from '@ionic/angular';
 
 import { AdminAccessService } from '../../core/services/admin-access.service';
-import { AllowlistEntry, UserProfile } from '../../models';
+import { AllowlistEntry, SourceHealth, UserProfile } from '../../models';
 import { relativeTime } from '../../shared/utils/relative-time';
 
 /** Validators.email on the TRIMMED value — pasted emails often carry spaces. */
@@ -40,6 +40,8 @@ export class AdminPage {
 
   readonly pending = signal<UserProfile[]>([]);
   readonly entries = signal<AllowlistEntry[]>([]);
+  /** Per-source ingest health (BB-245), worst-first. */
+  readonly health = signal<SourceHealth[]>([]);
   readonly loading = signal(false);
   /** uid (or allowlist doc id) of the row with an action in flight. */
   readonly busyId = signal<string | null>(null);
@@ -57,12 +59,14 @@ export class AdminPage {
   async reload(refresher?: { complete: () => void }): Promise<void> {
     this.loading.set(true);
     try {
-      const [pending, entries] = await Promise.all([
+      const [pending, entries, health] = await Promise.all([
         this.admin.pendingUsers(),
         this.admin.allowlist(),
+        this.admin.sourceHealth(),
       ]);
       this.pending.set(pending);
       this.entries.set(entries);
+      this.health.set(health);
     } catch {
       await this.present("Couldn't load. Pull to retry.");
     } finally {
@@ -155,5 +159,22 @@ export class AdminPage {
       position: 'top',
     });
     await t.present();
+  }
+
+  /**
+   * A source is "stale" after two consecutive empty runs (BB-245). One empty
+   * run is normal — a publisher can simply not post in six hours. Two in a row
+   * is the shape a dead feed makes, which is what happened to The Spirits
+   * Business for months before anyone noticed.
+   */
+  isStale(h: SourceHealth): boolean {
+    return h.consecutiveZeroRuns >= 2 || !!h.lastError;
+  }
+
+  /** Human "last produced articles" stamp, or an honest never. */
+  lastSuccess(h: SourceHealth): string {
+    return h.lastSuccessAt
+      ? relativeTime(h.lastSuccessAt.toDate())
+      : 'never produced articles';
   }
 }

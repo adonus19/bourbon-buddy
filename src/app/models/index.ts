@@ -17,3 +17,4 @@ export * from './app-notification.model';
 export * from './shared-item.model';
 export * from './access.model';
 export * from './store-note.model';
+export * from './source-health.model';

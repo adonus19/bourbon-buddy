@@ -20,6 +20,12 @@ import {
 } from "./parse";
 import { fetchOgImage } from "./og-image";
 import { fetchWpJsonItems, WpFeedItem } from "./wp-json";
+import {
+  fetchArticlePage,
+  fetchSitemap,
+  selectCandidates,
+  SitemapFeedItem,
+} from "./sitemap";
 import { htmlToText } from "../ai/article-text";
 
 const MAX_AGE_DAYS = 90;
@@ -43,6 +49,17 @@ const OG_IMAGE_MAX_PER_SOURCE = 25;
 // stored alongside the card fields is ~75KB per 25-article page that the UI
 // never renders. Rules deny the client this collection entirely.
 const BODIES = "articleBodies";
+// Per-source ingest health (BB-245). Written every run so a source that quietly
+// stops producing is visible in the app, not just buried in Cloud Logging.
+const HEALTH = "sourceHealth";
+// URLs we fetched and deliberately did not store (BB-245). Without this, a page
+// that yields no article is invisible to the existence check and gets re-fetched
+// on EVERY run: Breaking Bourbon re-touches old reviews, so ~13 of 34 candidates
+// in the lastmod window are years-old articles the 90-day filter drops. The
+// marker is what makes "only fetch what's new" actually true.
+const SKIPPED = "newsSkipped";
+// Page fetches for a sitemap source run at the same width as the og:image pool.
+const SITEMAP_CONCURRENCY = 4;
 
 type FeedItem = Parser.Item & {
   enclosure?: { url?: string };
@@ -67,7 +84,7 @@ const parser: Parser<unknown, FeedItem> = new Parser({
 
 /** Feed items that survived the link/age filter, with their parsed date. */
 interface FreshItem {
-  item: FeedItem | WpFeedItem;
+  item: FeedItem | WpFeedItem | SitemapFeedItem;
   link: string;
   published: Date | null;
 }
@@ -116,16 +133,95 @@ async function resolveThumbnails(
   return thumbs;
 }
 
+/**
+ * Items for a "sitemap" source (BB-245). The sitemap is one cheap request; a
+ * page fetch happens ONLY for URLs we don't already hold, which is what keeps
+ * this affordable — an edited old review re-enters the candidate list on every
+ * run and costs a document lookup, not a download. Steady state for Breaking
+ * Bourbon is well under one page fetch per cycle.
+ */
+async function fetchSitemapItems(
+  db: FirebaseFirestore.Firestore,
+  source: RssSource
+): Promise<SitemapFeedItem[]> {
+  const cfg = source.sitemap;
+  if (!cfg) {
+    throw new Error(`source ${source.name} is kind "sitemap" with no config`);
+  }
+  const entries = await fetchSitemap(source.url);
+  const candidates = selectCandidates(entries, {
+    pathPrefix: cfg.pathPrefix,
+    windowDays: cfg.windowDays,
+  });
+
+  // Spend a request only on URLs we have neither stored nor already rejected.
+  const unseen: string[] = [];
+  for (const c of candidates) {
+    const id = urlHash(c.loc);
+    const [article, skipped] = await Promise.all([
+      db.collection("newsArticles").doc(id).get(),
+      db.collection(SKIPPED).doc(id).get(),
+    ]);
+    if (!article.exists && !skipped.exists) {
+      unseen.push(c.loc);
+    }
+  }
+
+  const now = Date.now();
+  const items: SitemapFeedItem[] = [];
+  await pool(
+    unseen.slice(0, cfg.maxFetchesPerRun),
+    SITEMAP_CONCURRENCY,
+    async (url) => {
+      const item = await fetchArticlePage(url);
+      // No Article JSON-LD, or no usable date — nothing we can store.
+      if (!item) {
+        await markSkipped(db, url, source.name, "no-article-data");
+        return;
+      }
+      // Recent lastmod, old article: the page was edited or the sitemap was
+      // regenerated. The ingest loop's 90-day filter would drop it anyway; mark
+      // it so we never pay for the page again.
+      const published = publishedAt(item);
+      if (published && now - published.getTime() > MAX_AGE_MS) {
+        await markSkipped(db, url, source.name, "older-than-max-age");
+        return;
+      }
+      items.push(item);
+    }
+  );
+  return items;
+}
+
+/** Remember that a URL was fetched and produced nothing worth storing. */
+async function markSkipped(
+  db: FirebaseFirestore.Firestore,
+  url: string,
+  sourceName: string,
+  reason: string
+): Promise<void> {
+  try {
+    await db
+      .collection(SKIPPED)
+      .doc(urlHash(url))
+      .set({ url, sourceName, reason, skippedAt: Timestamp.now() });
+  } catch (err) {
+    logger.warn(`Failed to mark ${url} skipped`, err); // worst case: refetched
+  }
+}
+
 async function ingestSource(
   db: FirebaseFirestore.Firestore,
   source: RssSource
 ): Promise<number> {
   // BB-240: a source is either an XML feed or a WordPress REST endpoint; both
   // yield the same item shape, so everything downstream is identical.
-  const items: (FeedItem | WpFeedItem)[] =
+  const items: (FeedItem | WpFeedItem | SitemapFeedItem)[] =
     source.kind === "wp-json"
       ? await fetchWpJsonItems(source.url)
-      : (await parser.parseURL(source.url)).items ?? [];
+      : source.kind === "sitemap"
+        ? await fetchSitemapItems(db, source)
+        : (await parser.parseURL(source.url)).items ?? [];
   const now = Date.now();
   let written = 0;
 
@@ -203,6 +299,48 @@ async function ingestSource(
   return written;
 }
 
+/**
+ * Per-source ingest health (BB-245).
+ *
+ * The zero-item warning added in BB-240 only reaches Google Cloud Logging, which
+ * is pull, not push — findable once you already suspect something, and buried
+ * among audit-log noise. This writes the same signal somewhere the owner
+ * actually looks (the admin screen), and keeps the two facts a log line can't:
+ * WHICH source and SINCE WHEN.
+ *
+ * `consecutiveZeroRuns` uses increment() so it needs no read; a run that
+ * produces articles resets it and stamps lastSuccessAt. Server-only — rules
+ * deny clients everything except an admin read.
+ */
+async function recordHealth(
+  db: FirebaseFirestore.Firestore,
+  name: string,
+  count: number | null,
+  error: string | null
+): Promise<void> {
+  const healthy = count !== null && count > 0;
+  try {
+    await db
+      .collection(HEALTH)
+      .doc(name)
+      .set(
+        {
+          name,
+          lastRunAt: Timestamp.now(),
+          itemCount: count ?? 0,
+          lastError: error,
+          ...(healthy
+            ? { lastSuccessAt: Timestamp.now(), consecutiveZeroRuns: 0 }
+            : { consecutiveZeroRuns: FieldValue.increment(1) }),
+        },
+        { merge: true }
+      );
+  } catch (err) {
+    // Health bookkeeping must never take the ingest down with it.
+    logger.error(`Failed to record health for ${name}`, err);
+  }
+}
+
 export const fetchRssFeeds = onSchedule(
   { schedule: "every 6 hours", timeoutSeconds: 300, memory: "256MiB" },
   async () => {
@@ -210,19 +348,24 @@ export const fetchRssFeeds = onSchedule(
     const results = await Promise.allSettled(
       RSS_SOURCES.map((s) => ingestSource(db, s))
     );
-    results.forEach((r, i) => {
-      const name = RSS_SOURCES[i].name;
-      if (r.status === "rejected") {
-        logger.error(`Failed ${name}:`, r.reason);
-      } else if (r.value === 0) {
-        // BB-240: a source can rot for months while still "succeeding" —
-        // Promise.allSettled hides it and an INFO line reads like a normal run.
-        // Zero items from a live publisher means the source needs looking at.
-        logger.warn(`Fetched ${name}: 0 articles — source may be dead`);
-      } else {
-        logger.info(`Fetched ${name}: ${r.value} articles`);
-      }
-    });
+    await Promise.all(
+      results.map((r, i) => {
+        const name = RSS_SOURCES[i].name;
+        if (r.status === "rejected") {
+          logger.error(`Failed ${name}:`, r.reason);
+          return recordHealth(db, name, null, String(r.reason).slice(0, 500));
+        }
+        if (r.value === 0) {
+          // BB-240: a source can rot for months while still "succeeding" —
+          // Promise.allSettled hides it and an INFO line reads like a normal
+          // run. Zero items from a live publisher means it needs looking at.
+          logger.warn(`Fetched ${name}: 0 articles — source may be dead`);
+        } else {
+          logger.info(`Fetched ${name}: ${r.value} articles`);
+        }
+        return recordHealth(db, name, r.value, null);
+      })
+    );
   }
 );
 
@@ -254,7 +397,30 @@ export const cleanupOldArticles = onSchedule(
         break;
       }
     }
-    logger.info(`cleanupOldArticles removed ${deleted} articles`);
+    // Skip markers (BB-245) outlive their usefulness once the URL has fallen out
+    // of every source's lastmod window; drop them on the same monthly sweep so
+    // they can't grow without bound.
+    let skipsDropped = 0;
+    for (;;) {
+      const snap = await db
+        .collection(SKIPPED)
+        .where("skippedAt", "<", cutoff)
+        .limit(400)
+        .get();
+      if (snap.empty) {
+        break;
+      }
+      const batch = db.batch();
+      snap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      skipsDropped += snap.size;
+      if (snap.size < 400) {
+        break;
+      }
+    }
+    logger.info(
+      `cleanupOldArticles removed ${deleted} articles, ${skipsDropped} skip markers`
+    );
   }
 );
 
